@@ -256,7 +256,13 @@
   <div class="modal" id="modal"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
+// ---------- BACKEND (Supabase) ----------
+const SUPABASE_URL="https://ucciqthwxnlkjalwlhvh.supabase.co";
+const SUPABASE_KEY="sb_publishable_bgkssbRBOQ-kr1HTA79HMg_VUBmAwcp"; // publishable key — safe to ship client-side, data is guarded by RLS
+const sb=(typeof window!=="undefined"&&window.supabase)?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+
 // ---------- DATA ----------
 const STORES=[
   {id:"asda",name:"Asda",dist:"0.9 mi",fee:3.00,eta:"Today 19:00–20:00",mult:0.88,search:q=>`https://groceries.asda.com/search/${encodeURIComponent(q)}`},
@@ -305,7 +311,32 @@ function load(){
   try{const raw=localStorage.getItem("plentry_v1");if(raw)return Object.assign(JSON.parse(JSON.stringify(DEFAULTS)),JSON.parse(raw));}catch(e){}
   return JSON.parse(JSON.stringify(DEFAULTS));
 }
-function save(){try{localStorage.setItem("plentry_v1",JSON.stringify(S));}catch(e){}}
+let cloudTimer=null;
+function save(){
+  try{localStorage.setItem("plentry_v1",JSON.stringify(S));}catch(e){}
+  if(sb&&S.user&&S.user.id){clearTimeout(cloudTimer);cloudTimer=setTimeout(pushCloudState,800);}
+}
+async function pushCloudState(){
+  if(!sb||!S.user||!S.user.id)return;
+  try{
+    await sb.from("profiles").upsert({
+      id:S.user.id,email:S.user.email,name:S.user.name,
+      state:{prefs:S.prefs,pantry:S.pantry,planNames:S.planNames,orders:S.orders,onboarded:S.onboarded},
+      updated_at:new Date().toISOString(),
+    });
+  }catch(e){/* offline — localStorage still has it */}
+}
+async function loadCloudState(user){
+  S.user={id:user.id,email:user.email,name:(user.user_metadata&&user.user_metadata.name)||user.email.split("@")[0]};
+  try{
+    const {data}=await sb.from("profiles").select("state").eq("id",user.id).maybeSingle();
+    if(data&&data.state&&data.state.prefs){
+      Object.assign(S,{prefs:data.state.prefs,pantry:data.state.pantry||S.pantry,
+        planNames:data.state.planNames||[],orders:data.state.orders||[],onboarded:!!data.state.onboarded});
+    }
+  }catch(e){}
+  save();
+}
 const plan=()=>S.planNames.map(n=>RECIPES.find(r=>r.name===n)).filter(Boolean);
 
 // ---------- AUTH ----------
@@ -319,22 +350,53 @@ function toggleAuthMode(){
   document.getElementById("auth-switch").textContent=authMode==="signup"?"Log in":"Sign up";
   document.getElementById("auth-err").textContent="";
 }
-function submitAuth(){
+async function submitAuth(){
   const name=document.getElementById("su-name").value.trim();
   const email=document.getElementById("su-email").value.trim().toLowerCase();
   const pass=document.getElementById("su-pass").value;
   const err=document.getElementById("auth-err");
+  const btn=document.getElementById("auth-btn");
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){err.textContent="Enter a valid email address.";return;}
   if(pass.length<6){err.textContent="Password must be at least 6 characters.";return;}
   if(authMode==="signup"&&!name){err.textContent="Tell us your name.";return;}
-  // Beta: client-side account. Real auth (Supabase) ships with the backend.
-  S.user={name:name||email.split("@")[0],email};
-  save();
+  err.textContent="";
+  if(sb){
+    btn.disabled=true;btn.textContent="One sec…";
+    try{
+      if(authMode==="signup"){
+        const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
+        if(error)throw error;
+        if(!data.session){ // email confirmation is on
+          err.textContent="";
+          openModal(`<h2 style="margin-bottom:6px">📬 Check your inbox</h2>
+            <p class="sub">We sent a confirmation link to <b style="color:var(--text)">${email}</b>. Click it, then log in here.</p>
+            <button class="btn" style="width:100%" onclick="closeModal();toggleAuthMode()">Got it</button>`);
+          btn.disabled=false;btn.textContent="Sign up free →";return;
+        }
+        await loadCloudState(data.session.user);
+      }else{
+        const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+        if(error)throw error;
+        await loadCloudState(data.user);
+      }
+    }catch(e){
+      err.textContent=e.message||"Something went wrong — try again.";
+      btn.disabled=false;btn.textContent=authMode==="signup"?"Sign up free →":"Log in →";return;
+    }
+    btn.disabled=false;
+  }else{
+    // offline/local fallback
+    S.user={name:name||email.split("@")[0],email};save();
+  }
   document.getElementById("scr-landing").classList.remove("active");
   if(S.onboarded){enterApp();}
   else{document.getElementById("scr-onboard").classList.add("active");setPill("Setup");}
 }
-function signOut(){S.user=null;save();location.reload();}
+async function signOut(){
+  if(sb){try{await sb.auth.signOut();}catch(e){}}
+  S.user=null;try{localStorage.removeItem("plentry_v1");}catch(e){}
+  location.reload();
+}
 
 // ---------- ONBOARDING ----------
 function chips(elId,items,sel,single,onTap){
@@ -603,11 +665,20 @@ function closeModal(){document.getElementById("modal-bg").classList.remove("open
 chips("ob-diet",DIETS,S.prefs.diet,true,"toggleChip");
 chips("ob-cuisine",CUISINES,S.prefs.cuisines,false,"toggleChip");
 chips("ob-avoid",AVOIDS,S.prefs.avoid,false,"toggleChip");
-if(S.user){
-  document.getElementById("scr-landing").classList.remove("active");
-  if(S.onboarded){enterApp();}
-  else{document.getElementById("scr-onboard").classList.add("active");setPill("Setup");}
-}
+(async function init(){
+  if(sb){
+    try{
+      const {data}=await sb.auth.getSession();
+      if(data&&data.session){await loadCloudState(data.session.user);}
+      else{S.user=null;}
+    }catch(e){}
+  }
+  if(S.user){
+    document.getElementById("scr-landing").classList.remove("active");
+    if(S.onboarded){enterApp();}
+    else{document.getElementById("scr-onboard").classList.add("active");setPill("Setup");}
+  }
+})();
 </script>
 </body>
 </html>

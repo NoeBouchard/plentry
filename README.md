@@ -2,9 +2,10 @@
 
 **Your kitchen on autopilot.** AI meal planning that compares basket prices across local UK supermarkets (Tesco, Sainsbury's, Asda, Waitrose) and orders what your pantry is missing — delivered by the store itself. No boxes, no packing, no mark-ups.
 
-## Status: MVP (static prototype)
+## Status: MVP (static front-end + Supabase)
 
-- Signup / login (client-side beta auth — Supabase planned)
+- Signup / login via Supabase Auth (falls back to local-only mode if unreachable)
+- User profiles & app state synced to Postgres (`profiles` table, RLS-guarded JSONB) — run `supabase/schema.sql` once in the Supabase SQL Editor
 - 30-second onboarding: postcode, household, budget, diet, cuisines
 - AI weekly meal plan (rule-based scorer over recipe DB — LLM planned)
 - Pantry tracking with low-stock alerts; auto-replenishment into basket
