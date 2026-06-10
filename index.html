@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plentry — Your kitchen on autopilot</title>
+<meta name="description" content="AI meal planning that compares prices across your local supermarkets and orders what your pantry is missing. No boxes, no packing, no mark-ups.">
+<style>
+  :root{
+    --bg:#0f1410; --card:#161d17; --card2:#1d261e; --line:#2a352b;
+    --text:#e8efe8; --muted:#94a596; --green:#4ade80; --green-d:#22c55e;
+    --amber:#fbbf24; --red:#f87171; --radius:14px;
+    font-size:15px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .app{max-width:960px;margin:0 auto;padding:0 16px 90px}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 10px}
+  .logo{font-size:1.4rem;font-weight:800;letter-spacing:-.5px}
+  .logo span{color:var(--green)}
+  .pill{background:var(--card2);border:1px solid var(--line);border-radius:99px;padding:5px 12px;font-size:.78rem;color:var(--muted)}
+  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(15,20,16,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:none;justify-content:center;gap:4px;padding:8px;z-index:50}
+  nav.show{display:flex}
+  nav button{flex:1;max-width:150px;background:none;border:none;color:var(--muted);font-size:.74rem;padding:8px 4px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav button .ico{font-size:1.2rem}
+  nav button.active{color:var(--green);background:var(--card2)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+  h1{font-size:1.9rem;line-height:1.15;letter-spacing:-.5px;margin-bottom:10px}
+  h1 em{color:var(--green);font-style:normal}
+  h2{font-size:1.15rem;margin-bottom:4px}
+  h3{font-size:.95rem;margin-bottom:8px}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:14px}
+  .btn{background:var(--green-d);color:#06230f;border:none;border-radius:10px;padding:11px 18px;font-weight:700;font-size:.92rem;cursor:pointer;transition:transform .08s;text-decoration:none;display:inline-block}
+  .btn:active{transform:scale(.97)}
+  .btn.ghost{background:var(--card2);color:var(--text);border:1px solid var(--line)}
+  .btn.sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
+  .btn:disabled{opacity:.45;cursor:default}
+  .row{display:flex;gap:10px;align-items:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  input,select{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px;width:100%;font-size:.9rem}
+  label{font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px}
+  .field{margin-bottom:10px}
+  .err{color:var(--red);font-size:.8rem;margin-top:6px;min-height:1em}
+  .chip{display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:99px;padding:6px 13px;font-size:.82rem;cursor:pointer;margin:0 6px 6px 0;user-select:none}
+  .chip.on{background:var(--green-d);color:#06230f;border-color:var(--green-d);font-weight:700}
+  .meal{display:flex;gap:12px;align-items:center;padding:12px;background:var(--card2);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+  .meal .emoji{font-size:1.8rem;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--card);border-radius:10px;flex-shrink:0}
+  .meal .info{flex:1;min-width:0}
+  .meal .name{font-weight:700;font-size:.92rem}
+  .meal .meta{color:var(--muted);font-size:.76rem;margin-top:2px}
+  .tag{display:inline-block;font-size:.68rem;padding:2px 8px;border-radius:99px;background:rgba(74,222,128,.12);color:var(--green);margin-right:4px}
+  .tag.have{background:rgba(251,191,36,.12);color:var(--amber)}
+  .tag.grey{background:var(--card);color:var(--muted)}
+  .swap{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:.95rem}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;padding:8px 6px;border-bottom:1px solid var(--line)}
+  td{padding:9px 6px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:none}
+  .right{text-align:right}
+  .store{border:1.5px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--card2)}
+  .store.best{border-color:var(--green)}
+  .store .sname{font-weight:700}
+  .store .sdetail{color:var(--muted);font-size:.78rem;margin-top:2px}
+  .price{font-size:1.15rem;font-weight:800}
+  .badge{font-size:.66rem;font-weight:800;background:var(--green);color:#06230f;border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+  .stock-bar{height:6px;background:var(--card);border-radius:99px;overflow:hidden;margin-top:6px}
+  .stock-bar i{display:block;height:100%;border-radius:99px}
+  .pantry-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .pantry-item:last-child{border-bottom:none}
+  .pantry-item .pi-name{flex:1;font-size:.88rem}
+  .pantry-item .pi-qty{color:var(--muted);font-size:.78rem;width:84px;text-align:right}
+  .stepper{display:flex;gap:2px}
+  .stepper button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+  .alert{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:var(--amber);border-radius:10px;padding:10px 12px;font-size:.82rem;margin-bottom:12px}
+  .ok{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);color:var(--green)}
+  .stat{flex:1;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stat .v{font-size:1.25rem;font-weight:800}
+  .stat .k{color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  .screen{display:none;animation:fade .18s ease}
+  .screen.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .steps{display:flex;gap:6px;margin-bottom:18px}
+  .steps i{flex:1;height:4px;border-radius:99px;background:var(--line)}
+  .steps i.done{background:var(--green)}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;z-index:100}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:18px 18px 0 0;padding:20px;width:100%;max-width:960px;max-height:80vh;overflow:auto}
+  .ai-line{display:flex;gap:8px;align-items:flex-start;font-size:.84rem;color:var(--muted);padding:8px 0}
+  .ai-line .dot{color:var(--green)}
+  .feature{display:flex;gap:12px;align-items:flex-start;padding:10px 0}
+  .feature .f-ico{font-size:1.4rem}
+  .feature b{display:block;font-size:.9rem}
+  .feature p{color:var(--muted);font-size:.8rem}
+  .item-link{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:.86rem}
+  .item-link:last-child{border-bottom:none}
+  .item-link a{color:var(--green);text-decoration:none;font-weight:600;font-size:.8rem}
+  .timeline{display:flex;gap:0;margin:12px 0 4px}
+  .tstep{flex:1;text-align:center;font-size:.68rem;color:var(--muted);position:relative;padding-top:16px}
+  .tstep::before{content:"";position:absolute;top:4px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:var(--line)}
+  .tstep.done{color:var(--green)}
+  .tstep.done::before{background:var(--green)}
+  @media(max-width:560px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">plentry<span>.</span></div>
+    <div class="pill" id="hdr-pill">Welcome</div>
+  </header>
+
+  <!-- LANDING / SIGNUP -->
+  <div class="screen active" id="scr-landing">
+    <div class="card" style="padding:26px 20px">
+      <h1>Your kitchen,<br>on <em>autopilot</em>.</h1>
+      <p class="sub" style="font-size:.95rem">Plentry plans your meals with AI, compares the basket price at every supermarket near you, and orders what your pantry is missing — delivered by the store itself.</p>
+      <div class="feature"><div class="f-ico">🧠</div><div><b>AI weekly plans</b><p>Built around your tastes, budget and what's already in your cupboard.</p></div></div>
+      <div class="feature"><div class="f-ico">💸</div><div><b>Every store, one price check</b><p>Tesco, Sainsbury's, Asda, Waitrose — same basket, best price, every week.</p></div></div>
+      <div class="feature"><div class="f-ico">📦</div><div><b>No boxes, no packing</b><p>Normal groceries from local stores. Cheaper than meal kits, far less waste.</p></div></div>
+    </div>
+    <div class="card">
+      <h2 id="auth-title">Create your account</h2>
+      <p class="sub" id="auth-sub">Free while in beta. No card needed.</p>
+      <div class="field" id="f-name"><label>Name</label><input id="su-name" placeholder="Noe"></div>
+      <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com"></div>
+      <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="••••••••"></div>
+      <div class="err" id="auth-err"></div>
+      <button class="btn" style="width:100%" id="auth-btn" onclick="submitAuth()">Sign up free →</button>
+      <p class="sub" style="margin:12px 0 0;text-align:center">
+        <span id="auth-switch-label">Already have an account?</span>
+        <a href="#" style="color:var(--green)" onclick="toggleAuthMode();return false" id="auth-switch">Log in</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- ONBOARDING -->
+  <div class="screen" id="scr-onboard">
+    <div class="steps"><i class="done"></i><i id="st2"></i><i id="st3"></i></div>
+    <div class="card" id="ob-1">
+      <h2>Set up your kitchen</h2>
+      <p class="sub">30 seconds — the planner uses this for every week.</p>
+      <div class="grid2">
+        <div><label>Postcode</label><input id="ob-postcode" value="E2 8AA" placeholder="e.g. E2 8AA"></div>
+        <div><label>Household size</label><select id="ob-size"><option>1</option><option selected>2</option><option>3</option><option>4+</option></select></div>
+        <div><label>Weekly food budget (£)</label><input id="ob-budget" type="number" value="60"></div>
+        <div><label>Dinners to plan / week</label><select id="ob-meals"><option>3</option><option>4</option><option selected>5</option><option>7</option></select></div>
+      </div>
+      <div style="margin-top:14px"><button class="btn" onclick="obNext(2)">Continue →</button></div>
+    </div>
+    <div class="card" id="ob-2" style="display:none">
+      <h2>Tastes & constraints</h2>
+      <p class="sub">Tap everything that applies — the planner respects all of it.</p>
+      <h3>Diet</h3>
+      <div id="ob-diet"></div>
+      <h3 style="margin-top:12px">Cuisines you love</h3>
+      <div id="ob-cuisine"></div>
+      <h3 style="margin-top:12px">Hard avoid</h3>
+      <div id="ob-avoid"></div>
+      <div style="margin-top:14px"><button class="btn" onclick="obNext(3)">Continue →</button></div>
+    </div>
+    <div class="card" id="ob-3" style="display:none">
+      <h2>Stores near you</h2>
+      <p class="sub" id="ob-stores-sub"></p>
+      <div id="ob-stores"></div>
+      <div style="margin-top:14px"><button class="btn" onclick="finishOnboarding()">⚡ Generate my week</button></div>
+    </div>
+  </div>
+
+  <!-- PLAN -->
+  <div class="screen" id="scr-plan">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><h2>This week's plan</h2><p class="sub" style="margin:0">AI-built around your pantry, budget & tastes</p></div>
+        <button class="btn ghost sm" onclick="regeneratePlan()">↻ Re-plan</button>
+      </div>
+      <div id="ai-reasoning" style="margin:10px 0 4px"></div>
+    </div>
+    <div id="plan-list"></div>
+    <div class="card">
+      <div class="row">
+        <div class="stat"><div class="v" id="stat-cost">—</div><div class="k">est. basket</div></div>
+        <div class="stat"><div class="v" id="stat-pantry">—</div><div class="k">from pantry</div></div>
+        <div class="stat"><div class="v" id="stat-serv">—</div><div class="k">per serving</div></div>
+      </div>
+      <button class="btn" style="width:100%;margin-top:12px" onclick="goShop()">Build shopping basket →</button>
+    </div>
+  </div>
+
+  <!-- PANTRY -->
+  <div class="screen" id="scr-pantry">
+    <div class="card">
+      <h2>Pantry</h2>
+      <p class="sub">Plentry tracks this automatically from your orders & cooked meals. Adjust anything that drifts.</p>
+      <div id="pantry-alerts"></div>
+      <div id="pantry-list"></div>
+    </div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="screen" id="scr-shop">
+    <div class="card">
+      <h2>Shopping basket</h2>
+      <p class="sub">Only what the plan needs minus what you already have.</p>
+      <table id="shop-table"></table>
+    </div>
+    <div class="card">
+      <h2>Best price near you</h2>
+      <p class="sub">Same basket, priced at each store delivering to you. Tap one, confirm, done.</p>
+      <div id="store-compare"></div>
+      <div class="alert ok" id="savings-line" style="display:none"></div>
+      <button class="btn" style="width:100%" id="order-btn" onclick="confirmOrder()" disabled>Select a store to order</button>
+    </div>
+  </div>
+
+  <!-- ORDERS -->
+  <div class="screen" id="scr-orders">
+    <div class="card"><h2>Orders</h2><p class="sub">Confirmed baskets are sent straight to your chosen store's delivery.</p><div id="orders-list"><p class="sub">No orders yet. Build a basket from your plan.</p></div></div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="screen" id="scr-profile">
+    <div class="card">
+      <h2 id="pr-hello">Profile</h2>
+      <p class="sub" id="pr-email"></p>
+      <div class="grid2">
+        <div><label>Postcode</label><input id="pr-postcode"></div>
+        <div><label>Household size</label><select id="pr-size"><option>1</option><option>2</option><option>3</option><option>4+</option></select></div>
+        <div><label>Weekly budget (£)</label><input id="pr-budget" type="number"></div>
+        <div><label>Dinners / week</label><select id="pr-meals"><option>3</option><option>4</option><option>5</option><option>7</option></select></div>
+      </div>
+      <h3 style="margin-top:14px">Diet</h3><div id="pr-diet"></div>
+      <h3 style="margin-top:10px">Cuisines</h3><div id="pr-cuisine"></div>
+      <h3 style="margin-top:10px">Hard avoid</h3><div id="pr-avoid"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" onclick="saveProfile()">Save changes</button>
+        <button class="btn ghost" onclick="signOut()">Sign out</button>
+      </div>
+      <div class="err ok" id="pr-saved" style="color:var(--green)"></div>
+    </div>
+    <div class="card">
+      <h3>Beta notes</h3>
+      <p class="sub" style="margin:0">Prices are live estimates; final price confirms at the store. Ordering currently hands off to the store's own checkout — full auto-ordering lands with our retailer integrations.</p>
+    </div>
+  </div>
+
+  <nav id="main-nav">
+    <button data-s="plan" class="active" onclick="nav('plan')"><span class="ico">🍳</span>Plan</button>
+    <button data-s="pantry" onclick="nav('pantry')"><span class="ico">🥫</span>Pantry</button>
+    <button data-s="shop" onclick="nav('shop')"><span class="ico">🛒</span>Basket</button>
+    <button data-s="orders" onclick="nav('orders')"><span class="ico">📦</span>Orders</button>
+    <button data-s="profile" onclick="nav('profile')"><span class="ico">👤</span>Profile</button>
+  </nav>
+</div>
+
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+// ---------- DATA ----------
+const STORES=[
+  {id:"asda",name:"Asda",dist:"0.9 mi",fee:3.00,eta:"Today 19:00–20:00",mult:0.88,search:q=>`https://groceries.asda.com/search/${encodeURIComponent(q)}`},
+  {id:"tesco",name:"Tesco",dist:"0.7 mi",fee:3.00,eta:"Today 19:00–20:00",mult:1.00,search:q=>`https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(q)}`},
+  {id:"sains",name:"Sainsbury's",dist:"1.1 mi",fee:3.50,eta:"Tomorrow 10:00–11:00",mult:1.07,search:q=>`https://www.sainsburys.co.uk/gol-ui/SearchResults/${encodeURIComponent(q)}`},
+  {id:"wait",name:"Waitrose",dist:"1.6 mi",fee:4.00,eta:"Tomorrow 12:00–13:00",mult:1.34,search:q=>`https://www.waitrose.com/ecom/shop/search?&searchTerm=${encodeURIComponent(q)}`},
+];
+const INGREDIENTS={
+  "chicken thighs":{unit:"500g",price:3.80},"salmon fillet":{unit:"2 pc",price:4.50},
+  "minced beef":{unit:"500g",price:3.95},"halloumi":{unit:"225g",price:2.75},
+  "eggs":{unit:"6 pk",price:1.55},"chickpeas":{unit:"400g tin",price:0.65},
+  "rice":{unit:"1kg",price:1.45},"spaghetti":{unit:"500g",price:0.95},
+  "tortillas":{unit:"8 pk",price:1.10},"coconut milk":{unit:"400ml",price:1.05},
+  "curry paste":{unit:"jar",price:1.80},"passata":{unit:"500g",price:0.70},
+  "onions":{unit:"3 pk",price:0.85},"garlic":{unit:"bulb",price:0.35},
+  "bell peppers":{unit:"3 pk",price:1.60},"broccoli":{unit:"head",price:0.90},
+  "spinach":{unit:"240g",price:1.30},"tomatoes":{unit:"6 pk",price:1.20},
+  "lemons":{unit:"3 pk",price:1.00},"potatoes":{unit:"1kg",price:1.15},
+  "olive oil":{unit:"500ml",price:3.50},"feta":{unit:"200g",price:1.95},
+  "yoghurt":{unit:"500g",price:1.25},"parmesan":{unit:"80g",price:1.85},
+};
+const RECIPES=[
+  {name:"Chicken & chickpea curry",emoji:"🍛",time:30,cuisine:"Indian",diet:[],ing:["chicken thighs","chickpeas","curry paste","coconut milk","onions","garlic","rice","spinach"]},
+  {name:"Salmon traybake",emoji:"🐟",time:25,cuisine:"Modern",diet:["pescatarian"],ing:["salmon fillet","potatoes","broccoli","lemons","olive oil","garlic"]},
+  {name:"Beef ragù spaghetti",emoji:"🍝",time:35,cuisine:"Italian",diet:[],ing:["minced beef","spaghetti","passata","onions","garlic","parmesan"]},
+  {name:"Halloumi fajitas",emoji:"🌮",time:20,cuisine:"Mexican",diet:["vegetarian"],ing:["halloumi","tortillas","bell peppers","onions","yoghurt","lemons"]},
+  {name:"Shakshuka",emoji:"🍳",time:25,cuisine:"Middle Eastern",diet:["vegetarian"],ing:["eggs","passata","bell peppers","onions","garlic","feta"]},
+  {name:"Chickpea & spinach curry",emoji:"🥘",time:20,cuisine:"Indian",diet:["vegan","vegetarian"],ing:["chickpeas","curry paste","coconut milk","spinach","onions","rice","tomatoes"]},
+  {name:"Greek chicken bowls",emoji:"🥗",time:30,cuisine:"Greek",diet:[],ing:["chicken thighs","rice","tomatoes","feta","yoghurt","lemons","garlic"]},
+  {name:"Veggie spaghetti pomodoro",emoji:"🍅",time:20,cuisine:"Italian",diet:["vegetarian","vegan"],ing:["spaghetti","passata","tomatoes","garlic","olive oil","parmesan"]},
+];
+const DIETS=["none","vegetarian","pescatarian","vegan"];
+const CUISINES=["Italian","Indian","Mexican","Greek","Middle Eastern","Modern"];
+const AVOIDS=["beef","fish","dairy-heavy","spicy"];
+
+// ---------- STATE ----------
+const DEFAULTS={
+  user:null, // {name,email}
+  prefs:{diet:[],cuisines:["Italian","Indian"],avoid:[],meals:5,size:"2",budget:60,postcode:"E2 8AA"},
+  pantry:{"rice":0.8,"olive oil":0.5,"spaghetti":1,"garlic":1,"curry paste":0.3,"eggs":0.5,"onions":0.2,"passata":1},
+  planNames:[], orders:[], onboarded:false,
+};
+let S=load();
+let basket=[],chosenStore=null,authMode="signup";
+function load(){
+  try{const raw=localStorage.getItem("plentry_v1");if(raw)return Object.assign(JSON.parse(JSON.stringify(DEFAULTS)),JSON.parse(raw));}catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULTS));
+}
+function save(){try{localStorage.setItem("plentry_v1",JSON.stringify(S));}catch(e){}}
+const plan=()=>S.planNames.map(n=>RECIPES.find(r=>r.name===n)).filter(Boolean);
+
+// ---------- AUTH ----------
+function toggleAuthMode(){
+  authMode=authMode==="signup"?"login":"signup";
+  document.getElementById("auth-title").textContent=authMode==="signup"?"Create your account":"Welcome back";
+  document.getElementById("auth-sub").textContent=authMode==="signup"?"Free while in beta. No card needed.":"Log in to your kitchen.";
+  document.getElementById("auth-btn").textContent=authMode==="signup"?"Sign up free →":"Log in →";
+  document.getElementById("f-name").style.display=authMode==="signup"?"block":"none";
+  document.getElementById("auth-switch-label").textContent=authMode==="signup"?"Already have an account?":"New here?";
+  document.getElementById("auth-switch").textContent=authMode==="signup"?"Log in":"Sign up";
+  document.getElementById("auth-err").textContent="";
+}
+function submitAuth(){
+  const name=document.getElementById("su-name").value.trim();
+  const email=document.getElementById("su-email").value.trim().toLowerCase();
+  const pass=document.getElementById("su-pass").value;
+  const err=document.getElementById("auth-err");
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){err.textContent="Enter a valid email address.";return;}
+  if(pass.length<6){err.textContent="Password must be at least 6 characters.";return;}
+  if(authMode==="signup"&&!name){err.textContent="Tell us your name.";return;}
+  // Beta: client-side account. Real auth (Supabase) ships with the backend.
+  S.user={name:name||email.split("@")[0],email};
+  save();
+  document.getElementById("scr-landing").classList.remove("active");
+  if(S.onboarded){enterApp();}
+  else{document.getElementById("scr-onboard").classList.add("active");setPill("Setup");}
+}
+function signOut(){S.user=null;save();location.reload();}
+
+// ---------- ONBOARDING ----------
+function chips(elId,items,sel,single,onTap){
+  const el=document.getElementById(elId);if(!el)return;
+  el.innerHTML=items.map(i=>`<span class="chip ${sel.includes(i)?'on':''}" onclick="${onTap}('${elId}','${i}',${single})">${i}</span>`).join("");
+}
+function toggleChip(elId,val,single){
+  const key=elId.includes("diet")?"diet":elId.includes("cuisine")?"cuisines":"avoid";
+  const arr=S.prefs[key];
+  if(single){arr.length=0;arr.push(val);}
+  else arr.includes(val)?arr.splice(arr.indexOf(val),1):arr.push(val);
+  chips(elId,key==="diet"?DIETS:key==="cuisines"?CUISINES:AVOIDS,arr,single,"toggleChip");
+  save();
+}
+function obNext(step){
+  S.prefs.postcode=document.getElementById("ob-postcode").value||"E2 8AA";
+  S.prefs.size=document.getElementById("ob-size").value;
+  S.prefs.budget=+document.getElementById("ob-budget").value||60;
+  S.prefs.meals=+document.getElementById("ob-meals").value;
+  save();
+  ["ob-1","ob-2","ob-3"].forEach((id,i)=>document.getElementById(id).style.display=step===i+1?"block":"none");
+  document.getElementById("st2").className=step>=2?"done":"";
+  document.getElementById("st3").className=step>=3?"done":"";
+  if(step===3){
+    document.getElementById("ob-stores-sub").textContent=`Found ${STORES.length} supermarkets delivering to ${S.prefs.postcode}. We'll compare every basket across all of them.`;
+    document.getElementById("ob-stores").innerHTML=STORES.map(s=>
+      `<div class="store"><div><div class="sname">${s.name}</div><div class="sdetail">${s.dist} away · delivery £${s.fee.toFixed(2)} · ${s.eta}</div></div><div style="font-size:1.3rem">✓</div></div>`).join("");
+  }
+}
+function finishOnboarding(){
+  S.onboarded=true;generatePlan();save();
+  document.getElementById("scr-onboard").classList.remove("active");
+  enterApp();
+}
+function enterApp(){
+  document.getElementById("main-nav").classList.add("show");
+  renderPlan();nav("plan");
+}
+
+// ---------- PLANNER ("AI") ----------
+function recipeOk(r){
+  const d=S.prefs.diet;
+  if(d.includes("vegan")&&!r.diet.includes("vegan"))return false;
+  if(d.includes("vegetarian")&&!(r.diet.includes("vegetarian")||r.diet.includes("vegan")))return false;
+  if(d.includes("pescatarian")&&!(r.diet.includes("pescatarian")||r.diet.includes("vegetarian")||r.diet.includes("vegan")))return false;
+  if(S.prefs.avoid.includes("beef")&&r.ing.includes("minced beef"))return false;
+  if(S.prefs.avoid.includes("fish")&&r.ing.includes("salmon fillet"))return false;
+  return true;
+}
+function scoreRecipe(r){
+  let s=Math.random()*0.5;
+  if(S.prefs.cuisines.includes(r.cuisine))s+=2;
+  s+=r.ing.filter(i=>S.pantry[i]>=0.5).length*0.8;
+  return s;
+}
+function generatePlan(){
+  const pool=RECIPES.filter(recipeOk).sort((a,b)=>scoreRecipe(b)-scoreRecipe(a));
+  S.planNames=pool.slice(0,S.prefs.meals).map(r=>r.name);
+  save();renderPlan();
+}
+function regeneratePlan(){generatePlan();}
+function swapMeal(idx){
+  const used=S.planNames;
+  const alt=RECIPES.filter(r=>recipeOk(r)&&!used.includes(r.name));
+  if(alt.length)S.planNames[idx]=alt[Math.floor(Math.random()*alt.length)].name;
+  save();renderPlan();
+}
+function needList(){
+  const need={};
+  plan().forEach(r=>r.ing.forEach(i=>{need[i]=(need[i]||0)+0.5;}));
+  const buy={};let pantryValue=0;
+  for(const [i,q] of Object.entries(need)){
+    const have=S.pantry[i]||0;
+    const short=Math.max(0,q-have);
+    pantryValue+=Math.min(have,q)*INGREDIENTS[i].price;
+    if(short>0)buy[i]=Math.ceil(short);
+  }
+  return {buy,pantryValue};
+}
+function renderPlan(){
+  const list=document.getElementById("plan-list");
+  const P=plan();
+  list.innerHTML=P.map((r,idx)=>{
+    const fromPantry=r.ing.filter(i=>(S.pantry[i]||0)>=0.5).length;
+    return `<div class="meal">
+      <div class="emoji">${r.emoji}</div>
+      <div class="info"><div class="name">${r.name}</div>
+      <div class="meta">${r.time} min · ${r.cuisine} · ${r.ing.length} ingredients</div>
+      <div style="margin-top:4px"><span class="tag">${S.prefs.size} servings</span>${fromPantry?`<span class="tag have">${fromPantry} from pantry</span>`:""}</div></div>
+      <button class="swap" title="Swap" onclick="swapMeal(${idx})">⇄</button></div>`;
+  }).join("");
+  const {buy,pantryValue}=needList();
+  const cost=Object.entries(buy).reduce((t,[i,q])=>t+q*INGREDIENTS[i].price,0);
+  document.getElementById("stat-cost").textContent="£"+cost.toFixed(2);
+  document.getElementById("stat-pantry").textContent="£"+pantryValue.toFixed(2);
+  document.getElementById("stat-serv").textContent="£"+(cost/((P.length*(+S.prefs.size.toString().replace("+","")||2))||1)).toFixed(2);
+  const reasons=[
+    `Planned ${P.length} dinners under your £${S.prefs.budget} budget`,
+    `Reused ${Object.keys(S.pantry).filter(k=>S.pantry[k]>=0.3).length} pantry items — £${pantryValue.toFixed(2)} you don't re-buy`,
+    S.prefs.cuisines.length?`Weighted towards ${S.prefs.cuisines.join(" & ")}`:`Varied cuisines for the week`,
+  ];
+  document.getElementById("ai-reasoning").innerHTML=reasons.map(r=>`<div class="ai-line"><span class="dot">●</span><span>${r}</span></div>`).join("");
+}
+
+// ---------- PANTRY ----------
+function renderPantry(){
+  const list=document.getElementById("pantry-list");
+  const entries=Object.entries(S.pantry).sort((a,b)=>a[1]-b[1]);
+  list.innerHTML=entries.map(([i,q])=>{
+    const pct=Math.min(100,q*100);
+    const col=q<0.3?"var(--red)":q<0.6?"var(--amber)":"var(--green)";
+    return `<div class="pantry-item">
+      <div class="pi-name">${i}<div class="stock-bar"><i style="width:${pct}%;background:${col}"></i></div></div>
+      <div class="pi-qty">${(q*100).toFixed(0)}% of ${INGREDIENTS[i]?INGREDIENTS[i].unit:"unit"}</div>
+      <div class="stepper"><button onclick="adjPantry('${i}',-0.25)">−</button><button onclick="adjPantry('${i}',0.25)">+</button></div>
+    </div>`;
+  }).join("");
+  const low=entries.filter(([,q])=>q<0.3).map(([i])=>i);
+  document.getElementById("pantry-alerts").innerHTML=low.length?
+    `<div class="alert">⚠ Running low: ${low.join(", ")}. They'll be auto-added to your next basket.</div>`:
+    `<div class="alert ok">✓ Pantry healthy — nothing critically low.</div>`;
+}
+function adjPantry(i,d){S.pantry[i]=Math.max(0,Math.min(2,(S.pantry[i]||0)+d));save();renderPantry();renderPlan();}
+
+// ---------- SHOP ----------
+function goShop(){buildBasket();nav("shop");}
+function buildBasket(){
+  const {buy}=needList();
+  Object.entries(S.pantry).forEach(([i,q])=>{if(q<0.3&&!buy[i])buy[i]=1;});
+  basket=Object.entries(buy).map(([i,q])=>({i,q}));
+  chosenStore=null;
+  renderShop();
+}
+function storeTotal(s){return basket.reduce((t,b)=>t+b.q*INGREDIENTS[b.i].price*s.mult,0)+s.fee;}
+function renderShop(){
+  const tbl=document.getElementById("shop-table");
+  tbl.innerHTML=`<tr><th>Item</th><th>Qty</th><th class="right">Ref. price</th></tr>`+
+    basket.map(b=>`<tr><td>${b.i} <span style="color:var(--muted);font-size:.74rem">(${INGREDIENTS[b.i].unit})</span></td><td>${b.q}</td><td class="right">£${(b.q*INGREDIENTS[b.i].price).toFixed(2)}</td></tr>`).join("");
+  const totals=STORES.map(s=>({s,t:storeTotal(s)})).sort((a,b)=>a.t-b.t);
+  const best=totals[0],worst=totals[totals.length-1];
+  document.getElementById("store-compare").innerHTML=totals.map(({s,t},idx)=>
+    `<div class="store ${idx===0?'best':''}" onclick="pickStore('${s.id}')" id="store-${s.id}">
+      <div><div class="sname">${s.name}${idx===0?'<span class="badge">CHEAPEST</span>':''}</div>
+      <div class="sdetail">${s.dist} · delivery £${s.fee.toFixed(2)} · ${s.eta}</div></div>
+      <div class="price">£${t.toFixed(2)}</div></div>`).join("");
+  const save_=worst.t-best.t;
+  const sl=document.getElementById("savings-line");
+  sl.style.display="block";
+  sl.textContent=`✓ Choosing ${best.s.name} saves £${save_.toFixed(2)} vs the priciest option — £${(save_*52).toFixed(0)}/year at this rate.`;
+  const btn=document.getElementById("order-btn");
+  btn.disabled=true;btn.textContent="Select a store to order";
+}
+function pickStore(id){
+  chosenStore=STORES.find(s=>s.id===id);
+  STORES.forEach(s=>{const el=document.getElementById("store-"+s.id);if(el)el.style.borderColor=s.id===id?"var(--green)":"var(--line)";});
+  const btn=document.getElementById("order-btn");
+  btn.disabled=false;
+  btn.textContent=`Confirm £${storeTotal(chosenStore).toFixed(2)} at ${chosenStore.name} →`;
+}
+// ---------- ORDERING ----------
+// User confirms price -> order locked -> handed to store checkout via deep links.
+// (Direct API ordering replaces the handoff when retailer integrations land.)
+function confirmOrder(){
+  if(!chosenStore)return;
+  const total=storeTotal(chosenStore);
+  openModal(`<h2 style="margin-bottom:6px">Confirm your order</h2>
+    <p class="sub">${basket.length} items · <b style="color:var(--text)">£${total.toFixed(2)}</b> at ${chosenStore.name} · ${chosenStore.eta}</p>
+    <div class="alert">Final pence may vary at the store — we lock the basket, the store charges checkout price.</div>
+    <div class="row">
+      <button class="btn" style="flex:1" onclick="placeOrder()">Confirm & order</button>
+      <button class="btn ghost" onclick="closeModal()">Back</button>
+    </div>`);
+}
+function placeOrder(){
+  if(!chosenStore)return;
+  const total=storeTotal(chosenStore);
+  const order={id:Date.now(),storeId:chosenStore.id,store:chosenStore.name,total,eta:chosenStore.eta,
+    items:basket.map(b=>({...b})),date:new Date().toLocaleDateString("en-GB"),status:1};
+  S.orders.unshift(order);
+  basket.forEach(b=>{S.pantry[b.i]=Math.min(2,(S.pantry[b.i]||0)+b.q);});
+  basket=[];save();
+  closeModal();
+  renderOrders();renderPantry();renderPlan();renderShop();
+  nav("orders");
+  openOrderHandoff(order.id);
+}
+function orderById(id){return S.orders.find(o=>o.id===id);}
+function openOrderHandoff(id){
+  const o=orderById(id);if(!o)return;
+  const store=STORES.find(s=>s.id===o.storeId);
+  openModal(`<h2 style="margin-bottom:6px">🎉 Order confirmed — £${o.total.toFixed(2)}</h2>
+    <p class="sub">Sending your basket to ${o.store}. Each item below opens pre-searched in ${o.store}'s checkout — add, pay, done. Auto-checkout replaces this step when our retailer integration goes live.</p>
+    <div style="margin-bottom:12px">${o.items.map(b=>
+      `<div class="item-link"><span>${b.q} × ${b.i} <span style="color:var(--muted)">(${INGREDIENTS[b.i].unit})</span></span>
+       <a href="${store.search(b.i)}" target="_blank" rel="noopener">Open at ${o.store} ↗</a></div>`).join("")}</div>
+    <div class="row">
+      <button class="btn" style="flex:1" onclick="copyList(${o.id})">📋 Copy list</button>
+      <button class="btn ghost" style="flex:1" onclick="markDelivered(${o.id});closeModal()">Mark delivered</button>
+    </div>`);
+}
+function copyList(id){
+  const o=orderById(id);if(!o)return;
+  const txt=o.items.map(b=>`${b.q} x ${b.i} (${INGREDIENTS[b.i].unit})`).join("\n");
+  if(navigator.clipboard)navigator.clipboard.writeText(txt);
+}
+function markDelivered(id){const o=orderById(id);if(o){o.status=3;save();renderOrders();}}
+function renderOrders(){
+  if(!S.orders.length)return;
+  const STATUSES=["","Confirmed","Sent to store","Delivered"];
+  document.getElementById("orders-list").innerHTML=S.orders.map(o=>
+    `<div class="meal" style="align-items:flex-start">
+      <div class="emoji">📦</div>
+      <div class="info">
+        <div class="name">${o.store} — £${o.total.toFixed(2)}</div>
+        <div class="meta">${o.items.length} items · placed ${o.date} · ${o.eta}</div>
+        <div class="timeline">
+          <div class="tstep ${o.status>=1?'done':''}">Confirmed</div>
+          <div class="tstep ${o.status>=2?'done':''}">At store</div>
+          <div class="tstep ${o.status>=3?'done':''}">Delivered</div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sm" onclick="openOrderHandoff(${o.id})">Open basket links</button>
+          ${o.status<3?`<button class="btn ghost sm" onclick="markDelivered(${o.id})">Mark delivered</button>`:`<span class="tag">pantry synced</span>`}
+        </div>
+      </div></div>`).join("");
+}
+
+// ---------- PROFILE ----------
+function renderProfile(){
+  document.getElementById("pr-hello").textContent=`Hey ${S.user?S.user.name:""} 👋`;
+  document.getElementById("pr-email").textContent=S.user?S.user.email:"";
+  document.getElementById("pr-postcode").value=S.prefs.postcode;
+  document.getElementById("pr-size").value=S.prefs.size;
+  document.getElementById("pr-budget").value=S.prefs.budget;
+  document.getElementById("pr-meals").value=S.prefs.meals;
+  chips("pr-diet",DIETS,S.prefs.diet,true,"toggleChip");
+  chips("pr-cuisine",CUISINES,S.prefs.cuisines,false,"toggleChip");
+  chips("pr-avoid",AVOIDS,S.prefs.avoid,false,"toggleChip");
+  document.getElementById("pr-saved").textContent="";
+}
+function saveProfile(){
+  S.prefs.postcode=document.getElementById("pr-postcode").value||S.prefs.postcode;
+  S.prefs.size=document.getElementById("pr-size").value;
+  S.prefs.budget=+document.getElementById("pr-budget").value||S.prefs.budget;
+  S.prefs.meals=+document.getElementById("pr-meals").value;
+  save();renderPlan();
+  document.getElementById("pr-saved").textContent="✓ Saved — your next plan uses these settings.";
+}
+
+// ---------- NAV / MODAL ----------
+function nav(s){
+  document.querySelectorAll(".screen").forEach(e=>e.classList.remove("active"));
+  document.getElementById("scr-"+s).classList.add("active");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.s===s));
+  setPill({plan:"This week",pantry:"Auto-tracked",shop:S.prefs.postcode,orders:"History",profile:"Account"}[s]||"");
+  if(s==="pantry")renderPantry();
+  if(s==="shop"&&!basket.length)buildBasket();
+  if(s==="orders")renderOrders();
+  if(s==="profile")renderProfile();
+}
+function setPill(t){document.getElementById("hdr-pill").textContent=t;}
+function openModal(html){document.getElementById("modal").innerHTML=html;document.getElementById("modal-bg").classList.add("open");}
+function closeModal(){document.getElementById("modal-bg").classList.remove("open");}
+
+// ---------- INIT ----------
+chips("ob-diet",DIETS,S.prefs.diet,true,"toggleChip");
+chips("ob-cuisine",CUISINES,S.prefs.cuisines,false,"toggleChip");
+chips("ob-avoid",AVOIDS,S.prefs.avoid,false,"toggleChip");
+if(S.user){
+  document.getElementById("scr-landing").classList.remove("active");
+  if(S.onboarded){enterApp();}
+  else{document.getElementById("scr-onboard").classList.add("active");setPill("Setup");}
+}
+</script>
+</body>
+</html>
