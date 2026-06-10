@@ -28,7 +28,11 @@ Map synonyms to catalog names (e.g. "pasta"->"spaghetti", "peppers"->"bell peppe
       user: `Catalog (the ONLY allowed ingredients): ${cat}.
 User pantry (fraction of pack in stock): ${JSON.stringify(p.pantry || {})}.
 Household: ${p.size || 2} people. Budget: £${p.budget || 60}/week.
-Propose ${p.count || 8} varied dinner options. Favour (but don't force) recipes using pantry items. 4-8 ingredients each, all strictly from the catalog.
+Propose ${p.count || 8} varied, creative dinner options. Favour (but don't force) recipes using pantry items. 4-8 ingredients each, all strictly from the catalog.${
+        Array.isArray(p.exclude) && p.exclude.length
+          ? `\nDo NOT propose any of these existing dishes (or close variants): ${p.exclude.join("; ")}.`
+          : ""
+      }
 Return JSON: {"meals":[{"name":"...","emoji":"🍛","time":<minutes>,"ing":["catalog item",...]}]}`,
     };
   if (task === "recipe")
@@ -36,6 +40,21 @@ Return JSON: {"meals":[{"name":"...","emoji":"🍛","time":<minutes>,"ing":["cat
       system: "You are a concise, encouraging recipe writer. Respond with ONLY valid JSON, no prose.",
       user: `Write cooking instructions for "${p.name}" for ${p.servings || 2} people, using: ${(p.ing || []).join(", ")} (plus salt, pepper, basic spices).
 Return JSON: {"steps":["step 1...","step 2...",...],"tip":"one short pro tip"}. 5-9 clear steps, each 1-2 sentences, with rough timings.`,
+    };
+  if (task === "advisor")
+    return {
+      system: `You are Plentry's friendly meal advisor for a UK grocery app. Your job: figure out what the user fancies this week, then propose dinners.
+Rules:
+- Ask AT MOST 2 short questions total (one per turn): things like mood, cravings, time to cook, anything to avoid. Be warm and brief.
+- After 2 questions max (or sooner if you have enough), propose 4-6 dinner options.
+- Every ingredient must come strictly from this catalog: ${cat}.
+- ALWAYS respond with ONLY valid JSON: {"message":"<your short chat reply>","meals":[{"name":"...","emoji":"🍛","time":<minutes>,"ing":["catalog item",...]}]}
+- While still asking questions, use "meals": [].
+- When proposing, "message" should briefly introduce the options.`,
+      messages: (p.messages || []).slice(-12).map((m) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: String(m.content || "").slice(0, 1000),
+      })),
     };
   return null;
 }
@@ -62,7 +81,7 @@ module.exports = async (req, res) => {
         model: MODEL,
         max_tokens: 1500,
         system: pr.system,
-        messages: [{ role: "user", content: pr.user }],
+        messages: pr.messages && pr.messages.length ? pr.messages : [{ role: "user", content: pr.user }],
       }),
     });
     if (!r.ok) {

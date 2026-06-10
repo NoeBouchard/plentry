@@ -102,6 +102,13 @@
   .recipe-step{display:flex;gap:10px;padding:8px 0;font-size:.88rem;border-bottom:1px solid var(--line)}
   .recipe-step:last-child{border-bottom:none}
   .recipe-step .n{color:var(--green);font-weight:800;flex-shrink:0}
+  .bubble{max-width:85%;padding:9px 13px;border-radius:14px;margin:6px 0;font-size:.87rem;line-height:1.4}
+  .bubble.ai{background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:4px;margin-right:auto}
+  .bubble.user{background:var(--green-d);color:#06230f;border-bottom-right-radius:4px;margin-left:auto;font-weight:600}
+  .adv-meal{display:flex;gap:10px;align-items:center;padding:9px;border:1.5px solid var(--line);border-radius:10px;margin:6px 0;cursor:pointer;background:var(--card2)}
+  .adv-meal.sel{border-color:var(--green)}
+  .adv-meal .am-info{flex:1;font-size:.85rem}
+  .adv-meal .am-meta{color:var(--muted);font-size:.72rem}
   .spin{display:inline-block;animation:rot 1s linear infinite}
   @keyframes rot{to{transform:rotate(360deg)}}
   @media(max-width:560px){.grid2{grid-template-columns:1fr}.menu-grid{grid-template-columns:1fr}}
@@ -180,7 +187,10 @@
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <div><h2>This week's menu</h2><p class="sub" style="margin:0" id="menu-sub">Tap the meals you want.</p></div>
-        <button class="btn ghost sm" id="menu-refresh" onclick="loadMenuOptions(true)">↻ New ideas</button>
+        <div class="row" style="gap:6px">
+          <button class="btn sm" onclick="openAdvisor()">💬 Meal advisor</button>
+          <button class="btn ghost sm" id="menu-refresh" onclick="loadMenuOptions(true)">↻ New ideas</button>
+        </div>
       </div>
     </div>
     <div class="menu-grid" id="menu-grid"></div>
@@ -484,15 +494,38 @@ function enterApp(){
 }
 
 // ---------- MENU ----------
+const validMeal=m=>m&&m.name&&Array.isArray(m.ing)&&m.ing.length&&m.ing.every(i=>INGREDIENTS[i]);
+const normMeal=m=>({name:String(m.name).slice(0,60),emoji:m.emoji||"🍽️",time:+m.time||25,ing:m.ing});
+const shuffle=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
+async function saveMealsToDB(meals,source){
+  if(!sb||!S.user||!S.user.id||!meals.length)return;
+  try{
+    await sb.from("meals").upsert(
+      meals.map(m=>({name:m.name,emoji:m.emoji,time:m.time,ing:m.ing,source,created_by:S.user.id})),
+      {onConflict:"name",ignoreDuplicates:true});
+  }catch(e){}
+}
 async function loadMenuOptions(force){
   if(S.menuOptions.length&&!force){renderMenu();return;}
   const grid=document.getElementById("menu-grid");
   grid.innerHTML='<div class="card" style="grid-column:1/-1;text-align:center"><span class="spin" style="font-size:1.4rem">✨</span><p class="sub" style="margin:8px 0 0">Your AI chef is thinking…</p></div>';
   const btn=document.getElementById("menu-refresh");btn.disabled=true;
-  const res=await ai("meal_options",{pantry:S.pantry,size:S.prefs.size,budget:S.prefs.budget,count:8});
-  let meals=(res&&Array.isArray(res.meals))?res.meals.filter(m=>m&&m.name&&Array.isArray(m.ing)&&m.ing.every(i=>INGREDIENTS[i])):null;
-  if(!meals||meals.length<4)meals=FALLBACK_MEALS;
-  S.menuOptions=meals.map(m=>({name:m.name,emoji:m.emoji||"🍽️",time:+m.time||25,ing:m.ing}));
+  // 1. shared catalog from the database (grows over time)
+  let dbMeals=[];
+  if(sb&&S.user&&S.user.id){
+    try{const {data}=await sb.from("meals").select("name,emoji,time,ing");
+      if(data)dbMeals=data.filter(validMeal).map(normMeal);}catch(e){}
+  }
+  // 2. fresh AI ideas, excluding everything already known
+  const exclude=[...new Set([...dbMeals.map(m=>m.name),...S.menuOptions.map(m=>m.name),...FALLBACK_MEALS.map(m=>m.name)])];
+  const res=await ai("meal_options",{pantry:S.pantry,size:S.prefs.size,budget:S.prefs.budget,count:8,exclude});
+  let fresh=(res&&Array.isArray(res.meals))?res.meals.filter(validMeal).map(normMeal).filter(m=>!exclude.includes(m.name)):[];
+  // 3. the catalog grows: persist fresh ideas
+  saveMealsToDB(fresh,"ai");
+  // 4. compose this week's options: fresh ideas first, then catalog, then built-ins
+  let pool=[...fresh,...shuffle(dbMeals).filter(m=>!fresh.some(f=>f.name===m.name))];
+  FALLBACK_MEALS.forEach(m=>{if(pool.length<12&&!pool.some(p=>p.name===m.name))pool.push(normMeal(m));});
+  S.menuOptions=pool.slice(0,12);
   S.selected=S.selected.filter(n=>S.menuOptions.some(m=>m.name===n));
   save();btn.disabled=false;
   renderMenu();
@@ -504,7 +537,7 @@ function toggleMeal(name){
 }
 function renderMenu(){
   const grid=document.getElementById("menu-grid");
-  grid.innerHTML=S.menuOptions.map(m=>{
+  grid.innerHTML=S.menuOptions.map((m,idx)=>{
     const sel=S.selected.includes(m.name);
     const fromPantry=m.ing.filter(i=>(S.pantry[i]||0)>=0.5).length;
     return `<div class="opt ${sel?'sel':''}" onclick="toggleMeal('${m.name.replace(/'/g,"\\'")}')">
@@ -512,7 +545,7 @@ function renderMenu(){
       <div class="o-emoji">${m.emoji}</div>
       <div class="o-name">${m.name}</div>
       <div class="o-meta">${m.time} min · ${m.ing.length} ingredients${fromPantry?` · <span style="color:var(--amber)">${fromPantry} in pantry</span>`:""}</div>
-      ${S.recipes[m.name]?`<div style="margin-top:6px"><button class="btn ghost sm" onclick="event.stopPropagation();showRecipe('${m.name.replace(/'/g,"\\'")}')">📖 Recipe</button></div>`:""}
+      <div style="margin-top:6px"><button class="btn ghost sm" onclick="event.stopPropagation();showMealDetails(${idx})">ⓘ Details & recipe</button></div>
     </div>`;
   }).join("");
   document.getElementById("menu-sub").textContent=`Tap the meals you want — aiming for ${S.prefs.meals} this week.`;
@@ -524,6 +557,87 @@ function renderMenu(){
   const btn=document.getElementById("to-basket-btn");
   btn.disabled=!S.selected.length;
   btn.textContent=S.selected.length?`Build basket for ${S.selected.length} meal${S.selected.length>1?"s":""} →`:"Pick at least one meal";
+}
+
+// ---------- MEAL DETAILS ----------
+function showMealDetails(idx){
+  const m=S.menuOptions[idx];if(!m)return;
+  const sel=S.selected.includes(m.name);
+  const esc=m.name.replace(/'/g,"\\'");
+  openModal(`<h2>${m.emoji} ${m.name}</h2>
+    <p class="sub">${m.time} min · serves ${S.prefs.size}</p>
+    <h3>Ingredients</h3>
+    ${m.ing.map(i=>{
+      const have=(S.pantry[i]||0)>=0.5;
+      return `<div class="recipe-step"><span class="n">·</span><span>${i} <span style="color:var(--muted);font-size:.78rem">(${INGREDIENTS[i].unit})</span>${have?' <span class="tag have">in pantry</span>':''}</span></div>`;
+    }).join("")}
+    <div class="row" style="margin-top:14px">
+      <button class="btn" style="flex:1" onclick="closeModal();showRecipe('${esc}')">📖 Cooking instructions</button>
+      <button class="btn ghost" onclick="toggleMeal('${esc}');closeModal()">${sel?"Remove from week":"Add to my week"}</button>
+    </div>`);
+}
+
+// ---------- MEAL ADVISOR ----------
+let advisorMsgs=[],advisorProposed=[],advisorPicked=new Set();
+function openAdvisor(){
+  advisorMsgs=[{role:"assistant",content:"Hey! I'm your meal advisor 👋 What are you in the mood for this week — comfort food, something fresh, quick weeknight dinners?"}];
+  advisorProposed=[];advisorPicked=new Set();
+  renderAdvisor();
+}
+function renderAdvisor(thinking){
+  openModal(`<h2>💬 Meal advisor</h2>
+    <div id="adv-chat" style="max-height:38vh;overflow:auto;display:flex;flex-direction:column;padding:4px 0">
+      ${advisorMsgs.map(m=>`<div class="bubble ${m.role==="assistant"?"ai":"user"}">${m.content}</div>`).join("")}
+      ${thinking?'<div class="bubble ai"><span class="spin">✨</span> thinking…</div>':""}
+    </div>
+    <div id="adv-meals">${advisorProposed.length?renderAdvisorMeals():""}</div>
+    <div class="row" style="margin-top:10px">
+      <input id="adv-input" placeholder="Type your answer…" onkeydown="if(event.key==='Enter')sendAdvisor()">
+      <button class="btn" onclick="sendAdvisor()" ${thinking?"disabled":""}>Send</button>
+    </div>`);
+  const c=document.getElementById("adv-chat");if(c)c.scrollTop=c.scrollHeight;
+  const inp=document.getElementById("adv-input");if(inp&&!thinking)inp.focus();
+}
+function renderAdvisorMeals(){
+  return `<h3 style="margin-top:8px">Pick what you like:</h3>`+
+    advisorProposed.map((m,i)=>`<div class="adv-meal ${advisorPicked.has(i)?'sel':''}" onclick="toggleAdvisorMeal(${i})">
+      <div style="font-size:1.4rem">${m.emoji}</div>
+      <div class="am-info"><b>${m.name}</b><div class="am-meta">${m.time} min · ${m.ing.join(", ")}</div></div>
+      <div>${advisorPicked.has(i)?"✓":""}</div>
+    </div>`).join("")+
+    `<button class="btn" style="width:100%;margin-top:8px" onclick="addAdvisorMeals()" ${advisorPicked.size?"":"disabled"}>Add ${advisorPicked.size||""} to my menu →</button>`;
+}
+function toggleAdvisorMeal(i){
+  advisorPicked.has(i)?advisorPicked.delete(i):advisorPicked.add(i);
+  const el=document.getElementById("adv-meals");if(el)el.innerHTML=renderAdvisorMeals();
+}
+async function sendAdvisor(){
+  const inp=document.getElementById("adv-input");
+  const text=inp?inp.value.trim():"";
+  if(!text)return;
+  advisorMsgs.push({role:"user",content:text});
+  renderAdvisor(true);
+  const res=await ai("advisor",{messages:advisorMsgs});
+  if(!res||!res.message){
+    advisorMsgs.push({role:"assistant",content:"Hmm, I lost my train of thought — try again in a moment?"});
+  }else{
+    advisorMsgs.push({role:"assistant",content:res.message});
+    const meals=(Array.isArray(res.meals)?res.meals:[]).filter(validMeal).map(normMeal);
+    if(meals.length){advisorProposed=meals;advisorPicked=new Set(meals.map((_,i)=>i));}
+  }
+  renderAdvisor(false);
+}
+async function addAdvisorMeals(){
+  const picked=advisorProposed.filter((_,i)=>advisorPicked.has(i));
+  if(!picked.length)return;
+  // grow the shared database with what real users actually choose
+  saveMealsToDB(picked,"advisor");
+  picked.forEach(m=>{
+    if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.unshift(m);
+    if(!S.selected.includes(m.name))S.selected.push(m.name);
+  });
+  S.menuOptions=S.menuOptions.slice(0,16);
+  save();closeModal();renderMenu();
 }
 
 // ---------- RECIPES ----------
