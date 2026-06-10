@@ -282,9 +282,13 @@ const SUPABASE_KEY="sb_publishable_bgkssbRBOQ-kr1HTA79HMg_VUBmAwcp"; // publisha
 const sb=(typeof window!=="undefined"&&window.supabase)?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 
 // ---------- AI ----------
+// The endpoint acts on the user's own credentials: it reads the shared meals
+// DB before proposing (no duplicates) and writes new dishes back as it goes.
 async function ai(task,payload){
   try{
-    const r=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,payload})});
+    let accessToken=null;
+    if(sb){try{const {data}=await sb.auth.getSession();accessToken=data&&data.session?data.session.access_token:null;}catch(e){}}
+    const r=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,payload,accessToken})});
     if(!r.ok)return null;
     return await r.json();
   }catch(e){return null;}

@@ -3,6 +3,53 @@
 // Tasks: parse_pantry | meal_options | recipe — all return strict JSON.
 
 const MODEL = "claude-haiku-4-5-20251001";
+const SUPABASE_URL = "https://ucciqthwxnlkjalwlhvh.supabase.co";
+const SUPABASE_KEY = "sb_publishable_bgkssbRBOQ-kr1HTA79HMg_VUBmAwcp";
+
+// DB access on behalf of the signed-in user (their token -> RLS applies).
+async function db(path, { method = "GET", body, token, headers = {} } = {}) {
+  if (!token) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      method,
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!r.ok) return null;
+    const t = await r.text();
+    return t ? JSON.parse(t) : true;
+  } catch (e) {
+    return null;
+  }
+}
+
+const VALID = (m) =>
+  m && m.name && Array.isArray(m.ing) && m.ing.length && m.ing.every((i) => CATALOG.includes(i));
+
+async function readMealNames(token) {
+  const rows = await db("meals?select=name", { token });
+  return Array.isArray(rows) ? rows.map((r) => r.name) : [];
+}
+async function writeMeals(meals, source, token) {
+  if (!meals.length) return;
+  await db("meals?on_conflict=name", {
+    method: "POST",
+    token,
+    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: meals.map((m) => ({
+      name: String(m.name).slice(0, 60),
+      emoji: m.emoji || "🍽️",
+      time: +m.time || 25,
+      ing: m.ing,
+      source,
+    })),
+  });
+}
 
 const CATALOG = [
   "chicken thighs","salmon fillet","minced beef","halloumi","eggs","chickpeas",
@@ -65,8 +112,17 @@ module.exports = async (req, res) => {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return res.status(503).json({ error: "ai_not_configured" });
 
-  const { task, payload } = req.body || {};
-  const pr = prompts(task, payload || {});
+  const { task, payload, accessToken } = req.body || {};
+  const p = payload || {};
+
+  // The AI consults the shared meals DB before proposing, so it never
+  // re-invents what already exists — and it writes new dishes back.
+  if (task === "meal_options" && accessToken) {
+    const known = await readMealNames(accessToken);
+    p.exclude = [...new Set([...(p.exclude || []), ...known])];
+  }
+
+  const pr = prompts(task, p);
   if (!pr) return res.status(400).json({ error: "unknown task" });
 
   try {
@@ -92,7 +148,14 @@ module.exports = async (req, res) => {
     const text = (data.content || []).map((c) => c.text || "").join("");
     const m = text.match(/\{[\s\S]*\}/); // tolerate stray prose
     if (!m) return res.status(502).json({ error: "no_json" });
-    return res.status(200).json(JSON.parse(m[0]));
+    const out = JSON.parse(m[0]);
+
+    // grow the catalog: persist any valid new dishes the AI produced
+    if ((task === "meal_options" || task === "advisor") && accessToken && Array.isArray(out.meals)) {
+      const fresh = out.meals.filter(VALID).filter((x) => !(p.exclude || []).includes(x.name));
+      await writeMeals(fresh, task === "advisor" ? "advisor" : "ai", accessToken);
+    }
+    return res.status(200).json(out);
   } catch (e) {
     return res.status(500).json({ error: "server", detail: String(e).slice(0, 200) });
   }
