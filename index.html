@@ -226,7 +226,7 @@
     </div>
     <div class="card">
       <h2>Best price near you</h2>
-      <p class="sub">Same basket, priced at each store delivering to you. Tap one, confirm, we handle the rest.</p>
+      <p class="sub">Same basket, priced at each store delivering to you. Pick one and Plentry fills your basket there — you pay the store directly, no markup.</p>
       <div id="store-compare"></div>
       <div class="alert ok" id="savings-line" style="display:none"></div>
       <button class="btn" style="width:100%" id="order-btn" onclick="confirmOrder()" disabled>Select a store to order</button>
@@ -235,7 +235,7 @@
 
   <!-- ORDERS -->
   <div class="screen" id="scr-orders">
-    <div class="card"><h2>Orders</h2><p class="sub">We place your order at the store and it arrives by their delivery. Recipes unlock as soon as you order.</p><div id="orders-list"><p class="sub">No orders yet. Pick meals from your menu.</p></div></div>
+    <div class="card"><h2>Orders</h2><p class="sub">Plentry builds your bag; you check out at the store and it arrives by their delivery. Recipes unlock as soon as you order.</p><div id="orders-list"><p class="sub">No orders yet. Pick meals from your menu.</p></div></div>
   </div>
 
   <!-- PROFILE -->
@@ -288,19 +288,44 @@ async function ai(task,payload){
   try{
     let accessToken=null;
     if(sb){try{const {data}=await sb.auth.getSession();accessToken=data&&data.session?data.session.access_token:null;}catch(e){}}
-    const r=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,payload,accessToken})});
+    const headers={"Content-Type":"application/json","apikey":SUPABASE_KEY};
+    if(accessToken)headers["Authorization"]="Bearer "+accessToken; // logged in -> RLS-scoped; else publishable
+    const r=await fetch(SUPABASE_URL+"/functions/v1/ai",{method:"POST",headers,body:JSON.stringify({task,payload})});
+    if(!r.ok)return null;
+    return await r.json();
+  }catch(e){return null;}
+}
+
+// Same pattern as ai(), but for the `checkout` edge function (Pepesto basket creation).
+// Returns {live:false} when the backend has no key / user is logged out — callers
+// must degrade gracefully to reference prices + manual handoff.
+async function checkoutApi(task,payload){
+  try{
+    let accessToken=null;
+    if(sb){try{const {data}=await sb.auth.getSession();accessToken=data&&data.session?data.session.access_token:null;}catch(e){}}
+    const headers={"Content-Type":"application/json","apikey":SUPABASE_KEY};
+    if(accessToken)headers["Authorization"]="Bearer "+accessToken;
+    const r=await fetch(SUPABASE_URL+"/functions/v1/checkout",{method:"POST",headers,body:JSON.stringify({task,payload})});
     if(!r.ok)return null;
     return await r.json();
   }catch(e){return null;}
 }
 
 // ---------- CATALOG ----------
+// mult = reference-price multiplier, used ONLY as fallback when live quotes
+// (Pepesto via the `checkout` edge function) are unavailable.
+// search = public search-results URL, used for the manual handoff flow.
 const STORES=[
-  {id:"asda",name:"Asda",dist:"0.9 mi",fee:3.00,eta:"Today 19:00–20:00",mult:0.88},
-  {id:"tesco",name:"Tesco",dist:"0.7 mi",fee:3.00,eta:"Today 19:00–20:00",mult:1.00},
-  {id:"sains",name:"Sainsbury's",dist:"1.1 mi",fee:3.50,eta:"Tomorrow 10:00–11:00",mult:1.07},
-  {id:"wait",name:"Waitrose",dist:"1.6 mi",fee:4.00,eta:"Tomorrow 12:00–13:00",mult:1.34},
+  {id:"asda",name:"Asda",dist:"0.9 mi",fee:3.00,eta:"Today 19:00–20:00",mult:0.88,
+    home:"https://groceries.asda.com/",search:"https://groceries.asda.com/search/{q}"},
+  {id:"tesco",name:"Tesco",dist:"0.7 mi",fee:3.00,eta:"Today 19:00–20:00",mult:1.00,
+    home:"https://www.tesco.com/groceries/",search:"https://www.tesco.com/groceries/en-GB/search?query={q}"},
+  {id:"sains",name:"Sainsbury's",dist:"1.1 mi",fee:3.50,eta:"Tomorrow 10:00–11:00",mult:1.07,
+    home:"https://www.sainsburys.co.uk/shop/gb/groceries",search:"https://www.sainsburys.co.uk/gol-ui/SearchResults/{q}"},
+  {id:"wait",name:"Waitrose",dist:"1.6 mi",fee:4.00,eta:"Tomorrow 12:00–13:00",mult:1.34,
+    home:"https://www.waitrose.com/",search:"https://www.waitrose.com/ecom/shop/search?&searchTerm={q}"},
 ];
+const IS_MOBILE=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const INGREDIENTS={
   "chicken thighs":{unit:"500g",price:3.80},"salmon fillet":{unit:"2 pc",price:4.50},
   "minced beef":{unit:"500g",price:3.95},"halloumi":{unit:"225g",price:2.75},
@@ -339,6 +364,7 @@ const DEFAULTS={
 };
 let S=load();
 let basket=[],chosenStore=null,authMode="signup";
+let liveQuote=null,liveQuoteKey="",liveQuoteLoading=false; // live store prices for the current basket
 function load(){
   try{const raw=localStorage.getItem("plentry_v1");if(raw){const d=JSON.parse(JSON.stringify(DEFAULTS));return Object.assign(d,JSON.parse(raw));}}catch(e){}
   return JSON.parse(JSON.stringify(DEFAULTS));
@@ -729,76 +755,157 @@ function buildBasket(){
   basket=Object.entries(buy).map(([i,q])=>({i,q}));
   chosenStore=null;
   renderShop();
+  fetchLiveQuote();
 }
+// Reference estimate (fallback when no live quote for that store).
 function storeTotal(s){return basket.reduce((t,b)=>t+b.q*INGREDIENTS[b.i].price*s.mult,0)+s.fee;}
+// Live quote when available: real matched-product total (pence) + delivery fee.
+function storeQuote(s){
+  const q=liveQuote&&liveQuote.stores&&liveQuote.stores[s.id];
+  return (q&&q.ok)?{t:q.total/100+s.fee,live:true,q}:{t:storeTotal(s),live:false,q:null};
+}
+function basketKey(){return basket.map(b=>b.i+":"+b.q).sort().join("|");}
+async function fetchLiveQuote(){
+  if(!basket.length||!S.user){liveQuote=null;renderShop();return;}
+  const key=basketKey();
+  if(liveQuoteKey===key&&(liveQuote||liveQuoteLoading))return; // cached or in flight
+  liveQuoteKey=key;liveQuote=null;liveQuoteLoading=true;renderShop();
+  const res=await checkoutApi("quote",{items:basket.map(b=>({name:b.i,qty:b.q,unit:INGREDIENTS[b.i].unit}))});
+  liveQuoteLoading=false;
+  if(liveQuoteKey!==key)return; // basket changed meanwhile
+  liveQuote=(res&&res.live)?res:null;
+  renderShop();
+}
 function renderShop(){
   const tbl=document.getElementById("shop-table");
+  const chosenQ=chosenStore?storeQuote(chosenStore):null;
   if(!basket.length){tbl.innerHTML='<tr><td class="sub">Nothing needed — your pantry covers it. Pick more meals!</td></tr>';}
-  else tbl.innerHTML=`<tr><th>Item</th><th>Qty</th><th class="right">Ref. price</th></tr>`+
+  else if(chosenQ&&chosenQ.live){
+    // Real products matched at the chosen store
+    tbl.innerHTML=`<tr><th>Item</th><th>Product at ${chosenStore.name}</th><th class="right">Price</th></tr>`+
+      chosenQ.q.lines.map(l=>`<tr><td>${l.item}</td><td>${l.product}${l.units>1?` ×${l.units}`:""}${l.promo?' <span class="badge">OFFER</span>':""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
+      (chosenQ.q.unmatched||[]).map(u=>`<tr><td>${u}</td><td class="sub">picked for you at checkout</td><td class="right">—</td></tr>`).join("");
+  }
+  else tbl.innerHTML=`<tr><th>Item</th><th>Qty</th><th class="right">Est. price</th></tr>`+
     basket.map(b=>`<tr><td>${b.i} <span style="color:var(--muted);font-size:.74rem">(${INGREDIENTS[b.i].unit})</span></td><td>${b.q}</td><td class="right">£${(b.q*INGREDIENTS[b.i].price).toFixed(2)}</td></tr>`).join("");
-  const totals=STORES.map(s=>({s,t:storeTotal(s)})).sort((a,b)=>a.t-b.t);
+  const totals=STORES.map(s=>({s,...storeQuote(s)})).sort((a,b)=>a.t-b.t);
   const best=totals[0],worst=totals[totals.length-1];
-  document.getElementById("store-compare").innerHTML=totals.map(({s,t},idx)=>
+  const anyLive=totals.some(x=>x.live);
+  document.getElementById("store-compare").innerHTML=totals.map(({s,t,live},idx)=>
     `<div class="store ${idx===0?'best':''}" onclick="pickStore('${s.id}')" id="store-${s.id}">
-      <div><div class="sname">${s.name}${idx===0?'<span class="badge">CHEAPEST</span>':''}</div>
+      <div><div class="sname">${s.name}${idx===0?'<span class="badge">CHEAPEST</span>':''}${live?' <span class="badge" style="background:var(--green-d)">LIVE</span>':''}</div>
       <div class="sdetail">${s.dist} · delivery £${s.fee.toFixed(2)} · ${s.eta}</div></div>
       <div class="price">£${t.toFixed(2)}</div></div>`).join("");
   const save_=worst.t-best.t;
   const sl=document.getElementById("savings-line");
   sl.style.display="block";
-  sl.textContent=`✓ Choosing ${best.s.name} saves £${save_.toFixed(2)} vs the priciest option — £${(save_*52).toFixed(0)}/year at this rate.`;
-  const btn=document.getElementById("order-btn");
-  btn.disabled=true;btn.textContent="Select a store to order";
+  sl.textContent=(liveQuoteLoading?"⏳ Fetching live prices… ":"")+
+    `✓ Choosing ${best.s.name} saves £${save_.toFixed(2)} vs the priciest option — £${(save_*52).toFixed(0)}/year at this rate.`+
+    (anyLive?"":" Prices are estimates until live quotes load.");
+  if(chosenStore)pickStore(chosenStore.id);
+  else{const btn=document.getElementById("order-btn");btn.disabled=true;btn.textContent="Select a store to order";}
 }
 function pickStore(id){
   chosenStore=STORES.find(s=>s.id===id);
   STORES.forEach(s=>{const el=document.getElementById("store-"+s.id);if(el)el.style.borderColor=s.id===id?"var(--green)":"var(--line)";});
   const btn=document.getElementById("order-btn");
   btn.disabled=!basket.length;
-  btn.textContent=`Confirm £${storeTotal(chosenStore).toFixed(2)} at ${chosenStore.name} →`;
+  const {t,live}=storeQuote(chosenStore);
+  btn.textContent=`${live?"Create my bag":"Confirm"} — £${t.toFixed(2)} at ${chosenStore.name} →`;
+  renderShopTableOnly();
+}
+// re-render just the items table after picking a store (shows matched products)
+function renderShopTableOnly(){
+  const q=chosenStore?storeQuote(chosenStore):null;
+  if(!q)return;
+  const tbl=document.getElementById("shop-table");
+  if(q.live&&basket.length){
+    tbl.innerHTML=`<tr><th>Item</th><th>Product at ${chosenStore.name}</th><th class="right">Price</th></tr>`+
+      q.q.lines.map(l=>`<tr><td>${l.item}</td><td>${l.product}${l.units>1?` ×${l.units}`:""}${l.promo?' <span class="badge">OFFER</span>':""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
+      (q.q.unmatched||[]).map(u=>`<tr><td>${u}</td><td class="sub">picked for you at checkout</td><td class="right">—</td></tr>`).join("");
+  }
 }
 // ---------- ORDERING ----------
+// Two paths, honest about which one is running:
+//  LIVE  — the `checkout` edge fn (Pepesto) fills the user's own basket at the
+//          store; they pay the SUPERMARKET at its checkout. No markup, no card here.
+//  MANUAL— no live backend: we hand over a ready list + per-item store links.
 function confirmOrder(){
   if(!chosenStore||!basket.length)return;
-  const total=storeTotal(chosenStore);
-  openModal(`<h2 style="margin-bottom:6px">Confirm your order</h2>
-    <p class="sub">${basket.length} items · <b style="color:var(--text)">£${total.toFixed(2)}</b> at ${chosenStore.name} · ${chosenStore.eta}</p>
-    <div class="alert">Beta: no payment taken. The Plentry team places this order at ${chosenStore.name} for delivery to ${S.prefs.postcode}.</div>
+  const {t,live}=storeQuote(chosenStore);
+  openModal(`<h2 style="margin-bottom:6px">${live?"Create your bag":"Confirm your order"}</h2>
+    <p class="sub">${basket.length} items · <b style="color:var(--text)">£${t.toFixed(2)}</b> at ${chosenStore.name} · ${chosenStore.eta}</p>
+    ${live
+      ?`<div class="alert ok">Plentry fills your basket at ${chosenStore.name} with these exact products. You review it and pay ${chosenStore.name} directly at their checkout — no markup, we never touch your card.</div>`
+      :`<div class="alert">Live checkout isn't on yet — you'll get a ready-made list with one-tap links into ${chosenStore.name}'s site, and we save the order here to track your pantry.</div>`}
     <div class="row">
-      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">Confirm order</button>
+      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">${live?"Create my bag →":"Confirm order"}</button>
       <button class="btn ghost" onclick="closeModal()">Back</button>
     </div>`);
 }
 async function placeOrder(){
   if(!chosenStore||!basket.length)return;
   const cbtn=document.getElementById("confirm-btn");
-  if(cbtn){cbtn.disabled=true;cbtn.textContent="Sending…";}
-  const total=storeTotal(chosenStore);
-  const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total,eta:chosenStore.eta,
+  if(cbtn){cbtn.disabled=true;cbtn.textContent="Building your bag…";}
+  const {t,live}=storeQuote(chosenStore);
+  const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total:t,eta:chosenStore.eta,
     items:basket.map(b=>({...b,unit:INGREDIENTS[b.i].unit})),meals:[...S.selected],
-    date:new Date().toLocaleDateString("en-GB"),status:1};
-  // send to backend so the team can fulfil it
+    date:new Date().toLocaleDateString("en-GB"),status:1,bagUrl:"",adjustUrl:"",pepestoSession:""};
+  // LIVE path: create the real bag first, so the confirmation is truthful.
+  let bag=null;
+  if(live){
+    bag=await checkoutApi("bag",{store:chosenStore.id,redirect_url:location.origin,
+      items:basket.map(b=>({name:b.i,qty:b.q,unit:INGREDIENTS[b.i].unit}))});
+    if(bag&&bag.live&&(bag.url||bag.adjust)){
+      order.status=2; // bag created
+      order.bagUrl=bag.url||"";order.adjustUrl=bag.adjust||"";order.pepestoSession=bag.session||"";
+      if(bag.total)order.total=bag.total/100+chosenStore.fee;
+    }else bag=null; // fall back to manual handoff
+  }
+  // record the order (backend row powers ops + status sync either way)
   if(sb&&S.user&&S.user.id){
     try{
       const {data,error}=await sb.from("orders").insert({
         user_id:S.user.id,email:S.user.email,name:S.user.name,postcode:S.prefs.postcode,
         store:order.store,total:order.total,
-        items:{basket:order.items,meals:order.meals,eta:order.eta},
+        items:{basket:order.items,meals:order.meals,eta:order.eta,
+          mode:bag?"self_checkout":"manual",pepesto_session:order.pepestoSession||null},
       }).select("id").single();
       if(!error&&data)order.backendId=data.id;
     }catch(e){}
   }
   S.orders.unshift(order);
-  basket=[];save();
-  closeModal();
-  renderOrders();
-  nav("orders");
-  openModal(`<h2 style="margin-bottom:6px">🎉 Order confirmed — £${order.total.toFixed(2)}</h2>
-    <p class="sub">We're placing it at ${order.store} now. Delivery ${order.eta.toLowerCase()} to ${S.prefs.postcode}. Your pantry updates automatically when it arrives.</p>
-    <div class="alert ok">📖 Your recipes are ready — find them on your Menu, on each meal you picked.</div>
-    <button class="btn" style="width:100%" onclick="closeModal();nav('menu')">See my recipes</button>`);
+  basket=[];liveQuote=null;liveQuoteKey="";save();
+  closeModal();renderOrders();nav("orders");
+  if(bag)openBagModal(order,bag);
+  else openHandoffModal(order);
   // pre-generate recipes in the background so they're instant
   for(const n of order.meals){if(!S.recipes[n])showRecipePrefetch(n);}
+}
+function bagLink(o){return (IS_MOBILE&&o.bagUrl)?o.bagUrl:(o.adjustUrl||o.bagUrl);}
+function openBagModal(order,bag){
+  openModal(`<h2 style="margin-bottom:6px">🛍️ Your bag is ready — £${order.total.toFixed(2)}</h2>
+    <p class="sub">${bag.matched} products picked at ${order.store}${bag.unmatched&&bag.unmatched.length?` · ${bag.unmatched.length} item${bag.unmatched.length>1?"s":""} will be picked with you at checkout`:""}.</p>
+    <div class="alert ok">Finish at ${order.store}: sign in to your ${order.store} account there, review the basket, choose your slot and pay them directly.</div>
+    <a class="btn" style="width:100%;display:block;text-align:center;text-decoration:none" href="${bagLink(order)}" target="_blank" rel="noopener" onclick="closeModal()">Open my ${order.store} bag →</a>
+    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal();openHandoffModal(S.orders.find(o=>o.id===${order.id}))">I'd rather shop it manually</button>`);
+}
+function handoffText(order){
+  return `Plentry list — ${order.store} (£${order.total.toFixed(2)} est.)\n`+
+    order.items.map(b=>`${b.q}× ${b.i} (${b.unit})`).join("\n");
+}
+function openHandoffModal(order){
+  const st=STORES.find(s=>s.id===order.storeId)||STORES[0];
+  openModal(`<h2 style="margin-bottom:6px">🧾 Your ${order.store} list</h2>
+    <p class="sub">Tap an item to open it in ${order.store}'s search, or copy the whole list.</p>
+    <div style="max-height:38vh;overflow:auto;margin:8px 0">
+      ${order.items.map(b=>`<a class="btn ghost sm" style="display:block;text-align:left;margin:4px 0;text-decoration:none" target="_blank" rel="noopener" href="${st.search.replace("{q}",encodeURIComponent(b.i))}">${b.q}× ${b.i} <span style="color:var(--muted)">(${b.unit})</span> ↗</a>`).join("")}
+    </div>
+    <div class="row">
+      <button class="btn" style="flex:1" onclick="navigator.clipboard.writeText(handoffText(S.orders.find(o=>o.id===${order.id}))).then(()=>{this.textContent='✓ Copied'})">📋 Copy list</button>
+      <a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener" href="${st.home}">Open ${order.store} ↗</a>
+    </div>
+    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Done</button>`);
 }
 async function showRecipePrefetch(name){
   const meal=mealByName(name);if(!meal||S.recipes[name])return;
@@ -836,10 +943,12 @@ function renderOrders(){
         <div class="meta">${o.items.length} items · ${(o.meals||[]).length} meals · placed ${o.date} · ${o.eta}</div>
         <div class="timeline">
           <div class="tstep ${o.status>=1?'done':''}">Confirmed</div>
-          <div class="tstep ${o.status>=2?'done':''}">Ordered for you</div>
+          <div class="tstep ${o.status>=2?'done':''}">${o.bagUrl||o.adjustUrl?"Bag created":"Ordered for you"}</div>
           <div class="tstep ${o.status>=3?'done':''}">Delivered</div>
         </div>
         <div class="row" style="margin-top:8px">
+          ${o.status<3&&(o.bagUrl||o.adjustUrl)?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${bagLink(o)}">🛍️ Open bag</a>`:""}
+          ${o.status<3?`<button class="btn ghost sm" onclick="openHandoffModal(S.orders.find(x=>x.id===${o.id}))">🧾 List</button>`:""}
           ${(o.meals||[]).slice(0,3).map(n=>`<button class="btn ghost sm" onclick="showRecipe('${n.replace(/'/g,"\\'")}')">📖 ${n.length>18?n.slice(0,17)+"…":n}</button>`).join("")}
           ${o.status<3?`<button class="btn sm" onclick="markDelivered(${o.id})">Arrived ✓</button>`:`<span class="tag">pantry synced</span>`}
         </div>

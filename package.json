@@ -1,0 +1,23 @@
+{
+  "name": "plentry",
+  "version": "1.0.0",
+  "description": "**Your kitchen on autopilot.** Tell Plentry what's in your fridge, pick the meals you fancy, and it prices the basket across local UK supermarkets and gets the groceries ordered. No boxes, no packing, no mark-ups. A flexible, AI-run alternative to HelloFresh that uses existing supermarkets instead of its own warehouses.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NoeBouchard/plentry.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NoeBouchard/plentry/issues"
+  },
+  "homepage": "https://github.com/NoeBouchard/plentry#readme",
+  "dependencies": {
+    "@supabase/server": "^1.2.0"
+  }
+}

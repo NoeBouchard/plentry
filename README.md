@@ -35,9 +35,11 @@ There is **no custom server**. Everything is either the static page, the one AI 
 
 | Path | What it is |
 |---|---|
-| `index.html` | **The whole front end.** UI, state, Supabase calls, all screens. ~1.3k lines, one inline `<script>`. |
-| `api/ai.js` | **The AI serverless function.** Vercel deploys anything in `api/` as a function. Handles 4 tasks; talks to Anthropic + Postgres. |
+| `index.html` | **The whole front end.** UI, state, Supabase calls, all screens. ~1.4k lines, one inline `<script>`. |
+| `supabase/functions/ai/` | **The AI edge function** (Supabase, Deno). Handles 4 tasks; talks to Anthropic + Postgres. Vercel is static hosting only. |
+| `supabase/functions/checkout/` | **Basket creation edge function.** `quote` = live store prices, `bag` = fills the user's basket at the store via Pepesto. Keyless → `{live:false}` and the app falls back to estimates + manual handoff. |
 | `supabase/schema.sql` | Database schema. **Idempotent — safe to re-run.** Creates `profiles`, `orders`, `meals` with RLS policies. |
+| `supabase/seed_meals.sql` | 40 hand-verified dishes (`source='seed'`) + catalog health checks. **Idempotent.** |
 | `SPEC.md` | Product spec + the concrete plan to first paying customers. Start here for "what to build next". |
 | `PLAN.md` | Business/strategy: JTBD, differentiation, market, roadmap, risks. |
 | `README.md` | This file. |
@@ -50,7 +52,7 @@ There is **no custom server**. Everything is either the static page, the one AI 
 2. **Onboarding** — postcode / household / budget / dinners-per-week, then a free-text "what's in your kitchen?" box → `api/ai` `parse_pantry` turns it into a tracked pantry (catalog items with 0–1 stock fractions). No taste/cuisine questions — preferences are expressed by *picking meals*.
 3. **Menu** — `api/ai` `meal_options` proposes dinners. The user taps the ones they want. "💬 Meal advisor" opens a chat (`advisor` task) that asks ~2 questions then proposes a set to pick from. Every meal card has "ⓘ Details & recipe".
 4. **Basket** — selected meals → ingredient list → minus pantry stock → shopping list, priced across the 4 stores. User picks a store and confirms.
-5. **Order** — written to the `orders` table for **manual concierge fulfilment** (you place it at the store). Recipes (`recipe` task) generate per chosen meal.
+5. **Order** — the `checkout` fn fills the user's basket at their chosen store (Pepesto); the user pays the supermarket directly. Every order is also written to `orders` (`items.mode = self_checkout | manual`); manual mode gets a copy-list + per-item store links instead. Recipes (`recipe` task) generate per chosen meal.
 6. **Pantry sync** — marking an order delivered (or flipping `orders.status` to `delivered` in the dashboard) restocks the pantry.
 
 ### State model
@@ -81,21 +83,24 @@ Key behaviours baked into `api/ai.js`:
 ## Run & deploy
 
 ### Local
-There's no build. Open `index.html` directly for UI work, **but** `/api/ai` won't exist (the app falls back to built-ins). For the full stack locally, use `vercel dev` (Vercel CLI) with the env var set.
+There's no build. Open `index.html` directly for UI work — the edge functions are remote, so AI + checkout work as long as the deployed functions exist (otherwise the app falls back to built-ins/estimates). `supabase functions serve` for function work.
 
-### Environment variables (Vercel project)
-| Var | Where | Notes |
+### Secrets (Supabase edge functions — never in the client)
+| Var | Set with | Notes |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Vercel env (encrypted) | The only secret. Set on `production`/`preview`/`development`. |
+| `ANTHROPIC_API_KEY` | `supabase secrets set ANTHROPIC_API_KEY=...` | Powers `ai`. Missing → 503 → front-end fallbacks. |
+| `PEPESTO_API_KEY` | `supabase secrets set PEPESTO_API_KEY=...` | Powers `checkout`. Missing → `{live:false}` → estimates + manual handoff. |
 
-The Supabase **URL and publishable key are hard-coded** in `index.html` and `api/ai.js` — that's fine, they're public by design; data is protected by RLS, not by hiding the key. The Anthropic key must NEVER reach the client — it lives only in the serverless function.
+The Supabase **URL and publishable key are hard-coded** in `index.html` — that's fine, they're public by design; data is protected by RLS, not by hiding the key.
 
 ### Deploy
-The repo is connected to Vercel and Supabase via GitHub, so **`git push` auto-deploys**. Manual deploy if needed:
+Vercel hosts the static page only; it is **not** git-connected — deploy from disk:
 ```bash
-vercel deploy --prod --yes --token <VERCEL_TOKEN>
+vercel deploy --prod --yes --token <VERCEL_TOKEN>   # static front end
+supabase functions deploy ai                        # after editing supabase/functions/ai
+supabase functions deploy checkout                  # after editing supabase/functions/checkout
 ```
-After changing `supabase/schema.sql`, re-run the whole file in the Supabase SQL Editor (it's idempotent).
+After changing `supabase/schema.sql` or `supabase/seed_meals.sql`, re-run the whole file in the Supabase SQL Editor (both are idempotent).
 
 ---
 

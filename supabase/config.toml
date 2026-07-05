@@ -1,0 +1,29 @@
+# Supabase project config. `project_id` is the local project name (any string);
+# the remote project is linked via `supabase link --project-ref ucciqthwxnlkjalwlhvh`.
+project_id = "plentry"
+
+# ---- Edge Functions ----------------------------------------------------------
+# `verify_jwt` is the PLATFORM-level JWT gate, checked before your handler runs.
+#
+#   auth: 'user'                       -> leave verify_jwt = true  (the default)
+#   auth: 'publishable'|'secret'|'none' -> set  verify_jwt = false
+#
+# The `orders` function uses auth: 'user', so the platform JWT check stays on.
+[functions.orders]
+verify_jwt = true
+
+# The `ai` function uses auth: ['user', 'publishable'] (works logged in or out),
+# so the platform JWT gate must be OFF — the SDK does the auth check instead.
+[functions.ai]
+verify_jwt = false
+
+# `checkout` (Pepesto basket creation) also uses auth: ['user', 'publishable'];
+# it answers {live:false} to logged-out callers so credits can't be burned anonymously.
+[functions.checkout]
+verify_jwt = false
+
+# Template for a non-user function (e.g. a webhook or service-to-service call
+# using auth: 'secret' or auth: 'none'). Uncomment and rename when you add one:
+#
+# [functions.stripe-webhook]
+# verify_jwt = false
