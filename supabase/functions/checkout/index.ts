@@ -24,6 +24,7 @@
 //   curl https://api.pepesto.com/supermarkets -H "Authorization: Bearer $KEY"
 
 import { withSupabase } from 'npm:@supabase/server'
+import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 
 const PEPESTO = 'https://s.pepesto.com/api'
 
@@ -125,13 +126,16 @@ export default {
       ? p.items
           .filter((b: Item) => b && b.name)
           .slice(0, 50)
-          .map((b: Item) => ({ name: String(b.name).slice(0, 60), qty: +b.qty || 1, unit: b.unit ? String(b.unit).slice(0, 20) : '' }))
+          .map((b: Item) => ({ name: String(b.name).slice(0, 60), qty: Math.min(20, Math.max(1, Math.round(+b.qty || 1))), unit: b.unit ? String(b.unit).slice(0, 20) : '' }))
       : []
 
     const key = Deno.env.get('PEPESTO_API_KEY')
     // Live calls cost real credits — require a signed-in user; otherwise fall back.
     if (!key || !ctx.userClaims) return Response.json({ live: false })
     if (!items.length) return Response.json({ error: 'no_items' }, { status: 400 })
+
+    // Each live task can fan out to several paid Pepesto calls — cap per user.
+    if (!(await allow(ctx.supabaseAdmin, 'checkout', clientIdent(req, ctx), 20, 60))) return TOO_MANY()
 
     try {
       if (task === 'quote') {
@@ -162,7 +166,11 @@ export default {
         const mc = await pepesto('/mcheckout', key, {
           supermarket_domain: domain,
           user_locale: 'en-GB',
-          ...(p.redirect_url ? { redirect_url: String(p.redirect_url).slice(0, 300) } : {}),
+          // Only ever bounce back to the app — a client-chosen redirect_url would
+          // let an attacker turn the Pepesto flow into an open redirect.
+          ...(String(p.redirect_url || '').startsWith('https://plentry.vercel.app')
+            ? { redirect_url: String(p.redirect_url).slice(0, 300) }
+            : {}),
           skus: m.skus,
           unresolved_items: m.unmatched.slice(0, 20),
         })

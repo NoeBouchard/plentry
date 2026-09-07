@@ -9,6 +9,9 @@
 -- Rules for a valid dish (also enforced by the ai edge fn):
 --   * every `ing` entry is one of the 24 catalog ingredient keys
 --   * 4–8 ingredients, cook time 15–45 min, unique name
+-- Photos: run meals_images.sql after this file (adds image_url + backfill).
+
+alter table public.meals add column if not exists image_url text;
 
 -- ============ 1. SEED (idempotent; never overwrites existing rows) ============
 insert into public.meals (name, emoji, time, ing, source, created_by) values

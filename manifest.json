@@ -1,0 +1,16 @@
+{
+  "name": "Plentry — Your kitchen on autopilot",
+  "short_name": "Plentry",
+  "description": "AI meal planning that compares prices across your local supermarkets and orders what your pantry is missing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1410",
+  "theme_color": "#0f1410",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

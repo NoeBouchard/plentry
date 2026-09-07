@@ -3,71 +3,129 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plentry — Your kitchen on autopilot</title>
-<meta name="description" content="AI meal planning that compares prices across your local supermarkets and orders what your pantry is missing. No boxes, no packing, no mark-ups.">
+<title>Plentry — What's for dinner tonight?</title>
+<meta name="description" content="Plan your week, price it at Tesco, Sainsbury's, Asda or Waitrose, and we'll order the missing ingredients to your door.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f4f0e6">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Plentry">
 <style>
   :root{
-    --bg:#0f1410; --card:#161d17; --card2:#1d261e; --line:#2a352b;
-    --text:#e8efe8; --muted:#94a596; --green:#4ade80; --green-d:#22c55e;
-    --amber:#fbbf24; --red:#f87171; --radius:14px;
-    font-size:15px;
+    --bg:#f4f0e6; --card:#fff; --card2:#fbf8f1; --line:#e6dfd2;
+    --text:#1c3328; --muted:#6b7c72; --green:#2f6b4f; --green-d:#1f4a34;
+    --sage:#e8f1e4; --amber:#b8860b; --red:#c45c4a; --radius:18px;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    font-size:16px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-  .app{max-width:960px;margin:0 auto;padding:0 16px 90px}
-  header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 10px}
-  .logo{font-size:1.4rem;font-weight:800;letter-spacing:-.5px}
+  .app{max-width:480px;margin:0 auto;padding:0 18px 140px}
+  .sticky-cta{position:fixed;left:50%;transform:translateX(-50%);width:min(480px,100%);bottom:58px;padding:12px 18px 16px;background:linear-gradient(transparent,var(--bg) 28%);z-index:45;display:none;box-sizing:border-box}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 8px}
+  .logo{font-family:var(--serif);font-size:1.45rem;font-weight:700;letter-spacing:-.4px;color:var(--green-d)}
   .logo span{color:var(--green)}
-  .pill{background:var(--card2);border:1px solid var(--line);border-radius:99px;padding:5px 12px;font-size:.78rem;color:var(--muted)}
-  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(15,20,16,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:none;justify-content:center;gap:4px;padding:8px;z-index:50}
+  .pill{background:transparent;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:.78rem;color:var(--green-d);cursor:pointer;text-decoration:none}
+  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(244,240,230,.94);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:none;justify-content:center;gap:4px;padding:8px;z-index:50}
   nav.show{display:flex}
   nav button{flex:1;max-width:150px;background:none;border:none;color:var(--muted);font-size:.74rem;padding:8px 4px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
   nav button .ico{font-size:1.2rem}
-  nav button.active{color:var(--green);background:var(--card2)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px}
-  h1{font-size:1.9rem;line-height:1.15;letter-spacing:-.5px;margin-bottom:10px}
-  h1 em{color:var(--green);font-style:normal}
-  h2{font-size:1.15rem;margin-bottom:4px}
+  nav button.active{color:var(--green-d);background:var(--sage)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:12px;box-shadow:0 8px 24px rgba(28,51,40,.04)}
+  h1{font-family:var(--serif);font-size:2.05rem;line-height:1.15;letter-spacing:-.6px;margin-bottom:10px;color:var(--green-d)}
+  h1 em{color:var(--green);font-style:italic}
+  h2{font-family:var(--serif);font-size:1.25rem;margin-bottom:6px;color:var(--green-d)}
   h3{font-size:.95rem;margin-bottom:8px}
-  .sub{color:var(--muted);font-size:.85rem;margin-bottom:14px}
-  .btn{background:var(--green-d);color:#06230f;border:none;border-radius:10px;padding:11px 18px;font-weight:700;font-size:.92rem;cursor:pointer;transition:transform .08s;text-decoration:none;display:inline-block}
+  .sub{color:var(--muted);font-size:.9rem;margin-bottom:16px;line-height:1.45}
+  .lede{color:var(--green);font-size:1.05rem;margin-bottom:10px}
+  .btn{background:var(--green-d);color:#fff;border:none;border-radius:99px;padding:14px 22px;font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .08s;text-decoration:none;display:inline-block;text-align:center}
   .btn:active{transform:scale(.97)}
-  .btn.ghost{background:var(--card2);color:var(--text);border:1px solid var(--line)}
-  .btn.sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
-  .btn:disabled{opacity:.45;cursor:default}
+  .btn.ghost{background:var(--card);color:var(--green-d);border:1px solid var(--line)}
+  .btn.sm{padding:7px 14px;font-size:.8rem}
+  .btn:disabled{opacity:.4;cursor:default}
   .row{display:flex;gap:10px;align-items:center}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  input,select,textarea{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px;width:100%;font-size:.9rem;font-family:inherit}
+  input,select,textarea{background:#fff;border:1px solid var(--line);color:var(--text);border-radius:14px;padding:12px;width:100%;font-size:.95rem;font-family:inherit}
   textarea{resize:vertical;min-height:90px}
   label{font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px}
   .field{margin-bottom:10px}
   .err{color:var(--red);font-size:.8rem;margin-top:6px;min-height:1em}
+  .choice{display:flex;gap:12px;align-items:center;padding:14px;background:#fff;border:1.5px solid var(--line);border-radius:16px;margin-bottom:8px;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+  .choice.sel{background:var(--sage);border-color:var(--green)}
+  .choice .c-ico{width:40px;height:40px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.15rem}
+  .choice b{display:block;font-size:.92rem}
+  .choice p{color:var(--muted);font-size:.78rem;margin:0}
+  .store-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+  .store-tile{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:14px 10px 12px;cursor:pointer;text-align:center;min-height:118px}
+  .store-tile.picked,.store-tile.best.picked{border-color:var(--green-d);background:var(--sage)}
+  .store-tile .mark{width:36px;height:36px;border-radius:10px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.72rem;color:#fff}
+  .store-tile .sname{font-weight:700;font-size:.88rem}
+  .store-tile .sprice{font-weight:800;font-size:1.05rem;margin-top:4px}
+  .store-tile .sdetail{color:var(--muted);font-size:.7rem}
+  .counter{text-align:center;padding:18px 0}
+  .counter .n{font-size:4rem;font-weight:800;color:var(--green);line-height:1}
+  .counter .k{color:var(--muted);margin:4px 0 16px}
+  .counter .row{justify-content:center}
+  .counter button{width:48px;height:48px;border-radius:50%;border:none;font-size:1.4rem;cursor:pointer}
+  .counter .minus{background:#eee8dc;color:var(--text)}
+  .counter .plus{background:var(--green-d);color:#fff}
+  input[type=range]{accent-color:var(--green-d);width:100%}
+  .budget-val{font-size:2.4rem;font-weight:800;color:var(--green-d);text-align:center}
+  .week-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .week-card{background:#fff;border-radius:16px;padding:14px;border:1px solid var(--line)}
+  .week-card .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .week-card .v{font-size:1.35rem;font-weight:800;margin-top:2px}
+  .day-card{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px;margin-bottom:8px;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit}
+  .day-card img,.day-card .thumb-fallback{width:72px;height:72px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--sage);display:flex;align-items:center;justify-content:center;font-size:1.6rem}
+  .day-badge{position:absolute;left:6px;top:6px;background:var(--green-d);color:#fff;font-size:.62rem;font-weight:800;border-radius:99px;padding:2px 6px}
+  .day-photo{position:relative;flex-shrink:0}
+  .day-card .nm{font-weight:700;font-size:.9rem}
+  .day-card .meta{color:var(--muted);font-size:.75rem;margin-top:3px}
+  .day-card .mp{font-weight:800;margin-left:auto;white-space:nowrap}
+  .tag{display:inline-block;font-size:.66rem;padding:2px 8px;border-radius:99px;background:var(--sage);color:var(--green-d);margin-right:4px}
+  .tag.have{background:#f8edd0;color:var(--amber)}
+  .sticky-cta.show{display:block}
+  .sticky-cta .btn{width:100%}
+  .gen-wrap{padding:48px 8px 20px;text-align:center}
+  .gen-step{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);text-align:left;font-size:.88rem}
+  .gen-step:last-child{border-bottom:none}
+  .gen-step.done{color:var(--green)}
+  .meal-hero{width:100%;height:180px;object-fit:cover;border-radius:14px;margin-bottom:10px;background:var(--sage)}
+  .week-under{font-weight:700;font-size:.88rem;margin:2px 0 12px;color:var(--green)}
+  .week-over{color:var(--red)}
+  .store-chip{display:inline-flex;align-items:center;gap:6px;background:var(--sage);color:var(--green-d);border-radius:99px;padding:6px 12px;font-size:.78rem;font-weight:700;margin:8px 0 4px}
+  .hint{background:var(--sage);border-radius:14px;padding:12px 14px;font-size:.82rem;color:var(--green-d);margin:12px 0}
   .meal{display:flex;gap:12px;align-items:center;padding:12px;background:var(--card2);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
   .meal .emoji{font-size:1.8rem;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--card);border-radius:10px;flex-shrink:0}
   .meal .info{flex:1;min-width:0}
   .meal .name{font-weight:700;font-size:.92rem}
   .meal .meta{color:var(--muted);font-size:.76rem;margin-top:2px}
-  .tag{display:inline-block;font-size:.68rem;padding:2px 8px;border-radius:99px;background:rgba(74,222,128,.12);color:var(--green);margin-right:4px}
-  .tag.have{background:rgba(251,191,36,.12);color:var(--amber)}
+  .tag{display:inline-block;font-size:.66rem;padding:2px 8px;border-radius:99px;background:var(--sage);color:var(--green-d);margin-right:4px}
+  .tag.have{background:#f8edd0;color:var(--amber)}
   .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .opt{background:var(--card2);border:1.5px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;position:relative;transition:border-color .12s}
+  .opt{background:var(--card2);border:1.5px solid var(--line);border-radius:12px;padding:0 0 12px;cursor:pointer;position:relative;transition:border-color .12s;overflow:hidden}
   .opt.sel{border-color:var(--green)}
-  .opt .check{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#06230f}
+  .opt .check{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#06230f;background:var(--card);z-index:1}
   .opt.sel .check{background:var(--green);border-color:var(--green)}
-  .opt .o-emoji{font-size:1.7rem}
-  .opt .o-name{font-weight:700;font-size:.88rem;margin:6px 0 2px}
-  .opt .o-meta{color:var(--muted);font-size:.73rem}
+  .opt-img{width:100%;height:140px;object-fit:cover;display:block;background:var(--card)}
+  .opt .o-emoji,.opt .o-emoji-fallback{font-size:1.7rem;height:140px;display:flex;align-items:center;justify-content:center;background:var(--card)}
+  .opt .o-name{font-weight:700;font-size:.88rem;margin:8px 12px 2px}
+  .opt .o-meta{color:var(--muted);font-size:.73rem;margin:0 12px}
+  .opt .o-actions{margin:8px 12px 0}
   table{width:100%;border-collapse:collapse;font-size:.85rem}
   th{text-align:left;color:var(--muted);font-weight:600;font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;padding:8px 6px;border-bottom:1px solid var(--line)}
   td{padding:9px 6px;border-bottom:1px solid var(--line)}
   tr:last-child td{border-bottom:none}
   .right{text-align:right}
   .store{border:1.5px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--card2)}
-  .store.best{border-color:var(--green)}
+  .store.best,.store.picked{border-color:var(--green)}
   .store .sname{font-weight:700}
   .store .sdetail{color:var(--muted);font-size:.78rem;margin-top:2px}
   .price{font-size:1.15rem;font-weight:800}
-  .badge{font-size:.66rem;font-weight:800;background:var(--green);color:#06230f;border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+  .badge{font-size:.66rem;font-weight:800;background:var(--sage);color:var(--green-d);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
   .stock-bar{height:6px;background:var(--card);border-radius:99px;overflow:hidden;margin-top:6px}
   .stock-bar i{display:block;height:100%;border-radius:99px}
   .pantry-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -77,12 +135,12 @@
   .stepper{display:flex;gap:2px}
   .stepper button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
   .alert{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:var(--amber);border-radius:10px;padding:10px 12px;font-size:.82rem;margin-bottom:12px}
-  .ok{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);color:var(--green)}
+  .ok{background:var(--sage);border:1px solid #cfe0c8;color:var(--green-d)}
   .stat{flex:1;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
   .stat .v{font-size:1.25rem;font-weight:800}
   .stat .k{color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
-  .screen{display:none;animation:fade .18s ease}
-  .screen.active{display:block}
+  .screen{display:none}
+  .screen.active{display:block!important}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   .steps{display:flex;gap:6px;margin-bottom:18px}
   .steps i{flex:1;height:4px;border-radius:99px;background:var(--line)}
@@ -104,104 +162,135 @@
   .recipe-step .n{color:var(--green);font-weight:800;flex-shrink:0}
   .bubble{max-width:85%;padding:9px 13px;border-radius:14px;margin:6px 0;font-size:.87rem;line-height:1.4}
   .bubble.ai{background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:4px;margin-right:auto}
-  .bubble.user{background:var(--green-d);color:#06230f;border-bottom-right-radius:4px;margin-left:auto;font-weight:600}
+  .bubble.user{background:var(--green-d);color:#fff;border-bottom-right-radius:4px;margin-left:auto;font-weight:600}
   .adv-meal{display:flex;gap:10px;align-items:center;padding:9px;border:1.5px solid var(--line);border-radius:10px;margin:6px 0;cursor:pointer;background:var(--card2)}
   .adv-meal.sel{border-color:var(--green)}
   .adv-meal .am-info{flex:1;font-size:.85rem}
   .adv-meal .am-meta{color:var(--muted);font-size:.72rem}
   .spin{display:inline-block;animation:rot 1s linear infinite}
   @keyframes rot{to{transform:rotate(360deg)}}
-  @media(max-width:560px){.grid2{grid-template-columns:1fr}.menu-grid{grid-template-columns:1fr}}
+  .basket-fab{position:fixed;right:16px;bottom:72px;z-index:60;display:none;align-items:center;gap:8px;background:var(--green-d);color:#fff;border:none;border-radius:99px;padding:12px 16px;font-weight:800;font-size:.88rem;cursor:pointer;box-shadow:0 8px 24px rgba(31,74,52,.25)}
+  .basket-fab.show{display:flex}
+  .basket-fab .fab-count{background:#fff;color:var(--green-d);border-radius:99px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.72rem}
+  .basket-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:90}
+  .basket-bg.open{display:block}
+  .basket-panel{position:fixed;top:0;right:0;width:min(440px,100%);height:100%;background:var(--bg);border-left:1px solid var(--line);z-index:91;overflow:auto;padding:18px 16px 28px;transform:translateX(100%);transition:transform .18s ease}
+  .basket-bg.open .basket-panel{transform:none}
+  .store.ob-store{cursor:pointer}
+  @media(max-width:560px){
+    .grid2{grid-template-columns:1fr}
+    .menu-grid{grid-template-columns:1fr}
+    .opt-img,.opt .o-emoji,.opt .o-emoji-fallback{height:160px}
+    .basket-panel{top:auto;bottom:0;width:100%;height:min(88vh,100%);border-left:none;border-top:1px solid var(--line);border-radius:18px 18px 0 0;transform:translateY(100%)}
+    .basket-bg.open .basket-panel{transform:none}
+  }
 </style>
 </head>
 <body>
 <div class="app">
   <header>
     <div class="logo">plentry<span>.</span></div>
-    <div class="pill" id="hdr-pill">Welcome</div>
+    <a class="pill" href="#" id="hdr-pill" onclick="openAuth();return false">Log in</a>
   </header>
 
   <!-- LANDING / SIGNUP -->
-  <div class="screen active" id="scr-landing">
-    <div class="card" style="padding:26px 20px">
-      <h1>Your kitchen,<br>on <em>autopilot</em>.</h1>
-      <p class="sub" style="font-size:.95rem">Tell Plentry what's in your fridge. Pick the meals you fancy. We price the basket at every supermarket near you and handle the ordering. No boxes, no packing, no mark-ups.</p>
-      <div class="feature"><div class="f-ico">🧠</div><div><b>AI kitchen scan</b><p>Describe what you have — the AI tracks your pantry and never re-buys it.</p></div></div>
-      <div class="feature"><div class="f-ico">🍽️</div><div><b>You choose the meals</b><p>Fresh AI-suggested menu every week. Tap what you want, skip what you don't.</p></div></div>
-      <div class="feature"><div class="f-ico">💸</div><div><b>Every store, one price check</b><p>Tesco, Sainsbury's, Asda, Waitrose — same basket, best price.</p></div></div>
+  <div class="screen" id="scr-landing">
+    <div style="padding:28px 4px 8px">
+      <h1>What's for dinner<br><em>tonight?</em></h1>
+      <p class="lede">Never that question again.</p>
+      <p class="sub">We plan your week, price it at Tesco, Sainsbury's, Asda or Waitrose, and order the missing ingredients to your door.</p>
+      <button class="btn" style="width:100%" onclick="startOnboarding()">Plan my week →</button>
+      <p class="sub" style="text-align:center;margin-top:12px">Early access · we shop it for you</p>
     </div>
     <div class="card">
-      <h2 id="auth-title">Create your account</h2>
-      <p class="sub" id="auth-sub">Free while in beta. No card needed.</p>
-      <div class="field" id="f-name"><label>Name</label><input id="su-name" placeholder="Noe"></div>
-      <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com"></div>
-      <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="••••••••"></div>
-      <div class="err" id="auth-err"></div>
-      <button class="btn" style="width:100%" id="auth-btn" onclick="submitAuth()">Sign up free →</button>
-      <p class="sub" style="margin:12px 0 0;text-align:center">
-        <span id="auth-switch-label">Already have an account?</span>
-        <a href="#" style="color:var(--green)" onclick="toggleAuthMode();return false" id="auth-switch">Log in</a>
-      </p>
+      <h2>How it works</h2>
+      <div class="feature"><div class="f-ico">🛒</div><div><b>Pick your supermarket</b><p>Same week, live prices at the four shops that deliver to you.</p></div></div>
+      <div class="feature"><div class="f-ico">🍽️</div><div><b>A week you'll actually cook</b><p>Photo dinners, minutes, and a price per meal — swap anything.</p></div></div>
+      <div class="feature"><div class="f-ico">📦</div><div><b>We place the order</b><p>Card hold, then we order from your shop to your address.</p></div></div>
+    </div>
+    <div class="day-card" style="cursor:default">
+      <div class="day-photo"><img src="https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=400&h=400&q=80" alt="Chicken curry"></div>
+      <div style="flex:1;min-width:0"><div class="nm">Chicken & chickpea curry</div><div class="meta">30 min · 2 people</div><span class="tag">quick</span></div>
+      <div class="mp">£8.40</div>
     </div>
   </div>
 
   <!-- ONBOARDING -->
-  <div class="screen" id="scr-onboard">
-    <div class="steps"><i class="done"></i><i id="st2"></i><i id="st3"></i></div>
-    <div class="card" id="ob-1">
-      <h2>Set up your kitchen</h2>
-      <p class="sub">30 seconds — the planner uses this every week.</p>
-      <div class="grid2">
-        <div><label>Postcode</label><input id="ob-postcode" value="E2 8AA" placeholder="e.g. E2 8AA"></div>
-        <div><label>Household size</label><select id="ob-size"><option>1</option><option selected>2</option><option>3</option><option>4+</option></select></div>
-        <div><label>Weekly food budget (£)</label><input id="ob-budget" type="number" value="60"></div>
-        <div><label>Dinners to plan / week</label><select id="ob-meals"><option>3</option><option>4</option><option selected>5</option><option>7</option></select></div>
-      </div>
-      <div style="margin-top:14px"><button class="btn" onclick="obNext(2)">Continue →</button></div>
+  <div class="screen active" id="scr-onboard">
+    <div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="ob-back" onclick="obBack()">←</button><div class="steps" style="flex:1;margin:0"><i class="done"></i><i id="st2"></i><i id="st3"></i><i id="st4"></i><i id="st5"></i><i id="st6"></i></div></div>
+    <div id="ob-1">
+      <h1>What do you need help with?</h1>
+      <p class="sub">Pick everything that's true. We'll shape the week around it.</p>
+      <div id="ob-goals"></div>
+      <div style="margin-top:16px"><button class="btn" style="width:100%" id="ob-goal-btn" onclick="obNext(2)" disabled>Continue</button></div>
     </div>
-    <div class="card" id="ob-2" style="display:none">
-      <h2>What's in your kitchen right now?</h2>
-      <p class="sub">Just describe it — fridge, cupboards, the lot. The AI turns it into a tracked pantry so you never re-buy what you have.</p>
-      <textarea id="ob-fridge" placeholder="e.g. half a bag of rice, some pasta, a full bottle of olive oil, 3 eggs, a jar of curry paste almost finished, couple of onions..."></textarea>
-      <div style="margin-top:10px" class="row">
-        <button class="btn" id="scan-btn" onclick="scanPantry()">✨ Scan with AI</button>
-        <button class="btn ghost sm" onclick="skipScan()">Start empty</button>
+    <div id="ob-2" style="display:none">
+      <h1>Choose your shop</h1>
+      <p class="sub" id="ob-stores-sub">Same 5-dinner week, priced at each supermarket. You can change this later.</p>
+      <div class="store-grid" id="ob-stores"></div>
+      <div class="hint" id="ob-savings">We'll adapt ingredients and prices to your store.</div>
+      <div class="err" id="ob-store-err"></div>
+      <div style="margin-top:8px"><button class="btn" style="width:100%" id="ob-store-btn" onclick="obNext(3)" disabled>Continue</button></div>
+    </div>
+    <div id="ob-3" style="display:none">
+      <h1>How many of you?</h1>
+      <p class="sub">We scale portions and the shop.</p>
+      <div class="counter">
+        <div class="n" id="ob-size-n">2</div>
+        <div class="k">people</div>
+        <div class="row"><button class="minus" onclick="adjSize(-1)">−</button><button class="plus" onclick="adjSize(1)">+</button></div>
       </div>
+      <select id="ob-size" style="display:none"><option>1</option><option selected>2</option><option>3</option><option>4+</option></select>
+      <button class="btn" style="width:100%" onclick="obNext(4)">Continue</button>
+    </div>
+    <div id="ob-4" style="display:none">
+      <h1>What's your budget?</h1>
+      <p class="sub">We'll fit dinners to it — groceries at store price, no markup.</p>
+      <div class="budget-val">£<span id="ob-budget-n">60</span></div>
+      <p class="sub" style="text-align:center">per week</p>
+      <input id="ob-budget" type="range" min="25" max="150" step="5" value="60" oninput="syncBudgetLabel()">
+      <div class="row" style="justify-content:space-between"><span class="sub" style="margin:0">£25 tight</span><span class="sub" style="margin:0">£150 comfort</span></div>
+      <div class="hint">Same basket compared across Tesco, Sainsbury's, Asda and Waitrose.</div>
+      <input id="ob-postcode" value="E2 8AA" placeholder="Postcode" maxlength="8" style="margin:8px 0">
+      <div class="err" id="ob-err"></div>
+      <button class="btn" style="width:100%;margin-top:8px" onclick="obNext(5)">Continue</button>
+    </div>
+    <div id="ob-5" style="display:none">
+      <h1>How many dinners?</h1>
+      <p class="sub">We'll plan that many this week.</p>
+      <div id="ob-meals-picks"></div>
+      <select id="ob-meals" style="display:none"><option>3</option><option>4</option><option selected>5</option><option>7</option></select>
+      <button class="btn" style="width:100%;margin-top:12px" onclick="obNext(6)">Continue</button>
+    </div>
+    <div id="ob-6" style="display:none">
+      <h1>Anything already in the kitchen?</h1>
+      <p class="sub">Optional — skip and we'll shop a full basket.</p>
+      <textarea id="ob-fridge" placeholder="e.g. half a bag of rice, 3 eggs, olive oil…"></textarea>
       <div class="err" id="scan-err"></div>
       <div id="scan-result" style="display:none">
-        <h3 style="margin-top:14px">Found in your kitchen — adjust if needed:</h3>
+        <h3 style="margin-top:14px">Found — adjust if needed</h3>
         <div id="ob-pantry-list"></div>
-        <div style="margin-top:14px"><button class="btn" onclick="obNext(3)">Looks right →</button></div>
       </div>
+      <button class="btn" style="width:100%;margin-top:14px" onclick="beginGenerate()">Skip — generate my week</button>
+      <button class="btn ghost" style="width:100%;margin-top:8px" id="scan-btn" onclick="scanPantry()">Scan with AI</button>
     </div>
-    <div class="card" id="ob-3" style="display:none">
-      <h2>Stores near you</h2>
-      <p class="sub" id="ob-stores-sub"></p>
-      <div id="ob-stores"></div>
-      <div style="margin-top:14px"><button class="btn" onclick="finishOnboarding()">⚡ Build my menu</button></div>
+  </div>
+
+  <div class="screen" id="scr-generating">
+    <div class="gen-wrap">
+      <h1>Preparing your week…</h1>
+      <p class="sub">Picking dinners and building the shopping list for your shop.</p>
+      <div class="card" style="text-align:left">
+        <div class="gen-step" id="gs1"><span>Reading your shop and budget</span><span id="gs1s">…</span></div>
+        <div class="gen-step" id="gs2"><span>Choosing dinners you'll cook</span><span id="gs2s">waiting</span></div>
+        <div class="gen-step" id="gs3"><span>Building the shopping list</span><span id="gs3s">waiting</span></div>
+      </div>
     </div>
   </div>
 
   <!-- MENU -->
   <div class="screen" id="scr-menu">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div><h2>This week's menu</h2><p class="sub" style="margin:0" id="menu-sub">Tap the meals you want.</p></div>
-        <div class="row" style="gap:6px">
-          <button class="btn sm" onclick="openAdvisor()">💬 Meal advisor</button>
-          <button class="btn ghost sm" id="menu-refresh" onclick="loadMenuOptions(true)">↻ New ideas</button>
-        </div>
-      </div>
-    </div>
-    <div class="menu-grid" id="menu-grid"></div>
-    <div class="card" style="margin-top:12px">
-      <div class="row">
-        <div class="stat"><div class="v" id="stat-picked">0</div><div class="k">meals picked</div></div>
-        <div class="stat"><div class="v" id="stat-cost">—</div><div class="k">est. basket</div></div>
-        <div class="stat"><div class="v" id="stat-pantry">—</div><div class="k">from pantry</div></div>
-      </div>
-      <button class="btn" style="width:100%;margin-top:12px" id="to-basket-btn" onclick="goShop()" disabled>Pick at least one meal</button>
-    </div>
+    <div id="menu-week"></div>
   </div>
 
   <!-- PANTRY -->
@@ -226,7 +315,7 @@
     </div>
     <div class="card">
       <h2>Best price near you</h2>
-      <p class="sub">Same basket, priced at each store delivering to you. Pick one and Plentry fills your basket there — you pay the store directly, no markup.</p>
+      <p class="sub">Same basket, priced at Tesco, Sainsbury's, Asda and Waitrose. Pick one — we place the order at that supermarket after your card hold.</p>
       <div id="store-compare"></div>
       <div class="alert ok" id="savings-line" style="display:none"></div>
       <button class="btn" style="width:100%" id="order-btn" onclick="confirmOrder()" disabled>Select a store to order</button>
@@ -235,7 +324,7 @@
 
   <!-- ORDERS -->
   <div class="screen" id="scr-orders">
-    <div class="card"><h2>Orders</h2><p class="sub">Plentry builds your bag; you check out at the store and it arrives by their delivery. Recipes unlock as soon as you order.</p><div id="orders-list"><p class="sub">No orders yet. Pick meals from your menu.</p></div></div>
+    <div class="card"><h2>Orders</h2><p class="sub">After the card hold we order from your supermarket to your door. Recipes unlock as soon as you check out.</p><div id="orders-list"><p class="sub">No orders yet. Pick meals from your menu.</p></div></div>
   </div>
 
   <!-- PROFILE -->
@@ -244,10 +333,11 @@
       <h2 id="pr-hello">Profile</h2>
       <p class="sub" id="pr-email"></p>
       <div class="grid2">
-        <div><label>Postcode</label><input id="pr-postcode"></div>
+        <div><label>Postcode</label><input id="pr-postcode" maxlength="8"></div>
         <div><label>Household size</label><select id="pr-size"><option>1</option><option>2</option><option>3</option><option>4+</option></select></div>
-        <div><label>Weekly budget (£)</label><input id="pr-budget" type="number"></div>
+        <div><label>Weekly budget (£)</label><input id="pr-budget" type="number" min="1" max="500" step="1"></div>
         <div><label>Dinners / week</label><select id="pr-meals"><option>3</option><option>4</option><option>5</option><option>7</option></select></div>
+        <div><label>Preferred supermarket</label><select id="pr-store"><option value="">No preference</option></select></div>
       </div>
       <div class="row" style="margin-top:14px">
         <button class="btn" onclick="saveProfile()">Save changes</button>
@@ -257,7 +347,16 @@
     </div>
     <div class="card">
       <h3>Beta notes</h3>
-      <p class="sub" style="margin:0">Free during beta — no payment yet. Prices are live estimates; final price confirms at the store. Your order is placed for you by the Plentry team within the delivery window.</p>
+      <p class="sub" style="margin:0">Concierge beta: you pay a card hold (~15% above the estimate), we order to your address from Tesco, Sainsbury's, Asda or Waitrose, then charge the exact store total. Typical delivery fees are included; the slot is confirmed when we place it.</p>
+    </div>
+  </div>
+
+  <!-- ADMIN OPS (founder only — nav button revealed by JS for the admin email) -->
+  <div class="screen" id="scr-admin">
+    <div class="card">
+      <h2>Ops — order queue</h2>
+      <p class="sub">All customer orders, newest first. Work top-down: open the list, order at the store, mark it Ordered, then Delivered when it lands (delivery auto-refills the customer's pantry).</p>
+      <div id="admin-list"><p class="sub">Loading…</p></div>
     </div>
   </div>
 
@@ -267,9 +366,20 @@
     <button data-s="shop" onclick="nav('shop')"><span class="ico">🛒</span>Basket</button>
     <button data-s="orders" onclick="nav('orders')"><span class="ico">📦</span>Orders</button>
     <button data-s="profile" onclick="nav('profile')"><span class="ico">👤</span>Profile</button>
+    <button data-s="admin" id="nav-admin" style="display:none" onclick="nav('admin')"><span class="ico">🧑‍🍳</span>Ops</button>
   </nav>
+  <div class="sticky-cta" id="sticky-cta">
+    <button class="btn" id="sticky-order" onclick="openBasket()">Order this week</button>
+  </div>
 </div>
 
+<button class="basket-fab" id="basket-fab" onclick="openBasket()" type="button">
+  <span class="fab-count" id="fab-count">0</span>
+  <span id="fab-label">Basket</span>
+</button>
+<div class="basket-bg" id="basket-bg" onclick="if(event.target===this)closeBasket()">
+  <div class="basket-panel" id="basket-panel"></div>
+</div>
 <div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modal"></div>
 </div>
@@ -280,6 +390,24 @@
 const SUPABASE_URL="https://ucciqthwxnlkjalwlhvh.supabase.co";
 const SUPABASE_KEY="sb_publishable_bgkssbRBOQ-kr1HTA79HMg_VUBmAwcp"; // publishable — safe client-side, RLS guards data
 const sb=(typeof window!=="undefined"&&window.supabase)?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+
+// ---------- SECURITY ----------
+// HTML-escape EVERY untrusted value before it goes into innerHTML. Untrusted =
+// anything from the AI, the shared `meals` table (any user can insert rows),
+// Pepesto product names, or another user's order (shown in the admin panel).
+// Without this a malicious meal name / product / order field is stored XSS —
+// and order data renders in the founder's Ops tab, so it would run there too.
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+// URLs that go into href attributes: only ever http(s), escaped. Anything else
+// (javascript:, data:, a hostile string synced via cloud state) becomes "#".
+function safeUrl(u){u=String(u==null?"":u).trim();return /^https?:\/\//i.test(u)?esc(u):"#";}
+// UK postcode (permissive official pattern). Returns normalised "E2 8AA" or null.
+function normPostcode(v){
+  const p=String(v||"").trim().toUpperCase().replace(/\s+/g," ");
+  return /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/.test(p)?(p.includes(" ")?p:p.slice(0,-3)+" "+p.slice(-3)):null;
+}
+// Budgets: whole pounds, 1–500. Server clamps too — this is just good UX.
+function normBudget(v,fallback){const n=Math.round(Number(v));return Number.isFinite(n)&&n>=1?Math.min(500,n):fallback;}
 
 // ---------- AI ----------
 // The endpoint acts on the user's own credentials: it reads the shared meals
@@ -311,20 +439,96 @@ async function checkoutApi(task,payload){
   }catch(e){return null;}
 }
 
+// Same pattern, for the `pay` edge function (Stripe checkout + admin capture).
+// Requires a signed-in user (verify_jwt=true). {live:false} => Stripe not
+// configured yet; callers fall back to the free-beta flow.
+async function payApi(task,payload){
+  try{
+    if(!sb)return null;
+    const {data}=await sb.auth.getSession();
+    const accessToken=data&&data.session?data.session.access_token:null;
+    if(!accessToken)return null;
+    const r=await fetch(SUPABASE_URL+"/functions/v1/pay",{method:"POST",
+      headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+accessToken},
+      body:JSON.stringify({task,payload})});
+    if(!r.ok)return null;
+    return await r.json();
+  }catch(e){return null;}
+}
+
 // ---------- CATALOG ----------
 // mult = reference-price multiplier, used ONLY as fallback when live quotes
 // (Pepesto via the `checkout` edge function) are unavailable.
 // search = public search-results URL, used for the manual handoff flow.
 const STORES=[
-  {id:"asda",name:"Asda",dist:"0.9 mi",fee:3.00,eta:"Today 19:00–20:00",mult:0.88,
-    home:"https://groceries.asda.com/",search:"https://groceries.asda.com/search/{q}"},
   {id:"tesco",name:"Tesco",dist:"0.7 mi",fee:3.00,eta:"Today 19:00–20:00",mult:1.00,
     home:"https://www.tesco.com/groceries/",search:"https://www.tesco.com/groceries/en-GB/search?query={q}"},
   {id:"sains",name:"Sainsbury's",dist:"1.1 mi",fee:3.50,eta:"Tomorrow 10:00–11:00",mult:1.07,
     home:"https://www.sainsburys.co.uk/shop/gb/groceries",search:"https://www.sainsburys.co.uk/gol-ui/SearchResults/{q}"},
+  {id:"asda",name:"Asda",dist:"0.9 mi",fee:3.00,eta:"Today 19:00–20:00",mult:0.88,
+    home:"https://groceries.asda.com/",search:"https://groceries.asda.com/search/{q}"},
   {id:"wait",name:"Waitrose",dist:"1.6 mi",fee:4.00,eta:"Tomorrow 12:00–13:00",mult:1.34,
     home:"https://www.waitrose.com/",search:"https://www.waitrose.com/ecom/shop/search?&searchTerm={q}"},
 ];
+const STORE_MARK={tesco:{c:"#00539F",l:"T"},sains:{c:"#F06C00",l:"S"},asda:{c:"#68A51C",l:"A"},wait:{c:"#7BB01B",l:"W"}};
+const SHELF_LABEL="Own-brand shelf prices — Tesco estimated Sep 2026, others checked 5 Jul. Final price confirms at the store. Delivery is a typical fee, not a live slot.";
+const SAMPLE_WEEK_ITEMS=[
+  {name:"chicken thighs",qty:1,unit:"500g"},{name:"salmon fillet",qty:1,unit:"2 pc"},
+  {name:"minced beef",qty:1,unit:"500g"},{name:"halloumi",qty:1,unit:"225g"},
+  {name:"eggs",qty:1,unit:"6 pk"},{name:"chickpeas",qty:1,unit:"400g tin"},
+  {name:"rice",qty:1,unit:"1kg"},{name:"spaghetti",qty:1,unit:"500g"},
+  {name:"tortillas",qty:1,unit:"8 pk"},{name:"coconut milk",qty:1,unit:"400ml"},
+  {name:"curry paste",qty:1,unit:"jar"},{name:"passata",qty:1,unit:"500g"},
+  {name:"onions",qty:2,unit:"3 pk"},{name:"garlic",qty:2,unit:"bulb"},
+  {name:"bell peppers",qty:1,unit:"3 pk"},{name:"broccoli",qty:1,unit:"head"},
+  {name:"spinach",qty:1,unit:"240g"},{name:"lemons",qty:1,unit:"3 pk"},
+  {name:"potatoes",qty:1,unit:"1kg"},{name:"olive oil",qty:1,unit:"500ml"},
+  {name:"feta",qty:1,unit:"200g"},{name:"yoghurt",qty:1,unit:"500g"},
+  {name:"parmesan",qty:1,unit:"80g"},
+];
+const U=id=>`https://images.unsplash.com/${id}?auto=format&fit=crop&w=800&h=520&q=80`;
+const MEAL_PHOTOS={
+  "Chicken & chickpea curry":U("photo-1585937421612-70a008356fbe"),
+  "Salmon traybake":U("photo-1467003909585-2f8a72700288"),
+  "Beef ragù spaghetti":U("photo-1551892374-ecf8754cf8b0"),
+  "Halloumi fajitas":U("photo-1565299585323-38d6b0865b47"),
+  "Shakshuka":U("photo-1590412200988-a436970781fa"),
+  "Chickpea & spinach curry":U("photo-1455619452474-d2be8b1e70cd"),
+  "Greek chicken bowls":U("photo-1540189549336-e6e99c3679fe"),
+  "Veggie spaghetti pomodoro":U("photo-1621996346565-e3dbc646d9a9"),
+  "Lemon garlic roast chicken & potatoes":U("photo-1598103442097-8b74394b95c6"),
+  "Beef keema with rice":U("photo-1565557623262-b51c2513a641"),
+  "Salmon & broccoli pasta":U("photo-1563379926898-05f4575a45d8"),
+  "Spanish tortilla with tomato salad":U("photo-1608039829572-dee9b9547d0d"),
+  "Halloumi & chickpea traybake":U("photo-1512621776951-a57141f2eefd"),
+  "Chicken tikka-style wraps":U("photo-1626700051175-6818013e1d4f"),
+  "Egg fried rice with broccoli":U("photo-1603133872878-684f208fb84b"),
+  "Beef & bell pepper tacos":U("photo-1551504734-5ee1c36e3989"),
+  "Coconut salmon curry":U("photo-1455619452474-d2be8b1e70cd"),
+  "Baked feta pasta":U("photo-1473093295043-cdd812d0e601"),
+  "Chicken & broccoli rice bowls":U("photo-1546069901-ba9599a7e63c"),
+  "Spiced potato & spinach curry":U("photo-1585937421612-70a008356fbe"),
+  "Beef meatballs in tomato sauce":U("photo-1529042410759-befb1204b468"),
+  "Halloumi wraps with herby yoghurt":U("photo-1626700051175-6818013e1d4f"),
+  "Chickpea shakshuka":U("photo-1590412200988-a436970781fa"),
+  "Lemon chicken & parmesan rice":U("photo-1598103442097-8b74394b95c6"),
+  "Crispy salmon & smashed potatoes":U("photo-1467003909585-2f8a72700288"),
+  "Beef stuffed peppers":U("photo-1604467715873-828d3868e8f1"),
+  "Chicken saag-style curry":U("photo-1565557623262-b51c2513a641"),
+  "Greek-style chickpea salad bowls":U("photo-1540189549336-e6e99c3679fe"),
+  "Spinach & feta omelette with potatoes":U("photo-1525351484163-7529414344d8"),
+  "Tomato & parmesan baked rice":U("photo-1536304993881-47c5e0f0b6e1"),
+  "Curried beef & potato traybake":U("photo-1604908176997-125f25cc6f3d"),
+  "Halloumi & broccoli grain bowls":U("photo-1512621776951-a57141f2eefd"),
+  "Chicken fajita rice":U("photo-1565299585323-38d6b0865b47"),
+  "Salmon tacos with lemon yoghurt":U("photo-1551504734-5ee1c36e3989"),
+  "Spaghetti aglio e olio with spinach":U("photo-1621996346565-e3dbc646d9a9"),
+  "Chickpea & potato coconut stew":U("photo-1455619452474-d2be8b1e70cd"),
+  "Beef & broccoli fried rice":U("photo-1603133872878-684f208fb84b"),
+  "Feta & pepper egg wraps":U("photo-1626700051175-6818013e1d4f"),
+  "Chicken parm-style bake":U("photo-1632778149955-e80f8ceca18e"),
+  "Tandoori-style yoghurt chicken with rice":U("photo-1599487488170-d91ec13f0cf0"),
+};
 const IS_MOBILE=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const INGREDIENTS={
   "chicken thighs":{unit:"500g",price:3.80},"salmon fillet":{unit:"2 pc",price:4.50},
@@ -340,6 +544,45 @@ const INGREDIENTS={
   "olive oil":{unit:"500ml",price:3.50},"feta":{unit:"200g",price:1.95},
   "yoghurt":{unit:"500g",price:1.25},"parmesan":{unit:"80g",price:1.85},
 };
+// ---------- SHELF PRICES (ingredient_prices table) ----------
+// Real own-brand shelf prices per store, captured 5 Jul 2026 (see supabase/ingredient_prices.sql).
+// Keyed by meal_key (same keys as meals.ing / INGREDIENTS) then app store id.
+// Used for per-store totals + matched products on the manual path; Pepesto live quotes still win.
+const DB_STORE={tesco:"tesco",asda:"asda",sains:"sainsburys",wait:"waitrose"}; // app id -> db store id
+let SHELF={};let SHELF_READY=false;
+async function loadShelfPrices(){
+  if(!sb)return;
+  try{
+    const {data,error}=await sb.from("ingredient_prices")
+      .select("meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
+    if(error||!data)return;
+    // key by meal_key when linked to the meal catalog, else display_name — so pantry
+    // items outside the 24 meal keys (soy sauce, ketchup, …) still price correctly.
+    const byDb={};
+    for(const r of data){const k=r.meal_key||(r.display_name||"").toLowerCase();if(!k)continue;(byDb[k]=byDb[k]||{})[r.store]=r;}
+    SHELF={};
+    for(const [key,stores] of Object.entries(byDb)){
+      SHELF[key]={};
+      for(const [appId,dbId] of Object.entries(DB_STORE))if(stores[dbId])SHELF[key][appId]=stores[dbId];
+    }
+    SHELF_READY=Object.keys(SHELF).length>0;
+    if(basket.length)renderShop();
+    const ob2=document.getElementById("ob-2");
+    if(ob2&&ob2.style.display==="block")renderObStores();
+    renderBasketFab();
+    if(basketOpen)renderBasketDrawer();
+  }catch(e){}
+}
+function shelfRow(item,store){return (SHELF[item]&&SHELF[item][store.id])||null;}
+// Crash-proof ingredient info: hardcoded catalog first, then shelf data (pack size +
+// cheapest store price), then a generic guess. NEVER throws on unknown pantry items.
+function ingInfo(i){
+  if(INGREDIENTS[i])return INGREDIENTS[i];
+  const s=SHELF[i]&&Object.values(SHELF[i]);
+  if(s&&s.length)return {unit:s[0].pack_size||"",price:Math.min(...s.map(r=>Number(r.price_gbp)))};
+  return {unit:"",price:2.50};
+}
+
 // Fallback menu when the AI endpoint isn't configured/reachable
 const FALLBACK_MEALS=[
   {name:"Chicken & chickpea curry",emoji:"🍛",time:30,ing:["chicken thighs","chickpeas","curry paste","coconut milk","onions","garlic","rice","spinach"]},
@@ -351,11 +594,27 @@ const FALLBACK_MEALS=[
   {name:"Greek chicken bowls",emoji:"🥗",time:30,ing:["chicken thighs","rice","tomatoes","feta","yoghurt","lemons","garlic"]},
   {name:"Veggie spaghetti pomodoro",emoji:"🍅",time:20,ing:["spaghetti","passata","tomatoes","garlic","olive oil","parmesan"]},
 ];
+function mealPhoto(m){
+  const raw=m&&(m.image_url||MEAL_PHOTOS[m.name]);
+  return (raw&&/^https:\/\//i.test(raw))?raw:"";
+}
+function mealImgHtml(m,cls){
+  const src=mealPhoto(m);
+  const emoji=esc(m&&m.emoji||"🍽️");
+  return src?`<img class="${cls}" src="${safeUrl(src)}" alt="${esc(m.name)}" loading="lazy" referrerpolicy="no-referrer" data-emoji="${emoji}" onerror="var d=document.createElement('div');d.className=this.className+' o-emoji-fallback';d.textContent=this.getAttribute('data-emoji');this.replaceWith(d)">`
+    :`<div class="${cls} o-emoji-fallback">${emoji}</div>`;
+}
+function mealThumbHtml(m){
+  const src=mealPhoto(m);
+  const emoji=esc(m&&m.emoji||"🍽️");
+  return src?`<img src="${safeUrl(src)}" alt="${esc(m.name)}" loading="lazy" referrerpolicy="no-referrer" data-emoji="${emoji}" onerror="var d=document.createElement('div');d.className='thumb-fallback';d.textContent=this.getAttribute('data-emoji');this.replaceWith(d)">`
+    :`<div class="thumb-fallback">${emoji}</div>`;
+}
 
 // ---------- STATE ----------
 const DEFAULTS={
   user:null,
-  prefs:{meals:5,size:"2",budget:60,postcode:"E2 8AA"},
+  prefs:{meals:5,size:"2",budget:60,postcode:"E2 8AA",preferredStore:"",goals:[]},
   pantry:{},
   menuOptions:[],   // AI-suggested meals for the week
   selected:[],      // names the user picked
@@ -363,8 +622,12 @@ const DEFAULTS={
   orders:[], onboarded:false,
 };
 let S=load();
-let basket=[],chosenStore=null,authMode="signup";
+if(!S.prefs)S.prefs=JSON.parse(JSON.stringify(DEFAULTS.prefs));
+if(!S.prefs.preferredStore)S.prefs.preferredStore="";
+if(!S.prefs.goals)S.prefs.goals=[];
+let basket=[],chosenStore=null,authMode="signup",basketOpen=false,pendingCheckout=false,pendingMeals=false,obStep=1,lastAuthMsg="";
 let liveQuote=null,liveQuoteKey="",liveQuoteLoading=false; // live store prices for the current basket
+let sampleQuote=null,sampleQuoteLoading=false;
 function load(){
   try{const raw=localStorage.getItem("plentry_v1");if(raw){const d=JSON.parse(JSON.stringify(DEFAULTS));return Object.assign(d,JSON.parse(raw));}}catch(e){}
   return JSON.parse(JSON.stringify(DEFAULTS));
@@ -389,29 +652,51 @@ async function loadCloudState(user){
   try{
     const {data}=await sb.from("profiles").select("state").eq("id",user.id).maybeSingle();
     if(data&&data.state&&data.state.prefs){
-      Object.assign(S,{prefs:data.state.prefs,pantry:data.state.pantry||{},
+      Object.assign(S,{prefs:Object.assign({},DEFAULTS.prefs,data.state.prefs),pantry:data.state.pantry||{},
         menuOptions:data.state.menuOptions||[],selected:data.state.selected||[],
         recipes:data.state.recipes||{},orders:data.state.orders||[],onboarded:!!data.state.onboarded});
     }
   }catch(e){}
+  if(S.prefs.preferredStore)chosenStore=STORES.find(s=>s.id===S.prefs.preferredStore)||chosenStore;
   save();
 }
 const mealByName=n=>S.menuOptions.find(m=>m.name===n)||FALLBACK_MEALS.find(m=>m.name===n);
 const selectedMeals=()=>S.selected.map(mealByName).filter(Boolean);
 
 // ---------- AUTH ----------
+function authFormHtml(){
+  const signup=authMode==="signup";
+  return `<h2 id="auth-title">${signup?"Create your account":"Welcome back"}</h2>
+    <p class="sub" id="auth-sub">${signup?"Card hold at checkout — we order to your door from your supermarket.":"Log in to your kitchen."}</p>
+    <div class="field" id="f-name" style="${signup?"":"display:none"}"><label>Name</label><input id="su-name" placeholder="Noe"></div>
+    <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="••••••••"></div>
+    <div class="err" id="auth-err"></div>
+    <button class="btn" style="width:100%" id="auth-btn" onclick="submitAuth()">${signup?"Sign up →":"Log in →"}</button>
+    <p class="sub" style="margin:12px 0 0;text-align:center">
+      <span id="auth-switch-label">${signup?"Already have an account?":"New here?"}</span>
+      <a href="#" style="color:var(--green)" onclick="toggleAuthMode();return false" id="auth-switch">${signup?"Log in":"Sign up"}</a>
+    </p>`;
+}
+function openAuth(msg){
+  if(S.user&&S.user.id){if(S.onboarded)nav("profile");return;}
+  if(msg)lastAuthMsg=msg;
+  openModal(authFormHtml());
+  if(lastAuthMsg){const sub=document.getElementById("auth-sub");if(sub)sub.textContent=lastAuthMsg;}
+}
+function requireAccount(msg){
+  if(S.user&&(S.user.id||S.user.email))return true;
+  pendingMeals=true;
+  openAuth(msg||"Create an account to choose this week's dinners.");
+  return false;
+}
 function toggleAuthMode(){
   authMode=authMode==="signup"?"login":"signup";
-  document.getElementById("auth-title").textContent=authMode==="signup"?"Create your account":"Welcome back";
-  document.getElementById("auth-sub").textContent=authMode==="signup"?"Free while in beta. No card needed.":"Log in to your kitchen.";
-  document.getElementById("auth-btn").textContent=authMode==="signup"?"Sign up free →":"Log in →";
-  document.getElementById("f-name").style.display=authMode==="signup"?"block":"none";
-  document.getElementById("auth-switch-label").textContent=authMode==="signup"?"Already have an account?":"New here?";
-  document.getElementById("auth-switch").textContent=authMode==="signup"?"Log in":"Sign up";
-  document.getElementById("auth-err").textContent="";
+  openAuth();
 }
 async function submitAuth(){
-  const name=document.getElementById("su-name").value.trim();
+  const nameEl=document.getElementById("su-name");
+  const name=nameEl?nameEl.value.trim():"";
   const email=document.getElementById("su-email").value.trim().toLowerCase();
   const pass=document.getElementById("su-pass").value;
   const err=document.getElementById("auth-err");
@@ -428,9 +713,9 @@ async function submitAuth(){
         if(error)throw error;
         if(!data.session){
           openModal(`<h2 style="margin-bottom:6px">📬 Check your inbox</h2>
-            <p class="sub">We sent a confirmation link to <b style="color:var(--text)">${email}</b>. Click it, then log in here.</p>
-            <button class="btn" style="width:100%" onclick="closeModal();toggleAuthMode()">Got it</button>`);
-          btn.disabled=false;btn.textContent="Sign up free →";return;
+            <p class="sub">We sent a confirmation link to <b style="color:var(--text)">${esc(email)}</b>. Click it, then log in here.</p>
+            <button class="btn" style="width:100%" onclick="authMode='login';openAuth()">Got it</button>`);
+          return;
         }
         await loadCloudState(data.session.user);
       }else{
@@ -440,15 +725,25 @@ async function submitAuth(){
       }
     }catch(e){
       err.textContent=e.message||"Something went wrong — try again.";
-      btn.disabled=false;btn.textContent=authMode==="signup"?"Sign up free →":"Log in →";return;
+      btn.disabled=false;btn.textContent=authMode==="signup"?"Sign up →":"Log in →";return;
     }
     btn.disabled=false;
   }else{
     S.user={name:name||email.split("@")[0],email};save();
   }
-  document.getElementById("scr-landing").classList.remove("active");
-  if(S.onboarded){enterApp();}
-  else{document.getElementById("scr-onboard").classList.add("active");setPill("Setup");}
+  closeModal();
+  syncHeader();
+  lastAuthMsg="";
+  if(pendingCheckout){pendingCheckout=false;confirmOrder();return;}
+  if(pendingMeals){pendingMeals=false;if(S.onboarded)enterApp();return;}
+  const staying=document.getElementById("scr-onboard").classList.contains("active")
+    ||document.getElementById("scr-generating").classList.contains("active")
+    ||document.getElementById("scr-menu").classList.contains("active");
+  if(S.onboarded){
+    enterApp();
+  }else if(!staying){
+    startOnboarding();
+  }
 }
 async function signOut(){
   if(sb){try{await sb.auth.signOut();}catch(e){}}
@@ -457,22 +752,159 @@ async function signOut(){
 }
 
 // ---------- ONBOARDING ----------
-function obNext(step){
-  S.prefs.postcode=document.getElementById("ob-postcode").value||"E2 8AA";
+const OB_GOALS=[
+  {id:"decide",ico:"🤔",t:"I never know what to cook",d:"That 6pm question, every night"},
+  {id:"shop",ico:"🛒",t:"Shopping takes too long",d:"I want the list done for me"},
+  {id:"waste",ico:"🥬",t:"I waste food",d:"We buy more than we cook"},
+  {id:"budget",ico:"💷",t:"Stay on a budget",d:"Know the week's grocery spend"},
+  {id:"variety",ico:"🍽️",t:"Same meals on repeat",d:"A mixed week without thinking"},
+];
+function startOnboarding(){
+  activateScreen("scr-onboard");
+  document.getElementById("main-nav").classList.remove("show");
+  showSticky(false);
+  renderObGoals();
+  renderObMealPicks();
+  syncSizeLabel();
+  syncBudgetLabel();
+  showObStep(1);
+  syncHeader();
+}
+function saveHousehold(){
+  const err=document.getElementById("ob-err");
+  const pc=normPostcode(document.getElementById("ob-postcode").value);
+  if(!pc){if(err)err.textContent="Enter a valid UK postcode (e.g. E2 8AA).";return false;}
+  if(err)err.textContent="";
+  S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("ob-size").value;
-  S.prefs.budget=+document.getElementById("ob-budget").value||60;
+  S.prefs.budget=normBudget(document.getElementById("ob-budget").value,60);
   S.prefs.meals=+document.getElementById("ob-meals").value;
   save();
-  ["ob-1","ob-2","ob-3"].forEach((id,i)=>document.getElementById(id).style.display=step===i+1?"block":"none");
-  document.getElementById("st2").className=step>=2?"done":"";
-  document.getElementById("st3").className=step>=3?"done":"";
-  if(step===3){
-    document.getElementById("ob-stores-sub").textContent=`Found ${STORES.length} supermarkets delivering to ${S.prefs.postcode}. We'll compare every basket across all of them.`;
-    document.getElementById("ob-stores").innerHTML=STORES.map(s=>
-      `<div class="store"><div><div class="sname">${s.name}</div><div class="sdetail">${s.dist} away · delivery £${s.fee.toFixed(2)} · ${s.eta}</div></div><div style="font-size:1.3rem">✓</div></div>`).join("");
-  }
+  return true;
 }
-// crude local parser used when the AI endpoint is unavailable
+function showObStep(step){
+  obStep=step;
+  ["ob-1","ob-2","ob-3","ob-4","ob-5","ob-6"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.style.display=step===i+1?"block":"none";});
+  ["st2","st3","st4","st5","st6"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.className=step>=i+2?"done":"";});
+  if(step===2){renderObStores();fetchSampleQuote();}
+  if(step===3)syncSizeLabel();
+  if(step===4){
+    const b=document.getElementById("ob-budget");if(b)b.value=S.prefs.budget||60;
+    const pc=document.getElementById("ob-postcode");if(pc&&S.prefs.postcode)pc.value=S.prefs.postcode;
+    syncBudgetLabel();
+  }
+  if(step===5)renderObMealPicks();
+}
+function obBack(){
+  if(obStep<=1)return;
+  showObStep(obStep-1);
+}
+function obNext(step){
+  if(step===2&&!(S.prefs.goals&&S.prefs.goals.length))return;
+  if(step===3&&!S.prefs.preferredStore){
+    const e=document.getElementById("ob-store-err");
+    if(e)e.textContent="Tap the supermarket you want us to order from.";
+    return;
+  }
+  if(step>=5&&!saveHousehold())return;
+  showObStep(step);
+}
+function renderObGoals(){
+  if(!S.prefs.goals)S.prefs.goals=[];
+  const el=document.getElementById("ob-goals");if(!el)return;
+  el.innerHTML=OB_GOALS.map(g=>
+    `<button type="button" class="choice ${S.prefs.goals.includes(g.id)?"sel":""}" onclick="toggleGoal('${g.id}')">
+      <div class="c-ico">${g.ico}</div><div><b>${esc(g.t)}</b><p>${esc(g.d)}</p></div>
+    </button>`).join("");
+  const btn=document.getElementById("ob-goal-btn");
+  if(btn)btn.disabled=!S.prefs.goals.length;
+}
+function toggleGoal(id){
+  S.prefs.goals=S.prefs.goals||[];
+  const i=S.prefs.goals.indexOf(id);
+  i>=0?S.prefs.goals.splice(i,1):S.prefs.goals.push(id);
+  save();renderObGoals();
+}
+function sizeNum(){const v=S.prefs.size;return v==="4+"?4:Math.max(1,+v||2);}
+function syncSizeLabel(){
+  const n=sizeNum();
+  const el=document.getElementById("ob-size-n");if(el)el.textContent=S.prefs.size==="4+"?"4+":n;
+  const sel=document.getElementById("ob-size");if(sel)sel.value=S.prefs.size;
+}
+function adjSize(d){
+  let n=Math.max(1,Math.min(6,sizeNum()+d));
+  S.prefs.size=n>=4?"4+":String(n);
+  const sel=document.getElementById("ob-size");if(sel)sel.value=S.prefs.size;
+  save();syncSizeLabel();
+}
+function syncBudgetLabel(){
+  const el=document.getElementById("ob-budget");
+  const n=el?+el.value:S.prefs.budget;
+  const lab=document.getElementById("ob-budget-n");if(lab)lab.textContent=n;
+}
+function renderObMealPicks(){
+  const el=document.getElementById("ob-meals-picks");if(!el)return;
+  const n=S.prefs.meals||5;
+  const copy={3:"A light week",4:"Most weeknights",5:"A full week of dinners",7:"Every night"};
+  el.innerHTML=[3,4,5,7].map(x=>
+    `<button type="button" class="choice ${x===n?"sel":""}" onclick="pickMealCount(${x})">
+      <div class="c-ico">🍽️</div><div><b>${x} dinners</b><p>${copy[x]}</p></div>
+    </button>`).join("");
+}
+function pickMealCount(n){
+  S.prefs.meals=n;
+  const sel=document.getElementById("ob-meals");if(sel)sel.value=String(n);
+  save();renderObMealPicks();
+}
+function sampleStoreTotal(s){
+  return SAMPLE_WEEK_ITEMS.reduce((t,b)=>{
+    const r=shelfRow(b.name,s);
+    return t+b.qty*(r?Number(r.price_gbp):ingInfo(b.name).price*s.mult);
+  },0)+s.fee;
+}
+function sampleStoreQuote(s){
+  const q=sampleQuote&&sampleQuote.stores&&sampleQuote.stores[s.id];
+  if(q&&q.ok)return {t:q.total/100+s.fee,live:true};
+  const shelf=SHELF_READY&&SAMPLE_WEEK_ITEMS.every(b=>shelfRow(b.name,s));
+  return {t:sampleStoreTotal(s),live:false,shelf};
+}
+function renderObStores(){
+  const sub=document.getElementById("ob-stores-sub");
+  if(sub)sub.textContent=`Same 5 dinners, delivering to ${S.prefs.postcode||"you"}. Tap your shop.`;
+  const totals=STORES.map(s=>({s,...sampleStoreQuote(s)})).sort((a,b)=>a.t-b.t);
+  const best=totals[0],worst=totals[totals.length-1];
+  const host=document.getElementById("ob-stores");
+  if(host)host.innerHTML=totals.map(({s,t,live,shelf},idx)=>{
+    const mk=STORE_MARK[s.id]||{c:"#1f4a34",l:s.name[0]};
+    return `<button type="button" class="store-tile ${S.prefs.preferredStore===s.id?"picked":""}${idx===0?" best":""}" onclick="pickPreferredStore('${s.id}')">
+      <div class="mark" style="background:${mk.c}">${mk.l}</div>
+      <div class="sname">${esc(s.name)}</div>
+      <div class="sprice">${sampleQuoteLoading&&!live?"…":"£"+t.toFixed(0)}</div>
+      <div class="sdetail">${idx===0?"Cheapest this week":live?"Live prices":shelf?"Shelf prices":"Estimate"}</div>
+    </button>`;
+  }).join("");
+  const sl=document.getElementById("ob-savings");
+  if(sl)sl.textContent=(sampleQuoteLoading?"Fetching live prices… ":"")+
+    `Choosing ${best.s.name} saves about £${(worst.t-best.t).toFixed(0)} vs ${worst.s.name} on this sample week.`+
+    (totals.some(x=>x.live)?"":" "+SHELF_LABEL);
+  const btn=document.getElementById("ob-store-btn");
+  const picked=STORES.find(s=>s.id===S.prefs.preferredStore);
+  if(btn){btn.disabled=!picked;btn.textContent=picked?`Continue with ${picked.name}`:"Pick a supermarket";}
+}
+function pickPreferredStore(id){
+  S.prefs.preferredStore=id;
+  chosenStore=STORES.find(s=>s.id===id)||null;
+  save();
+  const err=document.getElementById("ob-store-err");if(err)err.textContent="";
+  renderObStores();
+}
+async function fetchSampleQuote(){
+  sampleQuoteLoading=true;renderObStores();
+  const res=await checkoutApi("quote",{items:SAMPLE_WEEK_ITEMS,stores:STORES.map(s=>s.id)});
+  sampleQuoteLoading=false;
+  sampleQuote=(res&&res.live)?res:null;
+  renderObStores();
+}
 function localParsePantry(text){
   const t=text.toLowerCase();
   const syn={"pasta":"spaghetti","peppers":"bell peppers","pepper":"bell peppers","tinned tomatoes":"passata","canned tomatoes":"passata","egg":"eggs","onion":"onions","potato":"potatoes","tomato":"tomatoes","lemon":"lemons","chicken":"chicken thighs","salmon":"salmon fillet","beef":"minced beef","mince":"minced beef","yogurt":"yoghurt"};
@@ -489,127 +921,352 @@ function localParsePantry(text){
 async function scanPantry(){
   const text=document.getElementById("ob-fridge").value.trim();
   const err=document.getElementById("scan-err");
-  if(!text){err.textContent="Describe at least a few things — or tap Start empty.";return;}
+  if(!text){err.textContent="Describe at least a few things — or tap Skip.";return;}
   err.textContent="";
   const btn=document.getElementById("scan-btn");
   btn.disabled=true;btn.innerHTML='<span class="spin">✨</span> Scanning…';
   const res=await ai("parse_pantry",{text});
   let pantry=(res&&res.pantry)||null;
-  if(pantry){ // keep only catalog items, clamp values
+  if(pantry){
     const clean={};Object.entries(pantry).forEach(([k,v])=>{if(INGREDIENTS[k])clean[k]=Math.max(0,Math.min(1,+v||0));});
     pantry=Object.keys(clean).length?clean:null;
   }
   if(!pantry)pantry=localParsePantry(text);
   S.pantry=pantry;save();
-  btn.disabled=false;btn.textContent="✨ Scan with AI";
+  btn.disabled=false;btn.textContent="Scan with AI";
   renderObPantry();
   document.getElementById("scan-result").style.display="block";
-  if(!Object.keys(pantry).length)err.textContent="Couldn't match anything to our catalog yet — add items below or continue.";
+  if(!Object.keys(pantry).length)err.textContent="Couldn't match anything to our catalog yet — add items below or generate anyway.";
 }
-function skipScan(){S.pantry={};save();renderObPantry();document.getElementById("scan-result").style.display="block";}
+function skipScan(){S.pantry={};save();beginGenerate();}
 function renderObPantry(){
   const el=document.getElementById("ob-pantry-list");
+  if(!el)return;
   const entries=Object.entries(S.pantry);
   el.innerHTML=(entries.length?entries:[]).map(([i,q])=>pantryRow(i,q,"ob")).join("")||'<p class="sub">Starting with an empty pantry — it fills up with your first delivery.</p>';
 }
-async function finishOnboarding(){
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function setGen(id,label,done){
+  const row=document.getElementById(id);
+  const s=document.getElementById(id+"s");
+  if(row)row.classList.toggle("done",!!done);
+  if(s)s.textContent=done?"✓":label;
+}
+async function beginGenerate(){
+  if(!S.prefs.preferredStore){activateScreen("scr-onboard");showObStep(2);return;}
+  if(!saveHousehold()){showObStep(4);activateScreen("scr-onboard");return;}
+  activateScreen("scr-generating");
+  document.getElementById("main-nav").classList.remove("show");
+  showSticky(false);
+  setGen("gs1","…",false);setGen("gs2","waiting",false);setGen("gs3","waiting",false);
+  await sleep(450);
+  setGen("gs1","",true);setGen("gs2","…",false);
+  await loadWeekCatalog();
+  autoPickWeek();
+  await sleep(500);
+  setGen("gs2","",true);setGen("gs3","…",false);
+  syncBasketFromMeals();
+  await sleep(450);
+  setGen("gs3","",true);
   S.onboarded=true;save();
-  document.getElementById("scr-onboard").classList.remove("active");
   enterApp();
-  await loadMenuOptions(false);
+}
+async function loadWeekCatalog(){
+  S.menuOptions=await loadCatalogMeals();
+  save();
+}
+function autoPickWeek(){
+  const n=S.prefs.meals||5;
+  if(!S.menuOptions.length)S.menuOptions=FALLBACK_MEALS.map(normMeal);
+  const pool=shuffle([...S.menuOptions]);
+  const s=preferredStoreObj()||STORES[0];
+  const picked=[];
+  let spend=s.fee;
+  for(const m of pool){
+    if(picked.length>=n)break;
+    const c=mealNeedCost(m,s);
+    if(picked.length&&spend+c>S.prefs.budget*1.2)continue;
+    picked.push(m.name);
+    spend+=c;
+  }
+  for(const m of pool){
+    if(picked.length>=n)break;
+    if(!picked.includes(m.name))picked.push(m.name);
+  }
+  S.selected=picked.slice(0,n);
+  save();
 }
 function enterApp(){
   document.getElementById("main-nav").classList.add("show");
-  nav("menu");
+  const admin=document.getElementById("nav-admin");
+  if(admin)admin.style.display=isAdmin()?"":"none";
+  syncHeader();
+  return Promise.resolve(ensureWeek()).catch(()=>{}).then(()=>{nav("menu");renderBasketFab();});
+}
+
+// ---------- ADMIN OPS (concierge fulfilment; founder account only) ----------
+// RLS does the real gating (supabase/admin_policies.sql) — hiding the nav
+// button is just UI. Statuses: new -> ordered -> delivered.
+const ADMIN_EMAIL="noyouchka.bouchard@gmail.com";
+function isAdmin(){return !!(S.user&&S.user.email===ADMIN_EMAIL);}
+function adminListText(o){
+  const items=(o.items&&o.items.basket)||[];
+  return `Plentry order #${o.id} — ${o.store} (£${Number(o.total||0).toFixed(2)})\n${o.name||""} · ${o.postcode||""}\n`+
+    items.map(b=>`${b.q}× ${b.product||b.i}${b.pack?` (${b.pack})`:""}${b.search?`\n  ${b.search}`:""}`).join("\n");
+}
+async function renderAdmin(){
+  const el=document.getElementById("admin-list");
+  if(!sb||!isAdmin()){el.innerHTML='<p class="sub">Admin only.</p>';return;}
+  const {data,error}=await sb.from("orders")
+    .select("id,email,name,postcode,store,total,items,status,created_at,payment_status,amount_held,amount_captured,address")
+    .order("created_at",{ascending:false}).limit(100);
+  if(error||!data){el.innerHTML='<p class="sub">Could not load orders — run supabase/admin_policies.sql?</p>';return;}
+  if(!data.length){el.innerHTML='<p class="sub">No orders yet.</p>';return;}
+  window.__adminOrders={};data.forEach(o=>window.__adminOrders[o.id]=o);
+  const st={new:["🆕 New","var(--green)"],ordered:["🛒 Ordered","var(--muted)"],delivered:["✅ Delivered","var(--muted)"]};
+  const pst={none:"",unpaid:"⏳ awaiting payment",authorized:"💳 PAID (hold)",captured:"💳 captured",canceled:"❌ payment canceled"};
+  el.innerHTML=data.map(o=>{
+    const items=(o.items&&o.items.basket)||[];const meals=(o.items&&o.items.meals)||[];
+    const s=st[o.status]||st.new;
+    const storeInfo=STORES.find(x=>x.name===o.store);
+    const ship=o.address&&o.address.shipping&&o.address.shipping.address;
+    const addr=ship?[ship.line1,ship.line2,ship.city,ship.postal_code].filter(Boolean).join(", "):(o.postcode||"—");
+    const paidBadge=pst[o.payment_status||"none"];
+    const unpaid=o.payment_status==="unpaid"||o.payment_status==="canceled";
+    return `<div class="store" style="display:block;cursor:default;${o.status==="new"&&!unpaid?"border-color:var(--green)":""}${unpaid?"opacity:.55":""}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><b>#${+o.id||0}</b> · ${esc(o.store)} · £${Number(o.total||0).toFixed(2)} <span class="badge" style="background:${s[1]}">${s[0]}</span>${paidBadge?` <span class="badge">${paidBadge}${o.payment_status==="authorized"?` £${Number(o.amount_held||0).toFixed(2)}`:o.payment_status==="captured"?` £${Number(o.amount_captured||0).toFixed(2)}`:""}</span>`:""}</div>
+        <div class="sdetail">${new Date(o.created_at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+      </div>
+      <div class="sdetail">${esc((o.address&&o.address.name)||o.name||"—")} · ${esc((o.address&&o.address.email)||o.email||"—")}${meals.length?` · ${meals.length} meals`:""}</div>
+      <div class="sdetail">📍 ${esc(addr)}</div>
+      <div class="sdetail" style="margin:6px 0;white-space:normal">${items.map(b=>`${+b.q||0}× ${esc(b.product||b.i)}`).join(" · ")}</div>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px">
+        ${unpaid?`<span class="sub">Waiting for the customer to pay — do not order yet.</span>`:""}
+        ${!unpaid&&o.status==="new"?`<button class="btn sm" onclick="adminSetStatus(${o.id},'ordered')">Mark ordered</button>`:""}
+        ${o.status==="ordered"?`<button class="btn sm" onclick="adminSetStatus(${o.id},'delivered')">Mark delivered</button>`:""}
+        ${o.payment_status==="authorized"?`<input id="cap-${o.id}" type="number" step="0.01" placeholder="exact £" style="width:92px;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--text)"><button class="btn sm" onclick="adminCapture(${o.id})">Capture</button>`:""}
+        <button class="btn ghost sm" onclick="navigator.clipboard.writeText(adminListText(window.__adminOrders[${o.id}])).then(()=>{this.textContent='✓ Copied'})">📋 Copy list</button>
+        ${storeInfo?`<a class="btn ghost sm" style="text-decoration:none" target="_blank" rel="noopener" href="${storeInfo.home}">Open ${esc(o.store)} ↗</a>`:""}
+      </div></div>`;}).join("");
+}
+async function adminSetStatus(id,status){
+  if(!sb||!isAdmin())return;
+  const {error}=await sb.from("orders").update({status}).eq("id",id);
+  if(!error)renderAdmin();
+}
+// Capture the EXACT store total against the Stripe hold (never more than held).
+async function adminCapture(id){
+  const inp=document.getElementById("cap-"+id);
+  const amt=parseFloat(inp&&inp.value);
+  const o=window.__adminOrders[id];
+  if(!amt||amt<=0)return alert("Enter the exact store total in £.");
+  if(o&&o.amount_held&&amt>o.amount_held)return alert(`Can't capture more than the £${Number(o.amount_held).toFixed(2)} hold.`);
+  const r=await payApi("capture",{order_id:id,amount_gbp:amt});
+  if(r&&r.live)renderAdmin();
+  else alert("Capture failed"+(r&&r.error?": "+(r.detail||r.error):"")+".");
 }
 
 // ---------- MENU ----------
 const validMeal=m=>m&&m.name&&Array.isArray(m.ing)&&m.ing.length&&m.ing.every(i=>INGREDIENTS[i]);
-const normMeal=m=>({name:String(m.name).slice(0,60),emoji:m.emoji||"🍽️",time:+m.time||25,ing:m.ing});
+// Strip angle brackets/quotes from free-text meal fields at the source so no HTML
+// can ever be stored on a meal (ing is already whitelisted to the catalog).
+const clean=s=>String(s==null?"":s).replace(/[<>"'`]/g,"").slice(0,60);
+const normMeal=m=>({name:clean(m.name),emoji:clean(m.emoji||"🍽️").slice(0,8)||"🍽️",time:+m.time||25,ing:m.ing,image_url:mealPhoto(m)});
 const shuffle=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
-async function saveMealsToDB(meals,source){
-  if(!sb||!S.user||!S.user.id||!meals.length)return;
-  try{
-    await sb.from("meals").upsert(
-      meals.map(m=>({name:m.name,emoji:m.emoji,time:m.time,ing:m.ing,source,created_by:S.user.id})),
-      {onConflict:"name",ignoreDuplicates:true});
-  }catch(e){}
+// NOTE: the client no longer writes to the shared `meals` table — the INSERT
+// policy was dropped (security_hardening_v2.sql). The `ai` edge function
+// persists every valid dish it proposes, server-side, with validated content.
+async function loadCatalogMeals(){
+  let dbMeals=[];
+  if(sb){
+    const pull=async()=>{
+      try{
+        const {data,error}=await sb.from("meals").select("name,emoji,time,ing,image_url");
+        if(!error&&data)return data.filter(validMeal).map(normMeal);
+      }catch(e){}
+      try{
+        const {data}=await sb.from("meals").select("name,emoji,time,ing");
+        if(data)return data.filter(validMeal).map(normMeal);
+      }catch(e2){}
+      return [];
+    };
+    try{
+      const wait=S.user?5000:2500;
+      dbMeals=await Promise.race([pull(),new Promise(r=>setTimeout(()=>r([]),wait))]);
+    }catch(e){dbMeals=[];}
+  }
+  const seed=FALLBACK_MEALS.map(normMeal);
+  const extra=(dbMeals||[]).filter(m=>!seed.some(s=>s.name===m.name));
+  return [...seed,...extra];
+}
+function mealNeedCost(m,s){
+  if(!m||!s||!Array.isArray(m.ing))return 0;
+  return m.ing.reduce((t,i)=>{
+    const have=S.pantry[i]||0;
+    if(have>=0.5)return t;
+    const r=shelfRow(i,s);
+    return t+(r?Number(r.price_gbp):ingInfo(i).price*s.mult);
+  },0);
+}
+function mealTag(m){
+  const ing=Array.isArray(m&&m.ing)?m.ing:[];
+  const meat=["chicken thighs","salmon fillet","minced beef"];
+  const veg=!ing.some(i=>meat.includes(i));
+  if((+m.time||99)<=20)return "quick";
+  if(veg)return "veggie";
+  return (+m.time||99)<=30?"weeknight":"from scratch";
+}
+function sanitizeMeals(){
+  S.menuOptions=(Array.isArray(S.menuOptions)?S.menuOptions:[]).filter(validMeal).map(normMeal);
+  const names=new Set([...S.menuOptions.map(m=>m.name),...FALLBACK_MEALS.map(m=>m.name)]);
+  S.selected=(Array.isArray(S.selected)?S.selected:[]).filter(n=>names.has(n));
+}
+async function ensureWeek(){
+  sanitizeMeals();
+  if(!S.menuOptions.length){
+    try{S.menuOptions=await loadCatalogMeals();}catch(e){S.menuOptions=FALLBACK_MEALS.map(normMeal);}
+  }
+  if(!S.menuOptions.length)S.menuOptions=FALLBACK_MEALS.map(normMeal);
+  if(!selectedMeals().length)autoPickWeek();
+  save();
 }
 async function loadMenuOptions(force){
+  if(force&&!requireAccount("Create an account to pick a new week of dinners."))return;
   if(S.menuOptions.length&&!force){renderMenu();return;}
-  const grid=document.getElementById("menu-grid");
-  grid.innerHTML='<div class="card" style="grid-column:1/-1;text-align:center"><span class="spin" style="font-size:1.4rem">✨</span><p class="sub" style="margin:8px 0 0">Your AI chef is thinking…</p></div>';
-  const btn=document.getElementById("menu-refresh");btn.disabled=true;
-  // 1. shared catalog from the database (grows over time)
-  let dbMeals=[];
-  if(sb&&S.user&&S.user.id){
-    try{const {data}=await sb.from("meals").select("name,emoji,time,ing");
-      if(data)dbMeals=data.filter(validMeal).map(normMeal);}catch(e){}
-  }
-  // 2. fresh AI ideas, excluding everything already known
-  const exclude=[...new Set([...dbMeals.map(m=>m.name),...S.menuOptions.map(m=>m.name),...FALLBACK_MEALS.map(m=>m.name)])];
+  const wrap=document.getElementById("menu-week");
+  if(wrap)wrap.innerHTML='<div class="card" style="text-align:center"><span class="spin" style="font-size:1.4rem">✨</span><p class="sub" style="margin:8px 0 0">Picking a new week…</p></div>';
+  const catalog=await loadCatalogMeals();
+  const exclude=[...new Set(catalog.map(m=>m.name))];
   const res=await ai("meal_options",{pantry:S.pantry,size:S.prefs.size,budget:S.prefs.budget,count:8,exclude});
   let fresh=(res&&Array.isArray(res.meals))?res.meals.filter(validMeal).map(normMeal).filter(m=>!exclude.includes(m.name)):[];
-  // 3. the catalog grows: persist fresh ideas
-  saveMealsToDB(fresh,"ai");
-  // 4. compose this week's options: fresh ideas first, then catalog, then built-ins
-  let pool=[...fresh,...shuffle(dbMeals).filter(m=>!fresh.some(f=>f.name===m.name))];
+  let pool=[...fresh,...shuffle(catalog).filter(m=>!fresh.some(f=>f.name===m.name))];
   FALLBACK_MEALS.forEach(m=>{if(pool.length<12&&!pool.some(p=>p.name===m.name))pool.push(normMeal(m));});
-  S.menuOptions=pool.slice(0,12);
-  S.selected=S.selected.filter(n=>S.menuOptions.some(m=>m.name===n));
-  save();btn.disabled=false;
+  S.menuOptions=pool.slice(0,16);
+  autoPickWeek();
+  save();
   renderMenu();
+  syncBasketFromMeals();
 }
+// Index-based wrappers so meal names never get inlined into onclick JS strings
+// (HTML-attribute + JS-string context can't be made safe by escaping alone).
+function toggleMealAt(i){if(!requireAccount("Create an account to choose this week's dinners."))return;const m=S.menuOptions[i];if(m)toggleMeal(m.name);}
+function showRecipeAt(i){const m=S.menuOptions[i];if(m)showRecipe(m.name);}
+function showRecipeFromOrder(id,i){const o=S.orders.find(x=>x.id===id);if(o&&o.meals&&o.meals[i]!=null)showRecipe(o.meals[i]);}
 function toggleMeal(name){
   const i=S.selected.indexOf(name);
   i>=0?S.selected.splice(i,1):S.selected.push(name);
-  save();renderMenu();
+  save();renderMenu();syncBasketFromMeals();
+}
+function mealCardHtml(m,idx){
+  const sel=S.selected.includes(m.name);
+  const ing=Array.isArray(m.ing)?m.ing:[];
+  const fromPantry=ing.filter(i=>(S.pantry[i]||0)>=0.5).length;
+  return `<div class="opt ${sel?'sel':''}" onclick="toggleMealAt(${idx})">
+      <div class="check">${sel?"✓":""}</div>
+      ${mealImgHtml(m,"opt-img")}
+      <div class="o-name">${esc(m.name)}</div>
+      <div class="o-meta">${+m.time||0} min · ${ing.length} ingredients${fromPantry?` · <span style="color:var(--amber)">${fromPantry} in pantry</span>`:""}</div>
+      <div class="o-actions"><button class="btn ghost sm" onclick="event.stopPropagation();showMealDetails(${idx})">ⓘ Details & recipe</button></div>
+    </div>`;
 }
 function renderMenu(){
-  const grid=document.getElementById("menu-grid");
-  grid.innerHTML=S.menuOptions.map((m,idx)=>{
-    const sel=S.selected.includes(m.name);
-    const fromPantry=m.ing.filter(i=>(S.pantry[i]||0)>=0.5).length;
-    return `<div class="opt ${sel?'sel':''}" onclick="toggleMeal('${m.name.replace(/'/g,"\\'")}')">
-      <div class="check">${sel?"✓":""}</div>
-      <div class="o-emoji">${m.emoji}</div>
-      <div class="o-name">${m.name}</div>
-      <div class="o-meta">${m.time} min · ${m.ing.length} ingredients${fromPantry?` · <span style="color:var(--amber)">${fromPantry} in pantry</span>`:""}</div>
-      <div style="margin-top:6px"><button class="btn ghost sm" onclick="event.stopPropagation();showMealDetails(${idx})">ⓘ Details & recipe</button></div>
-    </div>`;
-  }).join("");
-  document.getElementById("menu-sub").textContent=`Tap the meals you want — aiming for ${S.prefs.meals} this week.`;
-  const {buy,pantryValue}=needList();
-  const cost=Object.entries(buy).reduce((t,[i,q])=>t+q*INGREDIENTS[i].price,0);
-  document.getElementById("stat-picked").textContent=S.selected.length;
-  document.getElementById("stat-cost").textContent=S.selected.length?"£"+cost.toFixed(2):"—";
-  document.getElementById("stat-pantry").textContent=S.selected.length?"£"+pantryValue.toFixed(2):"—";
-  const btn=document.getElementById("to-basket-btn");
-  btn.disabled=!S.selected.length;
-  btn.textContent=S.selected.length?`Build basket for ${S.selected.length} meal${S.selected.length>1?"s":""} →`:"Pick at least one meal";
+  const wrap=document.getElementById("menu-week");
+  if(!wrap)return;
+  try{
+    const meals=selectedMeals();
+    const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    const s=preferredStoreObj();
+    const {buy,pantryValue}=needList();
+    const cost=s?storeTotalForItems(buy,s):Object.entries(buy).reduce((t,[i,q])=>t+q*ingInfo(i).price,0);
+    const n=meals.length||1;
+    const per=(cost-(s?s.fee:0))/n;
+    const under=(S.prefs.budget||0)-cost;
+    const mk=s?STORE_MARK[s.id]:null;
+    wrap.innerHTML=`<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+        <h1 style="margin:0;font-size:1.7rem">Your week<br><em>is ready.</em></h1>
+        <button class="btn ghost sm" onclick="loadMenuOptions(true)">↻ New week</button>
+      </div>
+      <p class="sub">Tap a dinner to see the recipe, swap it, or drop it from the basket.</p>
+      <div class="week-head">
+        <div class="week-card"><div class="k">This shop</div><div class="v">${cost?"£"+cost.toFixed(0):"—"}</div></div>
+        <div class="week-card"><div class="k">${basket.length||Object.keys(buy).length} items</div><div class="v">${s?esc(s.name):"Pick a shop"}</div></div>
+      </div>
+      ${s?`<div class="store-chip"><span class="mark" style="width:18px;height:18px;border-radius:6px;background:${(mk&&mk.c)||"var(--green-d)"};display:inline-block"></span> Planned for ${esc(s.name)}</div>`:""}
+      <div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${S.prefs.budget} budget`:`£${Math.abs(under).toFixed(0)} over your £${S.prefs.budget} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>
+      ${meals.length?meals.map((m,i)=>{
+        const idx=S.menuOptions.findIndex(x=>x.name===m.name);
+        const mc=s?mealNeedCost(m,s):per;
+        return `<button type="button" class="day-card" onclick="showMealDetails(${idx>=0?idx:0})">
+          <div class="day-photo">${mealThumbHtml(m)}<span class="day-badge">${days[i]||("D"+(i+1))}</span></div>
+          <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min · ${esc(S.prefs.size)} people</div><span class="tag">${esc(mealTag(m))}</span></div>
+          <div class="mp">£${Number(mc||0).toFixed(2)}</div>
+        </button>`;
+      }).join(""):`<div class="card"><p class="sub" style="margin:0">No dinners yet — generate a week from onboarding or tap New week.</p><button class="btn" style="width:100%;margin-top:10px" onclick="loadMenuOptions(true)">Generate my week</button></div>`}
+      <p class="sub" style="text-align:center"><a href="#" style="color:var(--green)" onclick="openAdvisor();return false">Ask the meal advisor</a></p>`;
+    const sticky=document.getElementById("sticky-order");
+    if(sticky){
+      sticky.disabled=!meals.length;
+      sticky.textContent=meals.length?(s&&cost?`Order this week · £${cost.toFixed(2)}`:"Order this week"):"Pick dinners first";
+    }
+    const menu=document.getElementById("scr-menu");
+    showSticky(!!(menu&&menu.classList.contains("active")&&meals.length));
+  }catch(e){
+    console.error(e);
+    wrap.innerHTML=`<div class="card"><h2>Couldn't load this week</h2><p class="sub">Tap below to generate dinners again.</p><button class="btn" style="width:100%" onclick="loadMenuOptions(true)">Generate my week</button></div>`;
+    showSticky(false);
+  }
 }
 
 // ---------- MEAL DETAILS ----------
 function showMealDetails(idx){
+  if(!requireAccount("Create an account to choose and swap this week's dinners."))return;
   const m=S.menuOptions[idx];if(!m)return;
   const sel=S.selected.includes(m.name);
-  const esc=m.name.replace(/'/g,"\\'");
-  openModal(`<h2>${m.emoji} ${m.name}</h2>
-    <p class="sub">${m.time} min · serves ${S.prefs.size}</p>
+  openModal(`${mealImgHtml(m,"meal-hero")}
+    <h2>${esc(m.name)}</h2>
+    <p class="sub">${+m.time||0} min · serves ${esc(S.prefs.size)}</p>
     <h3>Ingredients</h3>
-    ${m.ing.map(i=>{
+    ${(Array.isArray(m.ing)?m.ing:[]).map(i=>{
       const have=(S.pantry[i]||0)>=0.5;
-      return `<div class="recipe-step"><span class="n">·</span><span>${i} <span style="color:var(--muted);font-size:.78rem">(${INGREDIENTS[i].unit})</span>${have?' <span class="tag have">in pantry</span>':''}</span></div>`;
+      return `<div class="recipe-step"><span class="n">·</span><span>${esc(i)} <span style="color:var(--muted);font-size:.78rem">(${esc(ingInfo(i).unit)})</span>${have?' <span class="tag have">in pantry</span>':''}</span></div>`;
     }).join("")}
     <div class="row" style="margin-top:14px">
-      <button class="btn" style="flex:1" onclick="closeModal();showRecipe('${esc}')">📖 Cooking instructions</button>
-      <button class="btn ghost" onclick="toggleMeal('${esc}');closeModal()">${sel?"Remove from week":"Add to my week"}</button>
-    </div>`);
+      <button class="btn" style="flex:1" onclick="closeModal();showRecipeAt(${idx})">📖 Cooking instructions</button>
+      <button class="btn ghost" onclick="toggleMealAt(${idx});closeModal()">${sel?"Remove from week":"Add to my week"}</button>
+    </div>
+    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="openSwap(${idx})">Swap this dinner</button>`);
+}
+function openSwap(fromIdx){
+  const current=S.menuOptions[fromIdx];if(!current)return;
+  const s=preferredStoreObj();
+  openModal(`<h2>Swap ${esc(current.name)}</h2>
+    <p class="sub">Pick another dinner. The basket updates straight away.</p>
+    ${S.menuOptions.map((m,i)=>{
+      if(m.name===current.name||S.selected.includes(m.name))return "";
+      const thumb=mealThumbHtml(m);
+      const mc=s?mealNeedCost(m,s):0;
+      return `<button type="button" class="day-card" onclick="applySwap(${fromIdx},${i})">
+        <div class="day-photo">${thumb}</div>
+        <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min · ${esc(mealTag(m))}</div></div>
+        <div class="mp">${mc?"£"+mc.toFixed(2):""}</div>
+      </button>`;
+    }).join("")||'<p class="sub">No other dinners in this week\'s pool — try New week.</p>'}
+    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="showMealDetails(${fromIdx})">Back</button>`);
+}
+function applySwap(fromIdx,toIdx){
+  const from=S.menuOptions[fromIdx],to=S.menuOptions[toIdx];
+  if(!from||!to)return;
+  const si=S.selected.indexOf(from.name);
+  if(si>=0)S.selected[si]=to.name;
+  else if(!S.selected.includes(to.name))S.selected.push(to.name);
+  save();closeModal();renderMenu();syncBasketFromMeals();
 }
 
 // ---------- MEAL ADVISOR ----------
 let advisorMsgs=[],advisorProposed=[],advisorPicked=new Set();
 function openAdvisor(){
+  if(!requireAccount("Create an account to choose dinners with the meal advisor."))return;
   advisorMsgs=[{role:"assistant",content:"Hey! I'm your meal advisor 👋 What are you in the mood for this week — comfort food, something fresh, quick weeknight dinners?"}];
   advisorProposed=[];advisorPicked=new Set();
   renderAdvisor();
@@ -617,7 +1274,7 @@ function openAdvisor(){
 function renderAdvisor(thinking){
   openModal(`<h2>💬 Meal advisor</h2>
     <div id="adv-chat" style="max-height:38vh;overflow:auto;display:flex;flex-direction:column;padding:4px 0">
-      ${advisorMsgs.map(m=>`<div class="bubble ${m.role==="assistant"?"ai":"user"}">${m.content}</div>`).join("")}
+      ${advisorMsgs.map(m=>`<div class="bubble ${m.role==="assistant"?"ai":"user"}">${esc(m.content)}</div>`).join("")}
       ${thinking?'<div class="bubble ai"><span class="spin">✨</span> thinking…</div>':""}
     </div>
     <div id="adv-meals">${advisorProposed.length?renderAdvisorMeals():""}</div>
@@ -631,8 +1288,8 @@ function renderAdvisor(thinking){
 function renderAdvisorMeals(){
   return `<h3 style="margin-top:8px">Pick what you like:</h3>`+
     advisorProposed.map((m,i)=>`<div class="adv-meal ${advisorPicked.has(i)?'sel':''}" onclick="toggleAdvisorMeal(${i})">
-      <div style="font-size:1.4rem">${m.emoji}</div>
-      <div class="am-info"><b>${m.name}</b><div class="am-meta">${m.time} min · ${m.ing.join(", ")}</div></div>
+      <div style="font-size:1.4rem">${esc(m.emoji)}</div>
+      <div class="am-info"><b>${esc(m.name)}</b><div class="am-meta">${+m.time||0} min · ${esc(m.ing.join(", "))}</div></div>
       <div>${advisorPicked.has(i)?"✓":""}</div>
     </div>`).join("")+
     `<button class="btn" style="width:100%;margin-top:8px" onclick="addAdvisorMeals()" ${advisorPicked.size?"":"disabled"}>Add ${advisorPicked.size||""} to my menu →</button>`;
@@ -660,21 +1317,20 @@ async function sendAdvisor(){
 async function addAdvisorMeals(){
   const picked=advisorProposed.filter((_,i)=>advisorPicked.has(i));
   if(!picked.length)return;
-  // grow the shared database with what real users actually choose
-  saveMealsToDB(picked,"advisor");
+  // (the ai fn already persisted these dishes server-side when it proposed them)
   picked.forEach(m=>{
     if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.unshift(m);
     if(!S.selected.includes(m.name))S.selected.push(m.name);
   });
   S.menuOptions=S.menuOptions.slice(0,16);
-  save();closeModal();renderMenu();
+  save();closeModal();renderMenu();syncBasketFromMeals();
 }
 
 // ---------- RECIPES ----------
 async function showRecipe(name){
   const meal=mealByName(name);if(!meal)return;
   if(!S.recipes[name]){
-    openModal(`<h2>${meal.emoji} ${name}</h2><p class="sub"><span class="spin">✨</span> Writing your recipe…</p>`);
+    openModal(`<h2>${esc(meal.emoji)} ${esc(name)}</h2><p class="sub"><span class="spin">✨</span> Writing your recipe…</p>`);
     const res=await ai("recipe",{name,ing:meal.ing,servings:S.prefs.size});
     S.recipes[name]=(res&&Array.isArray(res.steps)&&res.steps.length)?{steps:res.steps,tip:res.tip||""}:{
       steps:["Prep all ingredients: chop the vegetables, measure everything out.",
@@ -687,10 +1343,10 @@ async function showRecipe(name){
     save();
   }
   const r=S.recipes[name];
-  openModal(`<h2>${meal.emoji} ${name}</h2>
-    <p class="sub">${meal.time} min · serves ${S.prefs.size} · ${meal.ing.join(", ")}</p>
-    ${r.steps.map((s,i)=>`<div class="recipe-step"><span class="n">${i+1}</span><span>${s}</span></div>`).join("")}
-    ${r.tip?`<div class="alert ok" style="margin-top:12px">💡 ${r.tip}</div>`:""}
+  openModal(`<h2>${esc(meal.emoji)} ${esc(name)}</h2>
+    <p class="sub">${+meal.time||0} min · serves ${esc(S.prefs.size)} · ${esc(meal.ing.join(", "))}</p>
+    ${r.steps.map((s,i)=>`<div class="recipe-step"><span class="n">${i+1}</span><span>${esc(s)}</span></div>`).join("")}
+    ${r.tip?`<div class="alert ok" style="margin-top:12px">💡 ${esc(r.tip)}</div>`:""}
     <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">Done</button>`);
   renderMenu();
 }
@@ -700,8 +1356,8 @@ function pantryRow(i,q,prefix){
   const pct=Math.min(100,q*100);
   const col=q<0.3?"var(--red)":q<0.6?"var(--amber)":"var(--green)";
   return `<div class="pantry-item">
-    <div class="pi-name">${i}<div class="stock-bar"><i style="width:${pct}%;background:${col}"></i></div></div>
-    <div class="pi-qty">${(q*100).toFixed(0)}% of ${INGREDIENTS[i]?INGREDIENTS[i].unit:"unit"}</div>
+    <div class="pi-name">${esc(i)}<div class="stock-bar"><i style="width:${pct}%;background:${col}"></i></div></div>
+    <div class="pi-qty">${(q*100).toFixed(0)}% of ${esc(INGREDIENTS[i]?INGREDIENTS[i].unit:"unit")}</div>
     <div class="stepper"><button onclick="adjPantry('${i}',-0.25,'${prefix}')">−</button><button onclick="adjPantry('${i}',0.25,'${prefix}')">+</button></div>
   </div>`;
 }
@@ -711,14 +1367,15 @@ function renderPantry(){
   list.innerHTML=entries.map(([i,q])=>pantryRow(i,q,"main")).join("")||'<p class="sub">Empty for now — it fills up with your first delivery.</p>';
   const low=entries.filter(([,q])=>q<0.3).map(([i])=>i);
   document.getElementById("pantry-alerts").innerHTML=low.length?
-    `<div class="alert">⚠ Running low: ${low.join(", ")}. They'll be auto-added to your next basket.</div>`:
+    `<div class="alert">⚠ Running low: ${esc(low.join(", "))}. They'll be auto-added to your next basket.</div>`:
     (entries.length?`<div class="alert ok">✓ Pantry healthy — nothing critically low.</div>`:"");
 }
 function adjPantry(i,d,prefix){
   S.pantry[i]=Math.max(0,Math.min(2,(S.pantry[i]||0)+d));
   if(S.pantry[i]===0)delete S.pantry[i];
   save();
-  if(prefix==="ob")renderObPantry();else{renderPantry();renderMenu();}
+  if(prefix==="ob"){renderObPantry();syncBasketFromMeals();}
+  else{renderPantry();renderMenu();syncBasketFromMeals();}
 }
 async function rescanPantry(){
   const text=document.getElementById("rescan-text").value.trim();
@@ -738,31 +1395,116 @@ async function rescanPantry(){
 // ---------- SHOP ----------
 function needList(){
   const need={};
-  selectedMeals().forEach(r=>r.ing.forEach(i=>{need[i]=(need[i]||0)+0.5;}));
+  selectedMeals().forEach(r=>{(r.ing||[]).forEach(i=>{need[i]=(need[i]||0)+0.5;});});
   const buy={};let pantryValue=0;
   for(const [i,q] of Object.entries(need)){
     const have=S.pantry[i]||0;
     const short=Math.max(0,q-have);
-    pantryValue+=Math.min(have,q)*INGREDIENTS[i].price;
+    pantryValue+=Math.min(have,q)*ingInfo(i).price;
     if(short>0)buy[i]=Math.ceil(short);
   }
-  return {buy,pantryValue};
+  return {buy,pantryValue,need};
 }
-function goShop(){buildBasket();nav("shop");}
-function buildBasket(){
+function preferredStoreObj(){return STORES.find(s=>s.id===(chosenStore&&chosenStore.id||S.prefs.preferredStore))||null;}
+function storeTotalForItems(buy,s){
+  return Object.entries(buy).reduce((t,[i,q])=>{
+    const r=shelfRow(i,s);
+    return t+q*(r?Number(r.price_gbp):ingInfo(i).price*s.mult);
+  },0)+s.fee;
+}
+function goShop(){openBasket();}
+function openBasket(){
+  syncBasketFromMeals();
+  basketOpen=true;
+  document.getElementById("basket-bg").classList.add("open");
+  renderBasketDrawer();
+  fetchLiveQuote();
+}
+function closeBasket(){basketOpen=false;document.getElementById("basket-bg").classList.remove("open");}
+function syncBasketFromMeals(){
   const {buy}=needList();
   Object.entries(S.pantry).forEach(([i,q])=>{if(q<0.3&&!buy[i])buy[i]=1;});
-  basket=Object.entries(buy).map(([i,q])=>({i,q}));
-  chosenStore=null;
+  const next=Object.entries(buy).map(([i,q])=>({i,q}));
+  const key=next.map(b=>b.i+":"+b.q).sort().join("|");
+  const changed=key!==basketKey();
+  basket=next;
+  if(!chosenStore)chosenStore=preferredStoreObj();
+  renderBasketFab();
+  if(basketOpen)renderBasketDrawer();
+  const shop=document.getElementById("scr-shop");
+  if(shop&&shop.classList.contains("active"))renderShop();
+  if(changed)fetchLiveQuote();
+}
+function renderBasketFab(){
+  const fab=document.getElementById("basket-fab");
+  if(!fab)return;
+  const onMenu=document.getElementById("scr-menu")&&document.getElementById("scr-menu").classList.contains("active");
+  const show=!!S.onboarded&&!!(S.selected.length||basket.length)&&!onMenu;
+  fab.classList.toggle("show",show);
+  const n=basket.length;
+  document.getElementById("fab-count").textContent=String(n);
+  const s=preferredStoreObj();
+  const q=s?storeQuote(s):null;
+  document.getElementById("fab-label").textContent=n?(q?"£"+q.t.toFixed(2):n+" item"+(n>1?"s":"")):"Basket";
+}
+function renderBasketDrawer(){
+  const panel=document.getElementById("basket-panel");
+  if(!panel)return;
+  const s=preferredStoreObj();
+  const q=s?storeQuote(s):null;
+  const totals=STORES.map(st=>({s:st,...storeQuote(st)})).sort((a,b)=>a.t-b.t);
+  const best=totals[0],worst=totals[totals.length-1];
+  const lines=basket.length
+    ?(s&&q&&q.live
+      ?q.q.lines.map(l=>`<tr><td>${esc(l.item)}</td><td>${esc(l.product)}${l.units>1?` ×${+l.units}`:""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
+        (q.q.unmatched||[]).map(u=>`<tr><td>${esc(u)}</td><td class="sub">picked at the store</td><td class="right">—</td></tr>`).join("")
+      :basket.map(b=>{const r=s?shelfRow(b.i,s):null;
+        return `<tr><td>${esc(b.i)}</td><td>${esc(r?r.product_name:ingInfo(b.i).unit)}${b.q>1?` ×${+b.q}`:""}</td><td class="right">£${(b.q*(r?Number(r.price_gbp):ingInfo(b.i).price)).toFixed(2)}</td></tr>`;}).join(""))
+    :`<tr><td class="sub" colspan="3">Nothing needed yet — tap a dinner to add it.</td></tr>`;
+  panel.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">Your basket</h2>
+      <button class="btn ghost sm" onclick="closeBasket()">Close</button>
+    </div>
+    <p class="sub">${S.selected.length} meal${S.selected.length===1?"":"s"} · only what's missing from your pantry</p>
+    <table>${lines}${pantryRows()}</table>
+    <h3 style="margin-top:16px">Supermarket</h3>
+    <p class="sub">We order from the shop you pick after the card hold.</p>
+    <div id="drawer-stores">${totals.map(({s:st,t,live,shelf})=>
+      `<div class="store ${s&&s.id===st.id?"picked":""}" onclick="pickStore('${st.id}')">
+        <div><div class="sname">${esc(st.name)}${live?' <span class="badge" style="background:var(--green-d)">LIVE</span>':shelf?' <span class="badge">SHELF</span>':''}</div>
+        <div class="sdetail">Typical delivery £${st.fee.toFixed(2)}</div></div>
+        <div class="price">£${t.toFixed(2)}</div></div>`).join("")}</div>
+    <div class="alert ok" style="margin-top:8px">${liveQuoteLoading?"⏳ Fetching live prices… ":""}${best?`Choosing ${esc(best.s.name)} saves £${(worst.t-best.t).toFixed(2)} vs ${esc(worst.s.name)}. `:""}${totals.some(x=>x.live)?"":SHELF_LABEL}</div>
+    <button class="btn" style="width:100%;margin-top:8px" id="drawer-order-btn" ${!basket.length||!s?"disabled":""} onclick="confirmOrder()">${s&&q?`Place my order — £${q.t.toFixed(2)} at ${esc(s.name)} →`:"Pick a store to order"}</button>`;
+}
+// Rows for ingredients the meals need but the pantry already covers — shown so the
+// consumer always sees the FULL ingredient list, not just what's being bought.
+function pantryRows(){
+  const {need}=needList();
+  const covered=Object.keys(need).filter(i=>!basket.find(b=>b.i===i));
+  if(!covered.length)return "";
+  return covered.map(i=>`<tr style="opacity:.62"><td>${esc(i)} <span style="color:var(--muted);font-size:.74rem">(${esc(ingInfo(i).unit)})</span></td><td><span class="tag have">✓ in your pantry</span></td><td class="right">£0.00</td></tr>`).join("");
+}
+function buildBasket(){
+  syncBasketFromMeals();
+  if(!chosenStore)chosenStore=preferredStoreObj();
   renderShop();
   fetchLiveQuote();
 }
-// Reference estimate (fallback when no live quote for that store).
-function storeTotal(s){return basket.reduce((t,b)=>t+b.q*INGREDIENTS[b.i].price*s.mult,0)+s.fee;}
+// Shelf-price total (real own-brand prices per store); falls back to the old
+// reference estimate (price × mult) only for items missing from the shelf data.
+function storeTotal(s){
+  return basket.reduce((t,b)=>{
+    const r=shelfRow(b.i,s);
+    return t+b.q*(r?Number(r.price_gbp):ingInfo(b.i).price*s.mult);
+  },0)+s.fee;
+}
+function shelfCoverage(s){return basket.length?basket.filter(b=>shelfRow(b.i,s)).length/basket.length:0;}
 // Live quote when available: real matched-product total (pence) + delivery fee.
 function storeQuote(s){
   const q=liveQuote&&liveQuote.stores&&liveQuote.stores[s.id];
-  return (q&&q.ok)?{t:q.total/100+s.fee,live:true,q}:{t:storeTotal(s),live:false,q:null};
+  if(q&&q.ok)return {t:q.total/100+s.fee,live:true,q};
+  return {t:storeTotal(s),live:false,q:null,shelf:SHELF_READY&&shelfCoverage(s)===1};
 }
 function basketKey(){return basket.map(b=>b.i+":"+b.q).sort().join("|");}
 async function fetchLiveQuote(){
@@ -770,11 +1512,13 @@ async function fetchLiveQuote(){
   const key=basketKey();
   if(liveQuoteKey===key&&(liveQuote||liveQuoteLoading))return; // cached or in flight
   liveQuoteKey=key;liveQuote=null;liveQuoteLoading=true;renderShop();
-  const res=await checkoutApi("quote",{items:basket.map(b=>({name:b.i,qty:b.q,unit:INGREDIENTS[b.i].unit}))});
+  const res=await checkoutApi("quote",{items:basket.map(b=>({name:b.i,qty:b.q,unit:ingInfo(b.i).unit}))});
   liveQuoteLoading=false;
   if(liveQuoteKey!==key)return; // basket changed meanwhile
   liveQuote=(res&&res.live)?res:null;
   renderShop();
+  renderBasketFab();
+  if(basketOpen)renderBasketDrawer();
 }
 function renderShop(){
   const tbl=document.getElementById("shop-table");
@@ -783,36 +1527,50 @@ function renderShop(){
   else if(chosenQ&&chosenQ.live){
     // Real products matched at the chosen store
     tbl.innerHTML=`<tr><th>Item</th><th>Product at ${chosenStore.name}</th><th class="right">Price</th></tr>`+
-      chosenQ.q.lines.map(l=>`<tr><td>${l.item}</td><td>${l.product}${l.units>1?` ×${l.units}`:""}${l.promo?' <span class="badge">OFFER</span>':""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
-      (chosenQ.q.unmatched||[]).map(u=>`<tr><td>${u}</td><td class="sub">picked for you at checkout</td><td class="right">—</td></tr>`).join("");
+      chosenQ.q.lines.map(l=>`<tr><td>${esc(l.item)}</td><td>${esc(l.product)}${l.units>1?` ×${+l.units}`:""}${l.promo?' <span class="badge">OFFER</span>':""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
+      (chosenQ.q.unmatched||[]).map(u=>`<tr><td>${esc(u)}</td><td class="sub">picked for you at checkout</td><td class="right">—</td></tr>`).join("")+pantryRows();
+  }
+  else if(chosenStore&&SHELF_READY){
+    // Shelf-matched own-brand products at the chosen store (captured 5 Jul 2026)
+    tbl.innerHTML=`<tr><th>Item</th><th>Product at ${chosenStore.name}</th><th class="right">Price</th></tr>`+
+      basket.map(b=>{const r=shelfRow(b.i,chosenStore);
+        return r?`<tr><td>${esc(b.i)}</td><td>${esc(r.product_name)} <span style="color:var(--muted);font-size:.74rem">(${esc(r.pack_size||"")})</span>${r.is_estimate?' <span class="badge">EST</span>':""}${b.q>1?` ×${+b.q}`:""}</td><td class="right">£${(b.q*Number(r.price_gbp)).toFixed(2)}</td></tr>`
+                :`<tr><td>${esc(b.i)}</td><td class="sub">picked for you at checkout</td><td class="right">~£${(b.q*ingInfo(b.i).price*chosenStore.mult).toFixed(2)}</td></tr>`;}).join("")+pantryRows();
   }
   else tbl.innerHTML=`<tr><th>Item</th><th>Qty</th><th class="right">Est. price</th></tr>`+
-    basket.map(b=>`<tr><td>${b.i} <span style="color:var(--muted);font-size:.74rem">(${INGREDIENTS[b.i].unit})</span></td><td>${b.q}</td><td class="right">£${(b.q*INGREDIENTS[b.i].price).toFixed(2)}</td></tr>`).join("");
+    basket.map(b=>`<tr><td>${esc(b.i)} <span style="color:var(--muted);font-size:.74rem">(${esc(ingInfo(b.i).unit)})</span></td><td>${+b.q}</td><td class="right">£${(b.q*ingInfo(b.i).price).toFixed(2)}</td></tr>`).join("")+pantryRows();
   const totals=STORES.map(s=>({s,...storeQuote(s)})).sort((a,b)=>a.t-b.t);
   const best=totals[0],worst=totals[totals.length-1];
   const anyLive=totals.some(x=>x.live);
-  document.getElementById("store-compare").innerHTML=totals.map(({s,t,live},idx)=>
+  document.getElementById("store-compare").innerHTML=totals.map(({s,t,live,shelf},idx)=>
     `<div class="store ${idx===0?'best':''}" onclick="pickStore('${s.id}')" id="store-${s.id}">
-      <div><div class="sname">${s.name}${idx===0?'<span class="badge">CHEAPEST</span>':''}${live?' <span class="badge" style="background:var(--green-d)">LIVE</span>':''}</div>
+      <div><div class="sname">${s.name}${idx===0?'<span class="badge">CHEAPEST</span>':''}${live?' <span class="badge" style="background:var(--green-d)">LIVE</span>':shelf?' <span class="badge">SHELF</span>':''}</div>
       <div class="sdetail">${s.dist} · delivery £${s.fee.toFixed(2)} · ${s.eta}</div></div>
       <div class="price">£${t.toFixed(2)}</div></div>`).join("");
   const save_=worst.t-best.t;
+  const anyShelf=totals.some(x=>x.shelf);
   const sl=document.getElementById("savings-line");
   sl.style.display="block";
   sl.textContent=(liveQuoteLoading?"⏳ Fetching live prices… ":"")+
     `✓ Choosing ${best.s.name} saves £${save_.toFixed(2)} vs the priciest option — £${(save_*52).toFixed(0)}/year at this rate.`+
-    (anyLive?"":" Prices are estimates until live quotes load.");
+    (anyLive?"":anyShelf?" "+SHELF_LABEL:" Prices are estimates until live quotes load.");
   if(chosenStore)pickStore(chosenStore.id);
-  else{const btn=document.getElementById("order-btn");btn.disabled=true;btn.textContent="Select a store to order";}
+  else if(S.prefs.preferredStore)pickStore(S.prefs.preferredStore);
+  else{const btn=document.getElementById("order-btn");if(btn){btn.disabled=true;btn.textContent="Select a store to order";}}
 }
 function pickStore(id){
-  chosenStore=STORES.find(s=>s.id===id);
+  const next=STORES.find(s=>s.id===id);
+  if(!next)return;
+  chosenStore=next;
+  S.prefs.preferredStore=chosenStore.id;save();
   STORES.forEach(s=>{const el=document.getElementById("store-"+s.id);if(el)el.style.borderColor=s.id===id?"var(--green)":"var(--line)";});
+  const {t}=storeQuote(chosenStore);
+  const label=`Place my order — £${t.toFixed(2)} at ${chosenStore.name} →`;
   const btn=document.getElementById("order-btn");
-  btn.disabled=!basket.length;
-  const {t,live}=storeQuote(chosenStore);
-  btn.textContent=`${live?"Create my bag":"Confirm"} — £${t.toFixed(2)} at ${chosenStore.name} →`;
+  if(btn){btn.disabled=!basket.length;btn.textContent=label;}
   renderShopTableOnly();
+  if(basketOpen)renderBasketDrawer();
+  renderBasketFab();
 }
 // re-render just the items table after picking a store (shows matched products)
 function renderShopTableOnly(){
@@ -821,89 +1579,115 @@ function renderShopTableOnly(){
   const tbl=document.getElementById("shop-table");
   if(q.live&&basket.length){
     tbl.innerHTML=`<tr><th>Item</th><th>Product at ${chosenStore.name}</th><th class="right">Price</th></tr>`+
-      q.q.lines.map(l=>`<tr><td>${l.item}</td><td>${l.product}${l.units>1?` ×${l.units}`:""}${l.promo?' <span class="badge">OFFER</span>':""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
-      (q.q.unmatched||[]).map(u=>`<tr><td>${u}</td><td class="sub">picked for you at checkout</td><td class="right">—</td></tr>`).join("");
+      q.q.lines.map(l=>`<tr><td>${esc(l.item)}</td><td>${esc(l.product)}${l.units>1?` ×${+l.units}`:""}${l.promo?' <span class="badge">OFFER</span>':""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
+      (q.q.unmatched||[]).map(u=>`<tr><td>${esc(u)}</td><td class="sub">picked for you at checkout</td><td class="right">—</td></tr>`).join("")+pantryRows();
+  }
+  else if(SHELF_READY&&basket.length){
+    tbl.innerHTML=`<tr><th>Item</th><th>Product at ${chosenStore.name}</th><th class="right">Price</th></tr>`+
+      basket.map(b=>{const r=shelfRow(b.i,chosenStore);
+        return r?`<tr><td>${esc(b.i)}</td><td>${esc(r.product_name)} <span style="color:var(--muted);font-size:.74rem">(${esc(r.pack_size||"")})</span>${r.is_estimate?' <span class="badge">EST</span>':""}${b.q>1?` ×${+b.q}`:""}</td><td class="right">£${(b.q*Number(r.price_gbp)).toFixed(2)}</td></tr>`
+                :`<tr><td>${esc(b.i)}</td><td class="sub">picked for you at checkout</td><td class="right">~£${(b.q*ingInfo(b.i).price*chosenStore.mult).toFixed(2)}</td></tr>`;}).join("")+pantryRows();
   }
 }
 // ---------- ORDERING ----------
-// Two paths, honest about which one is running:
-//  LIVE  — the `checkout` edge fn (Pepesto) fills the user's own basket at the
-//          store; they pay the SUPERMARKET at its checkout. No markup, no card here.
-//  MANUAL— no live backend: we hand over a ready list + per-item store links.
+// Concierge launch: live Pepesto quotes only. We never create a store bag.
+// The user pays a Stripe hold; Telegram pings only after the hold succeeds.
+function orderItemsPayload(){
+  const q=chosenStore?storeQuote(chosenStore):null;
+  const liveLines=q&&q.live&&q.q&&q.q.lines?q.q.lines:[];
+  return basket.map(b=>{
+    const r=shelfRow(b.i,chosenStore);
+    const live=liveLines.find(l=>String(l.item).toLowerCase()===b.i);
+    const product=live?live.product:(r?r.product_name:null);
+    const pack=r?r.pack_size:ingInfo(b.i).unit;
+    const price=live?live.pence/100:(r?Number(r.price_gbp):null);
+    const search=chosenStore.search.replace("{q}",encodeURIComponent(product||b.i));
+    return {i:b.i,q:b.q,unit:ingInfo(b.i).unit,product,pack,shelf_price:price,search};
+  });
+}
 function confirmOrder(){
   if(!chosenStore||!basket.length)return;
+  if(!S.user||!S.user.id){
+    pendingCheckout=true;
+    closeBasket();
+    openAuth("Create an account so we can take the card hold and order to your door.");
+    return;
+  }
   const {t,live}=storeQuote(chosenStore);
-  openModal(`<h2 style="margin-bottom:6px">${live?"Create your bag":"Confirm your order"}</h2>
-    <p class="sub">${basket.length} items · <b style="color:var(--text)">£${t.toFixed(2)}</b> at ${chosenStore.name} · ${chosenStore.eta}</p>
-    ${live
-      ?`<div class="alert ok">Plentry fills your basket at ${chosenStore.name} with these exact products. You review it and pay ${chosenStore.name} directly at their checkout — no markup, we never touch your card.</div>`
-      :`<div class="alert">Live checkout isn't on yet — you'll get a ready-made list with one-tap links into ${chosenStore.name}'s site, and we save the order here to track your pantry.</div>`}
+  closeBasket();
+  openModal(`<h2 style="margin-bottom:6px">We'll order this for you</h2>
+    <p class="sub">${basket.length} items · <b style="color:var(--text)">£${t.toFixed(2)}</b> at ${esc(chosenStore.name)} · typical ${esc(chosenStore.eta)}</p>
+    <div class="alert ok">A card hold ~15% above this estimate. We collect your delivery address, then place the ${esc(chosenStore.name)} order to your door. You're only charged the exact store total.</div>
+    ${live?"":`<div class="alert">${SHELF_LABEL}</div>`}
     <div class="row">
-      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">${live?"Create my bag →":"Confirm order"}</button>
+      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">Pay hold & place order →</button>
       <button class="btn ghost" onclick="closeModal()">Back</button>
     </div>`);
 }
 async function placeOrder(){
   if(!chosenStore||!basket.length)return;
-  const cbtn=document.getElementById("confirm-btn");
-  if(cbtn){cbtn.disabled=true;cbtn.textContent="Building your bag…";}
-  const {t,live}=storeQuote(chosenStore);
-  const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total:t,eta:chosenStore.eta,
-    items:basket.map(b=>({...b,unit:INGREDIENTS[b.i].unit})),meals:[...S.selected],
-    date:new Date().toLocaleDateString("en-GB"),status:1,bagUrl:"",adjustUrl:"",pepestoSession:""};
-  // LIVE path: create the real bag first, so the confirmation is truthful.
-  let bag=null;
-  if(live){
-    bag=await checkoutApi("bag",{store:chosenStore.id,redirect_url:location.origin,
-      items:basket.map(b=>({name:b.i,qty:b.q,unit:INGREDIENTS[b.i].unit}))});
-    if(bag&&bag.live&&(bag.url||bag.adjust)){
-      order.status=2; // bag created
-      order.bagUrl=bag.url||"";order.adjustUrl=bag.adjust||"";order.pepestoSession=bag.session||"";
-      if(bag.total)order.total=bag.total/100+chosenStore.fee;
-    }else bag=null; // fall back to manual handoff
+  if(!sb||!S.user||!S.user.id){
+    pendingCheckout=true;
+    openAuth("Log in so we can take the card hold and deliver to you.");
+    return;
   }
-  // record the order (backend row powers ops + status sync either way)
-  if(sb&&S.user&&S.user.id){
-    try{
-      const {data,error}=await sb.from("orders").insert({
-        user_id:S.user.id,email:S.user.email,name:S.user.name,postcode:S.prefs.postcode,
-        store:order.store,total:order.total,
-        items:{basket:order.items,meals:order.meals,eta:order.eta,
-          mode:bag?"self_checkout":"manual",pepesto_session:order.pepestoSession||null},
-      }).select("id").single();
-      if(!error&&data)order.backendId=data.id;
-    }catch(e){}
+  const cbtn=document.getElementById("confirm-btn");
+  if(cbtn){cbtn.disabled=true;cbtn.textContent="Starting checkout…";}
+  const {t}=storeQuote(chosenStore);
+  const items=orderItemsPayload();
+  const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total:t,eta:chosenStore.eta,
+    items,meals:[...S.selected],
+    date:new Date().toLocaleDateString("en-GB"),status:1,bagUrl:"",adjustUrl:"",pepestoSession:""};
+  try{
+    const {data,error}=await sb.from("orders").insert({
+      user_id:S.user.id,email:S.user.email,name:S.user.name,postcode:S.prefs.postcode,
+      store:order.store,total:order.total,payment_status:"unpaid",
+      items:{basket:order.items,meals:order.meals,eta:order.eta,mode:"manual"},
+    }).select("id").single();
+    if(error||!data)throw error||new Error("Could not save order");
+    order.backendId=data.id;
+  }catch(e){
+    openModal(`<h2>Could not start checkout</h2><p class="sub">${esc(e.message||"Try again in a moment.")}</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
+    return;
+  }
+  const pay=await payApi("checkout",{order_id:order.backendId});
+  if(!(pay&&pay.live&&pay.url)){
+    openModal(`<h2>Payments aren't ready yet</h2>
+      <p class="sub">We saved your basket but haven't charged you, and we won't place this order until card checkout is live. We'll message you when you can finish.</p>
+      <button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
+    S.orders.unshift(order);save();
+    return;
   }
   S.orders.unshift(order);
   basket=[];liveQuote=null;liveQuoteKey="";save();
-  closeModal();renderOrders();nav("orders");
-  if(bag)openBagModal(order,bag);
-  else openHandoffModal(order);
-  // pre-generate recipes in the background so they're instant
+  renderBasketFab();closeBasket();
   for(const n of order.meals){if(!S.recipes[n])showRecipePrefetch(n);}
+  location.href=pay.url;
 }
 function bagLink(o){return (IS_MOBILE&&o.bagUrl)?o.bagUrl:(o.adjustUrl||o.bagUrl);}
 function openBagModal(order,bag){
   openModal(`<h2 style="margin-bottom:6px">🛍️ Your bag is ready — £${order.total.toFixed(2)}</h2>
-    <p class="sub">${bag.matched} products picked at ${order.store}${bag.unmatched&&bag.unmatched.length?` · ${bag.unmatched.length} item${bag.unmatched.length>1?"s":""} will be picked with you at checkout`:""}.</p>
-    <div class="alert ok">Finish at ${order.store}: sign in to your ${order.store} account there, review the basket, choose your slot and pay them directly.</div>
-    <a class="btn" style="width:100%;display:block;text-align:center;text-decoration:none" href="${bagLink(order)}" target="_blank" rel="noopener" onclick="closeModal()">Open my ${order.store} bag →</a>
+    <p class="sub">${+bag.matched||0} products picked at ${esc(order.store)}${bag.unmatched&&bag.unmatched.length?` · ${bag.unmatched.length} item${bag.unmatched.length>1?"s":""} will be picked with you at checkout`:""}.</p>
+    <div class="alert ok">Finish at ${esc(order.store)}: sign in to your ${esc(order.store)} account there, review the basket, choose your slot and pay them directly.</div>
+    <a class="btn" style="width:100%;display:block;text-align:center;text-decoration:none" href="${safeUrl(bagLink(order))}" target="_blank" rel="noopener" onclick="closeModal()">Open my ${esc(order.store)} bag →</a>
     <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal();openHandoffModal(S.orders.find(o=>o.id===${order.id}))">I'd rather shop it manually</button>`);
 }
 function handoffText(order){
   return `Plentry list — ${order.store} (£${order.total.toFixed(2)} est.)\n`+
-    order.items.map(b=>`${b.q}× ${b.i} (${b.unit})`).join("\n");
+    order.items.map(b=>b.product
+      ?`${b.q}× ${b.product} (${b.pack||b.unit})${b.shelf_price?` — £${(b.q*b.shelf_price).toFixed(2)}`:""}`
+      :`${b.q}× ${b.i} (${b.unit})`).join("\n");
 }
 function openHandoffModal(order){
   const st=STORES.find(s=>s.id===order.storeId)||STORES[0];
-  openModal(`<h2 style="margin-bottom:6px">🧾 Your ${order.store} list</h2>
-    <p class="sub">Tap an item to open it in ${order.store}'s search, or copy the whole list.</p>
+  openModal(`<h2 style="margin-bottom:6px">🧾 Your ${esc(order.store)} list</h2>
+    <p class="sub">Tap an item to open it in ${esc(order.store)}'s search, or copy the whole list.</p>
     <div style="max-height:38vh;overflow:auto;margin:8px 0">
-      ${order.items.map(b=>`<a class="btn ghost sm" style="display:block;text-align:left;margin:4px 0;text-decoration:none" target="_blank" rel="noopener" href="${st.search.replace("{q}",encodeURIComponent(b.i))}">${b.q}× ${b.i} <span style="color:var(--muted)">(${b.unit})</span> ↗</a>`).join("")}
+      ${order.items.map(b=>`<a class="btn ghost sm" style="display:block;text-align:left;margin:4px 0;text-decoration:none" target="_blank" rel="noopener" href="${esc(st.search.replace("{q}",encodeURIComponent(b.product||b.i)))}">${+b.q||0}× ${esc(b.product||b.i)} <span style="color:var(--muted)">(${esc(b.pack||b.unit)})</span>${b.shelf_price?` <span style="color:var(--muted)">£${(b.q*b.shelf_price).toFixed(2)}</span>`:""} ↗</a>`).join("")}
     </div>
     <div class="row">
       <button class="btn" style="flex:1" onclick="navigator.clipboard.writeText(handoffText(S.orders.find(o=>o.id===${order.id}))).then(()=>{this.textContent='✓ Copied'})">📋 Copy list</button>
-      <a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener" href="${st.home}">Open ${order.store} ↗</a>
+      <a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener" href="${safeUrl(st.home)}">Open ${esc(order.store)} ↗</a>
     </div>
     <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Done</button>`);
 }
@@ -939,17 +1723,17 @@ function renderOrders(){
     `<div class="meal" style="align-items:flex-start">
       <div class="emoji">📦</div>
       <div class="info">
-        <div class="name">${o.store} — £${o.total.toFixed(2)}</div>
-        <div class="meta">${o.items.length} items · ${(o.meals||[]).length} meals · placed ${o.date} · ${o.eta}</div>
+        <div class="name">${esc(o.store)} — £${Number(o.total||0).toFixed(2)}</div>
+        <div class="meta">${o.items.length} items · ${(o.meals||[]).length} meals · placed ${esc(o.date)} · ${esc(o.eta)}</div>
         <div class="timeline">
           <div class="tstep ${o.status>=1?'done':''}">Confirmed</div>
           <div class="tstep ${o.status>=2?'done':''}">${o.bagUrl||o.adjustUrl?"Bag created":"Ordered for you"}</div>
           <div class="tstep ${o.status>=3?'done':''}">Delivered</div>
         </div>
         <div class="row" style="margin-top:8px">
-          ${o.status<3&&(o.bagUrl||o.adjustUrl)?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${bagLink(o)}">🛍️ Open bag</a>`:""}
+          ${o.status<3&&(o.bagUrl||o.adjustUrl)?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${safeUrl(bagLink(o))}">🛍️ Open bag</a>`:""}
           ${o.status<3?`<button class="btn ghost sm" onclick="openHandoffModal(S.orders.find(x=>x.id===${o.id}))">🧾 List</button>`:""}
-          ${(o.meals||[]).slice(0,3).map(n=>`<button class="btn ghost sm" onclick="showRecipe('${n.replace(/'/g,"\\'")}')">📖 ${n.length>18?n.slice(0,17)+"…":n}</button>`).join("")}
+          ${(o.meals||[]).slice(0,3).map((n,j)=>`<button class="btn ghost sm" onclick="showRecipeFromOrder(${o.id},${j})">📖 ${esc(n.length>18?n.slice(0,17)+"…":n)}</button>`).join("")}
           ${o.status<3?`<button class="btn sm" onclick="markDelivered(${o.id})">Arrived ✓</button>`:`<span class="tag">pantry synced</span>`}
         </div>
       </div></div>`).join("");
@@ -957,52 +1741,135 @@ function renderOrders(){
 
 // ---------- PROFILE ----------
 function renderProfile(){
-  document.getElementById("pr-hello").textContent=`Hey ${S.user?S.user.name:""} 👋`;
-  document.getElementById("pr-email").textContent=S.user?S.user.email:"";
+  document.getElementById("pr-hello").textContent=S.user?`Hey ${S.user.name} 👋`:"Your kitchen";
+  document.getElementById("pr-email").textContent=S.user?S.user.email:"Log in to save this week across devices and check out.";
   document.getElementById("pr-postcode").value=S.prefs.postcode;
   document.getElementById("pr-size").value=S.prefs.size;
   document.getElementById("pr-budget").value=S.prefs.budget;
   document.getElementById("pr-meals").value=S.prefs.meals;
+  const sel=document.getElementById("pr-store");
+  if(sel){
+    sel.innerHTML='<option value="">No preference</option>'+STORES.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");
+    sel.value=S.prefs.preferredStore||"";
+  }
   document.getElementById("pr-saved").textContent="";
 }
 function saveProfile(){
-  S.prefs.postcode=document.getElementById("pr-postcode").value||S.prefs.postcode;
+  const el=document.getElementById("pr-saved");
+  const pc=normPostcode(document.getElementById("pr-postcode").value);
+  if(!pc){el.style.color="var(--red)";el.textContent="Enter a valid UK postcode (e.g. E2 8AA).";return;}
+  el.style.color="var(--green)";
+  S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("pr-size").value;
-  S.prefs.budget=+document.getElementById("pr-budget").value||S.prefs.budget;
+  S.prefs.budget=normBudget(document.getElementById("pr-budget").value,S.prefs.budget);
   S.prefs.meals=+document.getElementById("pr-meals").value;
-  save();renderMenu();
-  document.getElementById("pr-saved").textContent="✓ Saved — your next menu uses these settings.";
+  S.prefs.preferredStore=document.getElementById("pr-store").value;
+  chosenStore=preferredStoreObj();
+  save();renderMenu();syncBasketFromMeals();
+  el.textContent="✓ Saved — your next menu uses these settings.";
 }
 
 // ---------- NAV / MODAL ----------
-function nav(s){
-  document.querySelectorAll(".screen").forEach(e=>e.classList.remove("active"));
-  document.getElementById("scr-"+s).classList.add("active");
-  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.s===s));
-  setPill({menu:"This week",pantry:"Auto-tracked",shop:S.prefs.postcode,orders:"History",profile:"Account"}[s]||"");
-  if(s==="menu")renderMenu();
-  if(s==="pantry")renderPantry();
-  if(s==="shop"&&!basket.length)buildBasket();
-  if(s==="orders"){renderOrders();syncOrderStatuses();}
-  if(s==="profile")renderProfile();
+function showSticky(on){
+  const el=document.getElementById("sticky-cta");
+  if(el)el.classList.toggle("show",!!on);
 }
-function setPill(t){document.getElementById("hdr-pill").textContent=t;}
+function activateScreen(id){
+  const el=document.getElementById(id)||document.getElementById("scr-onboard");
+  document.querySelectorAll(".screen").forEach(e=>{
+    const on=e===el;
+    e.classList.toggle("active",on);
+    e.removeAttribute("hidden");
+    e.setAttribute("aria-hidden",on?"false":"true");
+  });
+}
+function syncHeader(){
+  const pill=document.getElementById("hdr-pill");
+  if(!pill)return;
+  if(S.user){
+    pill.textContent=S.user.name||"Account";
+    pill.onclick=function(e){e.preventDefault();if(S.onboarded)nav("profile");};
+  }else{
+    pill.textContent="Log in";
+    pill.onclick=function(e){e.preventDefault();openAuth();};
+  }
+}
+function nav(s){
+  try{
+    if(s==="shop"){openBasket();return;}
+    activateScreen("scr-"+s);
+    document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.s===s));
+    syncHeader();
+    showSticky(false);
+    if(s==="menu"){renderMenu();renderBasketFab();}
+    if(s==="pantry"){renderPantry();renderBasketFab();}
+    if(s==="orders"){renderOrders();syncOrderStatuses();renderBasketFab();}
+    if(s==="profile"){renderProfile();renderBasketFab();}
+    if(s==="admin"){renderAdmin();renderBasketFab();}
+  }catch(e){
+    console.error(e);
+    activateScreen("scr-"+(s||"onboard"));
+  }
+}
 function openModal(html){document.getElementById("modal").innerHTML=html;document.getElementById("modal-bg").classList.add("open");}
 function closeModal(){document.getElementById("modal-bg").classList.remove("open");}
 
+// Stripe Checkout return handling (?paid=1&order=N or ?paycancel=1&order=N)
+function handlePaymentReturn(){
+  const q=new URLSearchParams(location.search);
+  const orderId=q.get("order");
+  if(q.get("paid")){
+    openModal(`<h2 style="margin-bottom:6px">✅ Payment confirmed</h2>
+      <p class="sub">Your card has a temporary hold ~15% above the estimate — you'll only be charged the exact store total. We've got your delivery address and we're placing your order now. Track it in the Orders tab.</p>
+      <button class="btn" style="width:100%" onclick="closeModal()">Great</button>`);
+  }else if(q.get("paycancel")){
+    openModal(`<h2 style="margin-bottom:6px">Payment not completed</h2>
+      <p class="sub">Your order is saved but won't be placed until it's paid.</p>
+      <div class="row">
+        <button class="btn" style="flex:1" onclick="retryPay(${Number(orderId)||0})">Pay now →</button>
+        <button class="btn ghost" onclick="closeModal()">Later</button>
+      </div>`);
+  }else return;
+  history.replaceState(null,"",location.pathname); // clean the URL
+}
+async function retryPay(orderId){
+  if(!orderId)return closeModal();
+  const pay=await payApi("checkout",{order_id:orderId});
+  if(pay&&pay.live&&pay.url)location.href=pay.url;
+  else openModal(`<h2>Payments aren't ready yet</h2><p class="sub">We can't take a card hold right now, so we won't place this order. Try again shortly.</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
+}
+
 // ---------- INIT ----------
 (async function init(){
-  if(sb){
-    try{
-      const {data}=await sb.auth.getSession();
-      if(data&&data.session){await loadCloudState(data.session.user);}
-      else{S.user=null;}
-    }catch(e){}
-  }
-  if(S.user){
-    document.getElementById("scr-landing").classList.remove("active");
-    if(S.onboarded){enterApp();if(!S.menuOptions.length)loadMenuOptions(false);}
-    else{document.getElementById("scr-onboard").classList.add("active");setPill("Setup");}
+  try{
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>{
+        const src=((r.active||r.waiting||r.installing)||{}).scriptURL||"";
+        if(location.pathname.indexOf("/plentry")===0&&/\/sw\.js$/.test(src)&&src.indexOf("/plentry/")<0)r.unregister();
+      })).catch(()=>{});
+      const swUrl=new URL("sw.js",location.href);
+      navigator.serviceWorker.register(swUrl.href,{scope:new URL("./",location.href).href}).catch(()=>{});
+    }
+    loadShelfPrices();
+    if(sb){
+      try{
+        const {data}=await sb.auth.getSession();
+        if(data&&data.session){await loadCloudState(data.session.user);}
+        else{S.user=null;}
+      }catch(e){S.user=null;}
+    }
+    sanitizeMeals();
+    syncHeader();
+    if((S.user&&S.onboarded)||(!S.user&&S.onboarded&&S.selected.length)){
+      await enterApp();
+      syncBasketFromMeals();
+    }else{
+      startOnboarding();
+    }
+    handlePaymentReturn();
+  }catch(e){
+    console.error(e);
+    startOnboarding();
   }
 })();
 </script>

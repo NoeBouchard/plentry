@@ -59,6 +59,7 @@ create table if not exists public.meals (
   created_by uuid default auth.uid() references auth.users(id),
   created_at timestamptz default now()
 );
+alter table public.meals add column if not exists image_url text;
 
 alter table public.meals enable row level security;
 

@@ -8,9 +8,8 @@ project_id = "plentry"
 #   auth: 'user'                       -> leave verify_jwt = true  (the default)
 #   auth: 'publishable'|'secret'|'none' -> set  verify_jwt = false
 #
-# The `orders` function uses auth: 'user', so the platform JWT check stays on.
-[functions.orders]
-verify_jwt = true
+# (the example `orders` function was removed 7 Jul 2026 — extra unvalidated
+# write path; if it was ever deployed, run: supabase functions delete orders)
 
 # The `ai` function uses auth: ['user', 'publishable'] (works logged in or out),
 # so the platform JWT gate must be OFF — the SDK does the auth check instead.
@@ -22,8 +21,15 @@ verify_jwt = false
 [functions.checkout]
 verify_jwt = false
 
-# Template for a non-user function (e.g. a webhook or service-to-service call
-# using auth: 'secret' or auth: 'none'). Uncomment and rename when you add one:
-#
-# [functions.stripe-webhook]
-# verify_jwt = false
+# `notify-order` is called by the Database Webhook on orders INSERT (no user
+# JWT); it gates on the x-webhook-secret header instead.
+[functions.notify-order]
+verify_jwt = false
+
+# `pay` (Stripe checkout/capture) requires a signed-in user.
+[functions.pay]
+verify_jwt = true
+
+# `stripe-webhook` is called by Stripe (no user JWT); gated by signature check.
+[functions.stripe-webhook]
+verify_jwt = false

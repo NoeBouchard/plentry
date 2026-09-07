@@ -12,6 +12,7 @@
 // Tasks: parse_pantry | meal_options | recipe | advisor — all return strict JSON.
 
 import { withSupabase } from 'npm:@supabase/server'
+import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 
 const MODEL = 'claude-haiku-4-5-20251001'
 
@@ -30,15 +31,27 @@ async function readMealNames(sb: any): Promise<string[]> {
   const { data } = await sb.from('meals').select('name')
   return Array.isArray(data) ? data.map((r: any) => r.name) : []
 }
-async function writeMeals(sb: any, meals: any[], source: string) {
+// Strip markup-significant chars so nothing that lands in the shared catalog can
+// carry HTML. ing is already whitelisted to CATALOG by VALID().
+const clean = (s: any, n: number) => String(s ?? '').replace(/[<>"'`]/g, '').slice(0, n)
+// Clamp any client-supplied number into a sane range (rejects NaN/strings).
+const num = (v: any, lo: number, hi: number, dflt: number) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt
+}
+// Writes go through the SERVICE ROLE: the client-side INSERT policy on meals
+// was dropped (security_hardening_v2.sql) so this function is the only writer.
+// created_by is set from the verified JWT — never from the payload.
+async function writeMeals(admin: any, meals: any[], source: string, userId: string | null) {
   if (!meals.length) return
-  await sb.from('meals').upsert(
+  await admin.from('meals').upsert(
     meals.map((m) => ({
-      name: String(m.name).slice(0, 60),
-      emoji: m.emoji || '🍽️',
-      time: +m.time || 25,
-      ing: m.ing,
+      name: clean(m.name, 60),
+      emoji: clean(m.emoji || '🍽️', 8) || '🍽️',
+      time: num(m.time, 1, 240, 25),
+      ing: m.ing.slice(0, 15),
       source,
+      created_by: userId,
     })),
     { onConflict: 'name', ignoreDuplicates: true },
   )
@@ -55,23 +68,35 @@ User's description of what they have at home:
 Return JSON: {"pantry":{"<catalog item>":<fraction 0..1 of a typical pack they have>}}.
 Map synonyms to catalog names (e.g. "pasta"->"spaghetti", "peppers"->"bell peppers", "tinned tomatoes"->"passata"). Skip anything not in the catalog. "some"/"half"≈0.5, "plenty"/"full"≈1, "a bit"/"almost out"≈0.2.`,
     }
-  if (task === 'meal_options')
+  if (task === 'meal_options') {
+    // Every field below is attacker-controllable: clamp numbers, whitelist the
+    // pantry to the catalog, and length-cap the exclude list before it reaches
+    // the prompt (a negative "budget" or instruction-carrying string otherwise
+    // lands verbatim in the LLM prompt).
+    const size = ['1', '2', '3', '4+'].includes(String(p.size)) ? String(p.size) : '2'
+    const budget = num(p.budget, 1, 500, 60)
+    const count = num(p.count, 1, 12, 8)
+    const pantry: Record<string, number> = {}
+    for (const [k, v] of Object.entries(p.pantry || {}))
+      if (CATALOG.includes(k)) pantry[k] = num(v, 0, 2, 0)
+    const exclude = (Array.isArray(p.exclude) ? p.exclude : []).slice(0, 300).map((s: any) => clean(s, 60))
     return {
       system: 'You are a meal planner for a UK grocery app. Respond with ONLY valid JSON, no prose.',
       user: `Catalog (the ONLY allowed ingredients): ${cat}.
-User pantry (fraction of pack in stock): ${JSON.stringify(p.pantry || {})}.
-Household: ${p.size || 2} people. Budget: £${p.budget || 60}/week.
-Propose ${p.count || 8} varied, creative dinner options. Favour (but don't force) recipes using pantry items. 4-8 ingredients each, all strictly from the catalog.${
-        Array.isArray(p.exclude) && p.exclude.length
-          ? `\nDo NOT propose any of these existing dishes (or close variants): ${p.exclude.join('; ')}.`
+User pantry (fraction of pack in stock): ${JSON.stringify(pantry)}.
+Household: ${size} people. Budget: £${budget}/week.
+Propose ${count} varied, creative dinner options. Favour (but don't force) recipes using pantry items. 4-8 ingredients each, all strictly from the catalog.${
+        exclude.length
+          ? `\nDo NOT propose any of these existing dishes (or close variants): ${exclude.join('; ')}.`
           : ''
       }
 Return JSON: {"meals":[{"name":"...","emoji":"🍛","time":<minutes>,"ing":["catalog item",...]}]}`,
     }
+  }
   if (task === 'recipe')
     return {
       system: 'You are a concise, encouraging recipe writer. Respond with ONLY valid JSON, no prose.',
-      user: `Write cooking instructions for "${p.name}" for ${p.servings || 2} people, using: ${(p.ing || []).join(', ')} (plus salt, pepper, basic spices).
+      user: `Write cooking instructions for "${clean(p.name, 80)}" for ${num(p.servings, 1, 12, 2)} people, using: ${(Array.isArray(p.ing) ? p.ing : []).filter((i: string) => CATALOG.includes(i)).join(', ')} (plus salt, pepper, basic spices).
 Return JSON: {"steps":["step 1...","step 2...",...],"tip":"one short pro tip"}. 5-9 clear steps, each 1-2 sentences, with rough timings.`,
     }
   if (task === 'advisor')
@@ -98,6 +123,11 @@ export default {
 
     const key = Deno.env.get('ANTHROPIC_API_KEY')
     if (!key) return Response.json({ error: 'ai_not_configured' }, { status: 503 })
+
+    // This endpoint accepts the PUBLIC publishable key (must work logged out), so
+    // it's open to anyone with the browser app's key. Rate-limit by user/IP to
+    // stop anonymous cost abuse. 40 calls / minute is plenty for real use.
+    if (!(await allow(ctx.supabaseAdmin, 'ai', clientIdent(req, ctx), 40, 60))) return TOO_MANY()
 
     const body = await req.json().catch(() => null)
     const { task, payload } = body || {}
@@ -142,9 +172,10 @@ export default {
       const out = JSON.parse(m[0])
 
       // Grow the catalog: persist any valid new dishes the AI produced.
+      // Service-role write (clients can no longer INSERT meals directly).
       if ((task === 'meal_options' || task === 'advisor') && signedIn && Array.isArray(out.meals)) {
         const fresh = out.meals.filter(VALID).filter((x: any) => !(p.exclude || []).includes(x.name))
-        await writeMeals(ctx.supabase, fresh, task === 'advisor' ? 'advisor' : 'ai')
+        await writeMeals(ctx.supabaseAdmin, fresh, task === 'advisor' ? 'advisor' : 'ai', ctx.userClaims?.sub || null)
       }
       return Response.json(out)
     } catch (e) {
