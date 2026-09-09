@@ -1,0 +1,15 @@
+---
+description: Test harness and safety rails so agents do not break the live app
+globs: "**/*.{html,ts,mjs,js,sql}"
+alwaysApply: false
+---
+
+# Do not break the app
+
+- Run `npm test` after edits. The jsdom harness loads `index.html` with a fake Supabase; no live network.
+- Keep `esc()` / `safeUrl()` on untrusted strings. Do not inline untrusted text into `onclick`.
+- `pay` must recompute totals server-side. Capture = store £ × 1.05, never above the hold.
+- Ops status is reversible: `new` | `ordered` | `delivered`. Unpaid orders stay locked.
+- Modify a dinner replaces one slot; week length stays `prefs.meals`.
+- If a change needs a new guarantee, add a test in `test/` in the same change.
+---

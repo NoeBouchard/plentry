@@ -47,3 +47,35 @@ from (values
   ('Tandoori-style yoghurt chicken with rice', 'https://images.unsplash.com/photo-1599487488170-d91ec13f0cf0?auto=format&fit=crop&w=800&h=520&q=80')
 ) as v(name, url)
 where public.meals.name = v.name;
+
+-- Ingredient-based fallback so AI-invented dishes still have a photo.
+update public.meals m
+set image_url = coalesce((
+  select p.url from (values
+    ('chicken thighs', 'https://images.unsplash.com/photo-1598103442097-8b74394b95c6?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('salmon fillet', 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('minced beef', 'https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('halloumi', 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('eggs', 'https://images.unsplash.com/photo-1590412200988-a436970781fa?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('chickpeas', 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('spaghetti', 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('rice', 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('tortillas', 'https://images.unsplash.com/photo-1551504734-5ee1c36e3989?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('potatoes', 'https://images.unsplash.com/photo-1608039829572-dee9b9547d0d?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('tomatoes', 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('broccoli', 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('spinach', 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('passata', 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('curry paste', 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('coconut milk', 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?auto=format&fit=crop&w=800&h=520&q=80'),
+    ('feta', 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&h=520&q=80')
+  ) as p(ing, url)
+  where m.ing @> jsonb_build_array(p.ing)
+  order by array_position(ARRAY[
+    'chicken thighs','salmon fillet','minced beef','halloumi','eggs','chickpeas',
+    'spaghetti','rice','tortillas','potatoes','tomatoes','broccoli','spinach',
+    'passata','curry paste','coconut milk','feta'
+  ]::text[], p.ing)
+  limit 1
+), 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&h=520&q=80')
+where image_url is null or image_url = '';

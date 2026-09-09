@@ -1,4 +1,4 @@
--- Tesco shelf fallback for the 24 meal-catalog keys.
+-- Tesco shelf fallback for meal-catalog grocery keys.
 -- Indicative own-brand prices (Sep 2026 estimates) so Tesco compares
 -- when Pepesto live quotes are unavailable. SAFE TO RE-RUN.
 
@@ -28,7 +28,10 @@ values
   ('olive-oil', 'Olive oil', 'pantry', 'tesco', 'olive oil', 'Tesco Olive Oil', '500ml', 3.50, '£0.70 per 100ml', true, '2026-09-05'),
   ('feta', 'Feta', 'dairy', 'tesco', 'feta', 'Tesco Greek Feta', '200g', 1.90, '£0.95 per 100g', true, '2026-09-05'),
   ('greek-yogurt', 'Greek yogurt', 'dairy', 'tesco', 'yoghurt', 'Tesco Greek Style Natural Yogurt', '500g', 1.15, '£0.23 per 100g', true, '2026-09-05'),
-  ('parmesan', 'Parmesan', 'dairy', 'tesco', 'parmesan', 'Tesco Italian Parmigiano Reggiano', '170g', 3.00, '£1.76 per 100g', true, '2026-09-05')
+  ('parmesan', 'Parmesan', 'dairy', 'tesco', 'parmesan', 'Tesco Italian Parmigiano Reggiano', '170g', 3.00, '£1.76 per 100g', true, '2026-09-05'),
+  ('chopped-tomatoes', 'Chopped tomatoes (tin)', 'pantry', 'tesco', 'chopped tomatoes', 'Tesco Chopped Tomatoes', '400g', 0.45, '£0.11 per 100g', true, '2026-09-08'),
+  ('butter', 'Butter', 'dairy', 'tesco', 'butter', 'Tesco British Salted Butter', '250g', 1.89, '£0.76 per 100g', true, '2026-09-08'),
+  ('fresh-coriander', 'Fresh coriander', 'veg', 'tesco', 'fresh coriander', 'Tesco Fresh Coriander', '30g', 0.60, '£2.00 per 100g', true, '2026-09-08')
 on conflict (slug, store) do update set
   display_name = excluded.display_name,
   category     = excluded.category,

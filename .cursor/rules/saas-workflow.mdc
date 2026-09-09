@@ -1,0 +1,15 @@
+---
+description: SaaS workflow — vault, tests, and staging (when this git repo is the Cursor workspace)
+alwaysApply: true
+---
+
+# Plentry SaaS workflow
+
+- Product truth lives in `doc/`. Read `doc/CURRENT-STATE.md` before coding. `README.md` and `SPEC.md` are stale if they disagree.
+- App code is `index.html` plus `supabase/functions/`. Do not introduce React, Next, or a bundler.
+- Before staging UI, money, order, or XSS changes: `npm test` must pass.
+- After staging, update `doc/CURRENT-STATE.md` and append `doc/CHANGELOG.md`. Also update workspace-root `../doc/` if that folder exists.
+- Commission is 5% in both `index.html` and `pay/index.ts`. Change them together.
+- Customer pays Plentry via Stripe (manual capture). Ops types the store total; the server adds 5%.
+- Never put secrets in the client or in `doc/`.
+---

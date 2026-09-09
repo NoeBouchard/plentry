@@ -1,14 +1,11 @@
 // Plentry — `pay` Edge Function (Stripe, no SDK — plain fetch).
 //
 // task 'checkout' (signed-in user): creates a Stripe Checkout Session for the
-//   user's order with MANUAL CAPTURE — the card is held for estimate +15%, the
-//   exact store total is captured later. Stripe's hosted page also collects the
-//   GB delivery address, so payment + address arrive together before any
-//   fulfilment happens. Returns {live:true,url} to redirect the user to, or
-//   {live:false} when STRIPE_SECRET_KEY isn't configured (free-beta fallback).
+//   user's order with MANUAL CAPTURE. Hold = (grocery estimate + 5% fee) * 1.15.
+//   Stripe's hosted page also collects the GB delivery address.
 //
-// task 'capture' (admin only): captures the exact amount after the store order
-//   is placed. amount_gbp must be <= the held amount.
+// task 'capture' (admin only): pass the exact store total as amount_gbp; the
+//   function adds the 5% Plentry fee and captures that, never above the hold.
 //
 // Secrets: supabase secrets set STRIPE_SECRET_KEY=sk_test_...   (later sk_live_)
 // Deploy:  supabase functions deploy pay
@@ -17,6 +14,7 @@ import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 
 const ADMIN_EMAIL = 'noyouchka.bouchard@gmail.com'
+const COMMISSION = 0.05
 const HOLD_MULTIPLIER = 1.15
 const APP_URL = 'https://plentry.vercel.app'
 const MAX_ORDER_GBP = 500
@@ -96,7 +94,8 @@ export default {
       if (Math.abs(Number(o.total) - est) > 0.01)
         await ctx.supabaseAdmin.from('orders').update({ total: est }).eq('id', o.id)
 
-      const amount = Math.round(est * HOLD_MULTIPLIER * 100) // pence
+      const charged = est * (1 + COMMISSION)
+      const amount = Math.round(charged * HOLD_MULTIPLIER * 100) // pence: groceries+fee, plus ~15% buffer
       const p = new URLSearchParams()
       p.set('mode', 'payment')
       p.set('success_url', `${APP_URL}/?paid=1&order=${o.id}`)
@@ -111,7 +110,7 @@ export default {
       p.set('line_items[0][price_data][unit_amount]', String(amount))
       p.set('line_items[0][price_data][product_data][name]', `Plentry groceries — ${o.store}`)
       p.set('line_items[0][price_data][product_data][description]',
-        'Temporary hold ≈15% above the estimate. You are only charged the exact store total.')
+        'Hold covers the estimate + 5% Plentry fee, with ~15% buffer. You are charged the exact store total plus 5%.')
       if (ctx.userClaims?.email) p.set('customer_email', ctx.userClaims.email)
 
       const { ok, j } = await stripe(sk, 'checkout/sessions', p)
@@ -131,8 +130,9 @@ export default {
         .select('id,payment_intent,amount_held,payment_status').eq('id', order_id).single()
       if (!o?.payment_intent) return Response.json({ error: 'no payment intent on order' }, { status: 400 })
       if (o.payment_status !== 'authorized') return Response.json({ error: `status is ${o.payment_status}` }, { status: 400 })
-      const amt = Math.round(Number(amount_gbp) * 100)
-      if (!amt || amt <= 0) return Response.json({ error: 'bad amount' }, { status: 400 })
+      const storePence = Math.round(Number(amount_gbp) * 100)
+      if (!storePence || storePence <= 0) return Response.json({ error: 'bad amount' }, { status: 400 })
+      const amt = Math.round(storePence * (1 + COMMISSION))
       // Server-side too (the UI checks this, but the UI is not a boundary):
       // can never capture more than the authorized hold.
       if (o.amount_held && amt > Math.round(Number(o.amount_held) * 100))
@@ -145,7 +145,7 @@ export default {
       await ctx.supabaseAdmin.from('orders')
         .update({ payment_status: 'captured', amount_captured: amt / 100 })
         .eq('id', order_id)
-      return Response.json({ live: true, captured_gbp: amt / 100 })
+      return Response.json({ live: true, captured_gbp: amt / 100, store_gbp: storePence / 100, fee_gbp: (amt - storePence) / 100 })
     }
 
     return Response.json({ error: 'unknown task' }, { status: 400 })

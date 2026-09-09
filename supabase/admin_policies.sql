@@ -12,3 +12,8 @@ create policy "admin select all orders" on public.orders
 drop policy if exists "admin update all orders" on public.orders;
 create policy "admin update all orders" on public.orders
   for update using ((auth.jwt()->>'email') = 'noyouchka.bouchard@gmail.com');
+
+drop policy if exists "admin update meals review" on public.meals;
+create policy "admin update meals review" on public.meals
+  for update using ((auth.jwt()->>'email') = 'noyouchka.bouchard@gmail.com')
+  with check ((auth.jwt()->>'email') = 'noyouchka.bouchard@gmail.com');

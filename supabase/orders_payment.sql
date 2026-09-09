@@ -54,3 +54,6 @@ create trigger notify_order_freebeta_webhook
   for each row
   when (old.payment_status = 'unpaid' and new.payment_status = 'none')
   execute function public.notify_order_webhook_fn();
+
+-- 8 Sep 2026: concierge no longer uses free-beta. See revoke_notify_rpc.sql
+-- (applied live): RPC revoked; insert/free-beta triggers dropped; paid trigger kept.

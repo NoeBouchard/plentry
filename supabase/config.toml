@@ -30,6 +30,11 @@ verify_jwt = false
 [functions.pay]
 verify_jwt = true
 
+# `newcoming` is called by pg_cron (no user JWT); gated by x-webhook-secret
+# (same ORDER_WEBHOOK_SECRET as notify-order).
+[functions.newcoming]
+verify_jwt = false
+
 # `stripe-webhook` is called by Stripe (no user JWT); gated by signature check.
 [functions.stripe-webhook]
 verify_jwt = false

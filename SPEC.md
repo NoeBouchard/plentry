@@ -1,5 +1,7 @@
 # Plentry — Product Spec
 
+> **Superseded for day-to-day work.** Agents must follow [`../doc/`](../doc/README.md) / [`doc/`](doc/README.md). This file still describes an older “pay the supermarket / Pepesto bag” model. **Current:** concierge + Stripe hold + 5% Plentry fee.
+
 Goal: get a handful of friends using Plentry *instead of HelloFresh* and paying for it, as fast as honestly possible. This is the working spec the team/agents build against. It is deliberately blunt about what's real vs. simulated.
 
 Status date: 5 July 2026 · Owner: Noe (solo technical founder)

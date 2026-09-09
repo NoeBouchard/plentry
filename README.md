@@ -1,8 +1,10 @@
 # Plentry
 
+> **Source of truth (Sep 2026):** [`../doc/`](../doc/README.md) (workspace vault) and [`./doc/`](doc/README.md) (copy in this git repo). Read those before this README or **`SPEC.md`**. Customer pays **Plentry via Stripe**; Ops shops at Tesco / Sainsbury’s / Asda / Waitrose; **5% fee**. Tests: `npm test`.
+
 **Your kitchen on autopilot.** Tell Plentry what's in your fridge, pick the meals you fancy, and it prices the basket across local UK supermarkets and gets the groceries ordered. No boxes, no packing, no mark-ups. A flexible, AI-run alternative to HelloFresh that uses existing supermarkets instead of its own warehouses.
 
-This README is written for the next engineer or AI agent picking up the project. For product direction and the path to revenue, read **`SPEC.md`**. For high-level strategy, **`PLAN.md`**.
+This README is historical. For product direction, architecture, current behaviour, testing, and security, read the vault. For high-level strategy, **`PLAN.md`**.
 
 ---
 

@@ -60,6 +60,9 @@ create table if not exists public.meals (
   created_at timestamptz default now()
 );
 alter table public.meals add column if not exists image_url text;
+alter table public.meals add column if not exists recipe jsonb;
+alter table public.meals add column if not exists tags jsonb;
+alter table public.meals add column if not exists reviewed_at timestamptz;
 
 alter table public.meals enable row level security;
 

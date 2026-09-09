@@ -72,6 +72,14 @@
   .counter button{width:48px;height:48px;border-radius:50%;border:none;font-size:1.4rem;cursor:pointer}
   .counter .minus{background:#eee8dc;color:var(--text)}
   .counter .plus{background:var(--green-d);color:#fff}
+  .bk-sec{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px}
+  .bk-line{display:flex;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:.86rem}
+  .bk-line .nm{flex:1;min-width:0}
+  .bk-line .meta{color:var(--muted);font-size:.72rem;margin-top:2px}
+  .bk-line .qty{display:flex;align-items:center;gap:4px;flex-shrink:0}
+  .bk-line .qty button{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:1rem;line-height:1}
+  .bk-line .mp{font-weight:800;min-width:52px;text-align:right;flex-shrink:0}
+  .cupboard-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
   input[type=range]{accent-color:var(--green-d);width:100%}
   .budget-val{font-size:2.4rem;font-weight:800;color:var(--green-d);text-align:center}
   .week-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
@@ -79,14 +87,18 @@
   .week-card .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .week-card .v{font-size:1.35rem;font-weight:800;margin-top:2px}
   .day-card{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px;margin-bottom:8px;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit}
+  .day-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;margin-left:auto}
   .day-card img,.day-card .thumb-fallback{width:72px;height:72px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--sage);display:flex;align-items:center;justify-content:center;font-size:1.6rem}
   .day-badge{position:absolute;left:6px;top:6px;background:var(--green-d);color:#fff;font-size:.62rem;font-weight:800;border-radius:99px;padding:2px 6px}
   .day-photo{position:relative;flex-shrink:0}
   .day-card .nm{font-weight:700;font-size:.9rem}
   .day-card .meta{color:var(--muted);font-size:.75rem;margin-top:3px}
   .day-card .mp{font-weight:800;margin-left:auto;white-space:nowrap}
+  .day-side .mp{margin-left:0}
   .tag{display:inline-block;font-size:.66rem;padding:2px 8px;border-radius:99px;background:var(--sage);color:var(--green-d);margin-right:4px}
   .tag.have{background:#f8edd0;color:var(--amber)}
+  .tag.newcoming{background:#f8edd0;color:var(--amber)}
+  .tag-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
   .sticky-cta.show{display:block}
   .sticky-cta .btn{width:100%}
   .gen-wrap{padding:48px 8px 20px;text-align:center}
@@ -157,6 +169,17 @@
   .tstep::before{content:"";position:absolute;top:4px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:var(--line)}
   .tstep.done{color:var(--green)}
   .tstep.done::before{background:var(--green)}
+  .tstep.active{color:var(--green-d);font-weight:700}
+  .tstep.active::before{background:var(--green-d);box-shadow:0 0 0 3px var(--sage)}
+  .tstep.warn{color:var(--amber)}
+  .tstep.warn::before{background:var(--amber)}
+  .status-bar{display:flex;border:1.5px solid var(--line);border-radius:99px;overflow:hidden;margin:10px 0 6px;background:var(--card2)}
+  .status-seg{flex:1;border:none;background:transparent;padding:9px 6px;font-size:.72rem;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;transition:background .12s,color .12s}
+  .status-seg.done{background:var(--sage);color:var(--green-d)}
+  .status-seg.active{background:var(--green-d);color:#fff}
+  .status-seg:disabled{opacity:.45;cursor:default}
+  .hist{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 0;border:none;border-bottom:1px solid var(--line);cursor:pointer;width:100%;background:none;text-align:left;font:inherit;color:inherit}
+  .hist:last-child{border-bottom:none}
   .recipe-step{display:flex;gap:10px;padding:8px 0;font-size:.88rem;border-bottom:1px solid var(--line)}
   .recipe-step:last-child{border-bottom:none}
   .recipe-step .n{color:var(--green);font-weight:800;flex-shrink:0}
@@ -245,7 +268,7 @@
     </div>
     <div id="ob-4" style="display:none">
       <h1>What's your budget?</h1>
-      <p class="sub">We'll fit dinners to it — groceries at store price, no markup.</p>
+      <p class="sub">We'll fit dinners to it — groceries at store price, plus a 5% Plentry fee.</p>
       <div class="budget-val">£<span id="ob-budget-n">60</span></div>
       <p class="sub" style="text-align:center">per week</p>
       <input id="ob-budget" type="range" min="25" max="150" step="5" value="60" oninput="syncBudgetLabel()">
@@ -263,16 +286,11 @@
       <button class="btn" style="width:100%;margin-top:12px" onclick="obNext(6)">Continue</button>
     </div>
     <div id="ob-6" style="display:none">
-      <h1>Anything already in the kitchen?</h1>
-      <p class="sub">Optional — skip and we'll shop a full basket.</p>
-      <textarea id="ob-fridge" placeholder="e.g. half a bag of rice, 3 eggs, olive oil…"></textarea>
-      <div class="err" id="scan-err"></div>
-      <div id="scan-result" style="display:none">
-        <h3 style="margin-top:14px">Found — adjust if needed</h3>
-        <div id="ob-pantry-list"></div>
-      </div>
-      <button class="btn" style="width:100%;margin-top:14px" onclick="beginGenerate()">Skip — generate my week</button>
-      <button class="btn ghost" style="width:100%;margin-top:8px" id="scan-btn" onclick="scanPantry()">Scan with AI</button>
+      <h1>What's in the cupboard?</h1>
+      <p class="sub">Tick oils and spices you already cook with. We'll skip them on the shop. Groceries you don't need can be removed from the basket later.</p>
+      <input id="ob-have-q" placeholder="Search salt, oil, paprika…" oninput="renderObHave()" style="margin-bottom:10px">
+      <div id="ob-have-list"></div>
+      <button class="btn" style="width:100%;margin-top:14px" onclick="beginGenerate()">Continue</button>
     </div>
   </div>
 
@@ -296,13 +314,11 @@
   <!-- PANTRY -->
   <div class="screen" id="scr-pantry">
     <div class="card">
-      <h2>Pantry</h2>
-      <p class="sub">Updated automatically from your deliveries. Adjust anything that drifts, or re-scan below.</p>
+      <h2>Cupboard</h2>
+      <p class="sub">Tick oils and spices you already cook with. We'll skip them on the shop. Take groceries you don't need out of the basket.</p>
+      <input id="pantry-q" placeholder="Search salt, oil, paprika…" oninput="renderPantry()" style="margin-bottom:10px">
       <div id="pantry-alerts"></div>
       <div id="pantry-list"></div>
-      <h3 style="margin-top:16px">Quick re-scan</h3>
-      <textarea id="rescan-text" placeholder="e.g. just used the last of the rice, bought 6 eggs..." style="min-height:60px"></textarea>
-      <div style="margin-top:8px"><button class="btn sm" id="rescan-btn" onclick="rescanPantry()">✨ Update with AI</button><span class="err" id="rescan-err" style="margin-left:8px"></span></div>
     </div>
   </div>
 
@@ -310,7 +326,7 @@
   <div class="screen" id="scr-shop">
     <div class="card">
       <h2>Shopping basket</h2>
-      <p class="sub">Only what your chosen meals need minus what you already have.</p>
+      <p class="sub">Edit quantities in the basket, skip cupboard items you already have, then confirm to place the order.</p>
       <table id="shop-table"></table>
     </div>
     <div class="card">
@@ -324,7 +340,7 @@
 
   <!-- ORDERS -->
   <div class="screen" id="scr-orders">
-    <div class="card"><h2>Orders</h2><p class="sub">After the card hold we order from your supermarket to your door. Recipes unlock as soon as you check out.</p><div id="orders-list"><p class="sub">No orders yet. Pick meals from your menu.</p></div></div>
+    <div class="card"><h2>Orders</h2><p class="sub">Live status of every shop — from the card hold through to delivery at your door.</p><div id="orders-list"><p class="sub">No orders yet. Pick meals from your menu.</p></div></div>
   </div>
 
   <!-- PROFILE -->
@@ -346,16 +362,26 @@
       <div class="err ok" id="pr-saved" style="color:var(--green)"></div>
     </div>
     <div class="card">
+      <h3>Order history</h3>
+      <p class="sub" style="margin-bottom:8px">Every order on this account, newest first.</p>
+      <div id="pr-orders"><p class="sub">No orders yet.</p></div>
+    </div>
+    <div class="card">
       <h3>Beta notes</h3>
-      <p class="sub" style="margin:0">Concierge beta: you pay a card hold (~15% above the estimate), we order to your address from Tesco, Sainsbury's, Asda or Waitrose, then charge the exact store total. Typical delivery fees are included; the slot is confirmed when we place it.</p>
+      <p class="sub" style="margin:0">Concierge beta: you pay a card hold (~15% above groceries + our 5% fee). We order to your address from Tesco, Sainsbury's, Asda or Waitrose, then charge the exact store total plus 5%. Typical delivery fees are included; the slot is confirmed when we place it.</p>
     </div>
   </div>
 
   <!-- ADMIN OPS (founder only — nav button revealed by JS for the admin email) -->
   <div class="screen" id="scr-admin">
     <div class="card">
+      <h2>Newcoming meals</h2>
+      <p class="sub">Advisor dinners land here until you mark them reviewed. A Telegram reminder runs on the 1st and 15th. The current catalog is already reviewed.</p>
+      <div id="admin-newcoming"><p class="sub">Loading…</p></div>
+    </div>
+    <div class="card">
       <h2>Ops — order queue</h2>
-      <p class="sub">All customer orders, newest first. Work top-down: open the list, order at the store, mark it Ordered, then Delivered when it lands (delivery auto-refills the customer's pantry).</p>
+      <p class="sub">All customer orders, newest first. Use the status bar to set New, Ordered or Delivered — tap again to undo a miss-click. Delivery auto-refills the customer's pantry.</p>
       <div id="admin-list"><p class="sub">Loading…</p></div>
     </div>
   </div>
@@ -472,6 +498,12 @@ const STORES=[
 ];
 const STORE_MARK={tesco:{c:"#00539F",l:"T"},sains:{c:"#F06C00",l:"S"},asda:{c:"#68A51C",l:"A"},wait:{c:"#7BB01B",l:"W"}};
 const SHELF_LABEL="Own-brand shelf prices — Tesco estimated Sep 2026, others checked 5 Jul. Final price confirms at the store. Delivery is a typical fee, not a live slot.";
+const COMMISSION=0.05;
+const HOLD_BUFFER=0.15;
+function gbp(n){return Math.round(Number(n||0)*100)/100;}
+function plentryFee(shop){return gbp(shop*COMMISSION);}
+function customerTotal(shop){return gbp(Number(shop||0)+plentryFee(shop));}
+function holdAmount(shop){return gbp(customerTotal(shop)*(1+HOLD_BUFFER));}
 const SAMPLE_WEEK_ITEMS=[
   {name:"chicken thighs",qty:1,unit:"500g"},{name:"salmon fillet",qty:1,unit:"2 pc"},
   {name:"minced beef",qty:1,unit:"500g"},{name:"halloumi",qty:1,unit:"225g"},
@@ -529,6 +561,28 @@ const MEAL_PHOTOS={
   "Chicken parm-style bake":U("photo-1632778149955-e80f8ceca18e"),
   "Tandoori-style yoghurt chicken with rice":U("photo-1599487488170-d91ec13f0cf0"),
 };
+const PHOTO_BY_ING={
+  "chicken thighs":U("photo-1598103442097-8b74394b95c6"),
+  "salmon fillet":U("photo-1467003909585-2f8a72700288"),
+  "minced beef":U("photo-1551892374-ecf8754cf8b0"),
+  "halloumi":U("photo-1565299585323-38d6b0865b47"),
+  "eggs":U("photo-1590412200988-a436970781fa"),
+  "chickpeas":U("photo-1455619452474-d2be8b1e70cd"),
+  "spaghetti":U("photo-1621996346565-e3dbc646d9a9"),
+  "rice":U("photo-1603133872878-684f208fb84b"),
+  "tortillas":U("photo-1551504734-5ee1c36e3989"),
+  "potatoes":U("photo-1608039829572-dee9b9547d0d"),
+  "tomatoes":U("photo-1473093295043-cdd812d0e601"),
+  "chopped tomatoes":U("photo-1473093295043-cdd812d0e601"),
+  "broccoli":U("photo-1512621776951-a57141f2eefd"),
+  "spinach":U("photo-1540189549336-e6e99c3679fe"),
+  "passata":U("photo-1621996346565-e3dbc646d9a9"),
+  "curry paste":U("photo-1585937421612-70a008356fbe"),
+  "coconut milk":U("photo-1455619452474-d2be8b1e70cd"),
+  "feta":U("photo-1525351484163-7529414344d8"),
+};
+const PHOTO_FALLBACK=U("photo-1546069901-ba9599a7e63c");
+const PHOTO_ING_ORDER=["chicken thighs","salmon fillet","minced beef","halloumi","eggs","chickpeas","spaghetti","rice","tortillas","potatoes","tomatoes","chopped tomatoes","broccoli","spinach","passata","curry paste","coconut milk","feta"];
 const IS_MOBILE=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const INGREDIENTS={
   "chicken thighs":{unit:"500g",price:3.80},"salmon fillet":{unit:"2 pc",price:4.50},
@@ -543,7 +597,103 @@ const INGREDIENTS={
   "lemons":{unit:"3 pk",price:1.00},"potatoes":{unit:"1kg",price:1.15},
   "olive oil":{unit:"500ml",price:3.50},"feta":{unit:"200g",price:1.95},
   "yoghurt":{unit:"500g",price:1.25},"parmesan":{unit:"80g",price:1.85},
+  "chopped tomatoes":{unit:"400g tin",price:0.50},"butter":{unit:"250g",price:1.99},
+  "fresh coriander":{unit:"30g bunch",price:0.70},
+  "salt":{unit:"750g",price:0.65},"black pepper":{unit:"jar",price:1.10},
+  "paprika":{unit:"jar",price:1.10},"cumin":{unit:"jar",price:1.10},
+  "chilli flakes":{unit:"jar",price:1.00},"mixed herbs":{unit:"jar",price:1.10},
+  "soy sauce":{unit:"150ml",price:0.55},"stock cubes":{unit:"10 pk",price:1.10},
 };
+// Cupboard: oils, aromatics, spices. Tick to skip on the shop. Groceries stay in the basket.
+const STAPLES=["olive oil","butter","garlic","onions","lemons","curry paste","salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
+function isStaple(i){return STAPLES.indexOf(i)>=0;}
+function seasoningFor(m){
+  const blob=((m&&m.name||"")+" "+((m&&m.ing)||[]).join(" ")).toLowerCase();
+  const extra=["salt","black pepper"];
+  if(/curry|tikka|tandoori|keema|saag|stew/.test(blob))extra.push("paprika","cumin","chilli flakes","stock cubes");
+  else if(/fajita|taco/.test(blob))extra.push("paprika","cumin","chilli flakes");
+  else if(/fried rice/.test(blob))extra.push("soy sauce");
+  else if(/aglio/.test(blob))extra.push("chilli flakes");
+  else if(/shakshuka/.test(blob))extra.push("paprika","cumin","mixed herbs");
+  else if(/greek|herby/.test(blob))extra.push("mixed herbs");
+  else if(/pasta|spaghetti|ragu|pomodoro|meatball|parm|baked feta|baked rice/.test(blob)||/\bpassata\b/.test(blob))extra.push("mixed herbs");
+  else extra.push("paprika");
+  return extra;
+}
+function completeIng(m){
+  const ing=Array.isArray(m&&m.ing)?m.ing:[];
+  const out=[];const seen={};
+  const extras=ing.indexOf("salt")>=0?["salt","black pepper"]:seasoningFor(m);
+  for(const i of ing.concat(extras)){
+    if(INGREDIENTS[i]&&!seen[i]){seen[i]=1;out.push(i);}
+  }
+  return out;
+}
+function storedRecipe(m){
+  const r=m&&m.recipe;
+  if(r&&Array.isArray(r.steps)&&r.steps.length)return {steps:r.steps.map(s=>String(s)),tip:String(r.tip||"")};
+  return null;
+}
+// Closed meal tags (same set as ai/index.ts). A dinner can have several.
+const MEAL_TAGS=["vegetarian","vegan","meat","fish","low_calorie","high_protein","low_carb","breakfast","lunch","dinner","snack","gym","meal_prep","quick","comfort_food"];
+const MEAT_ING=["chicken thighs","minced beef"];
+const FISH_ING=["salmon fillet"];
+const ANIMAL_ING=["chicken thighs","minced beef","salmon fillet","eggs","feta","halloumi","yoghurt","parmesan","butter"];
+const PROTEIN_ING=["chicken thighs","minced beef","salmon fillet","eggs","halloumi","yoghurt","chickpeas","feta"];
+const CARB_ING=["rice","spaghetti","tortillas","potatoes"];
+function tagsFor(m){
+  const ing=Array.isArray(m&&m.ing)?m.ing:[];
+  const name=String(m&&m.name||"").toLowerCase();
+  const time=+m.time||25;
+  const has=k=>ing.indexOf(k)>=0;
+  const anyOf=keys=>keys.some(k=>has(k));
+  const tags=[];
+  if(anyOf(MEAT_ING))tags.push("meat");
+  else if(anyOf(FISH_ING))tags.push("fish");
+  else if(!anyOf(ANIMAL_ING))tags.push("vegan");
+  else tags.push("vegetarian");
+  if(anyOf(PROTEIN_ING))tags.push("high_protein");
+  if(!anyOf(CARB_ING))tags.push("low_carb");
+  const diet=tags[0];
+  if((diet==="vegan"||diet==="vegetarian")&&!has("coconut milk")&&!has("spaghetti")&&!has("halloumi")&&!has("feta")&&!has("parmesan")&&time<=25&&!/pasta|bake|fried rice|mash|curry|stew|meatball/.test(name))tags.push("low_calorie");
+  tags.push("dinner");
+  if(/omelette|shakshuka|frittata|baked eggs|spanish tortilla/.test(name))tags.push("breakfast");
+  if(/bowl|wrap|taco|salad|soup|omelette|fajita|frittata/.test(name))tags.push("lunch");
+  if(time<=20)tags.push("quick");
+  if(/curry|stew|rag[uù]|bolognese|traybake|casserole|keema|baked rice|soup/.test(name))tags.push("meal_prep");
+  if(tags.indexOf("high_protein")>=0&&(diet==="meat"||diet==="fish"||has("eggs")||has("halloumi")))tags.push("gym");
+  if(/pasta|spaghetti|curry|meatball|mash|bake|fried rice|shakshuka|parm|rag[uù]|stew|bolognese/.test(name))tags.push("comfort_food");
+  return tags.filter((t,i,a)=>a.indexOf(t)===i);
+}
+function mealTags(m){
+  const raw=Array.isArray(m&&m.tags)?m.tags:[];
+  const keep=raw.map(t=>String(t)).filter(t=>MEAL_TAGS.indexOf(t)>=0);
+  return keep.length?keep:tagsFor(m);
+}
+function mealTagHtml(m){
+  return mealTags(m).slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+}
+function wantedTags(){
+  const g=Array.isArray(S.prefs.goals)?S.prefs.goals:[];
+  const t=[];
+  if(g.indexOf("decide")>=0)t.push("quick");
+  if(g.indexOf("shop")>=0)t.push("meal_prep","quick");
+  if(g.indexOf("waste")>=0)t.push("meal_prep");
+  if(g.indexOf("budget")>=0)t.push("low_calorie");
+  return t.filter((x,i,a)=>a.indexOf(x)===i);
+}
+function scoreMeal(m){
+  const tags=mealTags(m),want=wantedTags();
+  let s=tags.indexOf("dinner")>=0?1:0;
+  want.forEach(t=>{if(tags.indexOf(t)>=0)s+=2;});
+  return s;
+}
+function rankCatalog(list){
+  return (list||[]).slice().sort((a,b)=>{
+    const d=scoreMeal(b)-scoreMeal(a);
+    return d!==0?d:Math.random()-0.5;
+  });
+}
 // ---------- SHELF PRICES (ingredient_prices table) ----------
 // Real own-brand shelf prices per store, captured 5 Jul 2026 (see supabase/ingredient_prices.sql).
 // Keyed by meal_key (same keys as meals.ing / INGREDIENTS) then app store id.
@@ -557,7 +707,7 @@ async function loadShelfPrices(){
       .select("meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
     if(error||!data)return;
     // key by meal_key when linked to the meal catalog, else display_name — so pantry
-    // items outside the 24 meal keys (soy sauce, ketchup, …) still price correctly.
+    // items outside the meal keys (soy sauce, ketchup, …) still price correctly.
     const byDb={};
     for(const r of data){const k=r.meal_key||(r.display_name||"").toLowerCase();if(!k)continue;(byDb[k]=byDb[k]||{})[r.store]=r;}
     SHELF={};
@@ -573,7 +723,15 @@ async function loadShelfPrices(){
     if(basketOpen)renderBasketDrawer();
   }catch(e){}
 }
-function shelfRow(item,store){return (SHELF[item]&&SHELF[item][store.id])||null;}
+function shelfRow(item,store){
+  const aliases={"mixed herbs":"dried mixed herbs","stock cubes":"chicken stock cubes"};
+  for(const k of [item,aliases[item]]){
+    if(!k)continue;
+    const r=SHELF[k]&&SHELF[k][store.id];
+    if(r)return r;
+  }
+  return null;
+}
 // Crash-proof ingredient info: hardcoded catalog first, then shelf data (pack size +
 // cheapest store price), then a generic guess. NEVER throws on unknown pantry items.
 function ingInfo(i){
@@ -585,18 +743,22 @@ function ingInfo(i){
 
 // Fallback menu when the AI endpoint isn't configured/reachable
 const FALLBACK_MEALS=[
-  {name:"Chicken & chickpea curry",emoji:"🍛",time:30,ing:["chicken thighs","chickpeas","curry paste","coconut milk","onions","garlic","rice","spinach"]},
-  {name:"Salmon traybake",emoji:"🐟",time:25,ing:["salmon fillet","potatoes","broccoli","lemons","olive oil","garlic"]},
-  {name:"Beef ragù spaghetti",emoji:"🍝",time:35,ing:["minced beef","spaghetti","passata","onions","garlic","parmesan"]},
-  {name:"Halloumi fajitas",emoji:"🌮",time:20,ing:["halloumi","tortillas","bell peppers","onions","yoghurt","lemons"]},
-  {name:"Shakshuka",emoji:"🍳",time:25,ing:["eggs","passata","bell peppers","onions","garlic","feta"]},
-  {name:"Chickpea & spinach curry",emoji:"🥘",time:20,ing:["chickpeas","curry paste","coconut milk","spinach","onions","rice","tomatoes"]},
-  {name:"Greek chicken bowls",emoji:"🥗",time:30,ing:["chicken thighs","rice","tomatoes","feta","yoghurt","lemons","garlic"]},
-  {name:"Veggie spaghetti pomodoro",emoji:"🍅",time:20,ing:["spaghetti","passata","tomatoes","garlic","olive oil","parmesan"]},
+  {"name": "Chicken & chickpea curry", "emoji": "🍛", "time": 30, "ing": ["black pepper", "chicken thighs", "chickpeas", "chilli flakes", "coconut milk", "cumin", "curry paste", "fresh coriander", "garlic", "olive oil", "onions", "paprika", "rice", "salt", "spinach", "stock cubes"], "recipe": {"steps": ["Rinse 150g rice and cook in 300ml water with a pinch of salt: boil, cover, simmer on the lowest heat for 12 minutes, then rest covered.", "Dice 1 onion and chop 3 garlic cloves. Heat 1 tbsp olive oil in a large pan over medium-high heat and cook the onion for 4 minutes.", "Cut 4 boneless chicken thighs into chunks, add to the pan and cook for 5 minutes until lightly browned.", "Stir in the garlic, 2 tbsp curry paste, 1 tsp cumin, 1 tsp paprika and ½ tsp chilli flakes. Cook for 1 minute.", "Add a 400ml tin of coconut milk, 1 crumbled stock cube and a drained 400g tin of chickpeas. Simmer for 12 minutes until the chicken is cooked through and the sauce has thickened.", "Stir in 150g spinach until wilted. Season with salt and black pepper.", "Serve over the rice, topped with chopped fresh coriander."], "tip": "Brown the chicken properly before the liquid goes in — it's where the depth of flavour comes from."}},
+  {"name": "Salmon traybake", "emoji": "🐟", "time": 30, "ing": ["black pepper", "broccoli", "garlic", "lemons", "olive oil", "paprika", "potatoes", "salmon fillet", "salt"], "recipe": {"steps": ["Preheat the oven to 220°C (200°C fan). Cut 500g potatoes into 2cm cubes and toss on a large tray with 2 tbsp olive oil, ½ tsp paprika, salt and black pepper. Roast for 15 minutes.", "Cut 1 head of broccoli into florets, chop 2 garlic cloves and slice 1 lemon into thin rounds.", "Push the potatoes to the sides. Place 2 salmon fillets in the middle, season with salt, pepper and ½ tsp paprika, and top with the lemon slices.", "Scatter the broccoli and garlic around, drizzle with 1 tbsp olive oil and a pinch of salt.", "Roast for 13 minutes until the salmon flakes and the broccoli is tender. Serve straight from the tray."], "tip": "Cut the potatoes evenly at 2cm so they're done in the same time as the salmon."}},
+  {"name": "Beef ragù spaghetti", "emoji": "🍝", "time": 35, "ing": ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "spaghetti"], "recipe": {"steps": ["Finely dice 1 onion and chop 2 garlic cloves. Heat 1 tbsp olive oil in a large pan over medium heat and cook the onion for 5 minutes until soft.", "Turn the heat up, add 400g minced beef and cook for 6 minutes, breaking it up, until well browned.", "Stir in the garlic and 1 tsp mixed herbs for 1 minute.", "Pour in 400g passata and 100ml water, season with ½ tsp salt and ¼ tsp black pepper.", "Simmer on low, uncovered, for 20 minutes, stirring now and then, until thick and rich.", "Cook 180g spaghetti in salted boiling water for 9–10 minutes. Keep a mug of pasta water, then drain.", "Toss the spaghetti through the ragù, loosening with a splash of pasta water, and serve with 30g grated parmesan."], "tip": "The longer, slower simmer is what turns mince and passata into a proper ragù — don't rush step 5."}},
+  {"name": "Halloumi fajitas", "emoji": "🌮", "time": 20, "ing": ["bell peppers", "black pepper", "chilli flakes", "cumin", "fresh coriander", "halloumi", "lemons", "olive oil", "onions", "paprika", "salt", "tortillas", "yoghurt"], "recipe": {"steps": ["Slice a 225g block of halloumi into strips and pat dry. Slice 1 onion and 2 bell peppers into strips.", "Heat 1 tbsp olive oil in a large frying pan over medium-high heat. Fry the halloumi for 2 minutes per side until golden, then set aside.", "Add 1 tbsp olive oil, then the onion and peppers. Cook for 6 minutes until soft and charred in places.", "Sprinkle over 1 tsp cumin, 1 tsp paprika, ½ tsp chilli flakes, a pinch of salt and black pepper. Cook for 1 minute.", "Return the halloumi and squeeze over the juice of half a lemon.", "Mix 4 tbsp yoghurt with the remaining lemon juice and a pinch of salt. Warm 4 tortillas in a dry pan for 30 seconds per side.", "Fill the tortillas with halloumi and peppers, top with lemon yoghurt and chopped fresh coriander, and serve."], "tip": "Dry the halloumi well — wet halloumi steams and never browns."}},
+  {"name": "Shakshuka", "emoji": "🍳", "time": 25, "ing": ["bell peppers", "black pepper", "cumin", "eggs", "feta", "garlic", "mixed herbs", "olive oil", "onions", "paprika", "passata", "salt", "tortillas"], "recipe": {"steps": ["Dice 1 onion and 2 bell peppers and chop 2 garlic cloves. Heat 1 tbsp olive oil in a large frying pan with a lid over medium heat.", "Cook the onion and peppers for 7 minutes until soft, then the garlic for 1 minute.", "Stir in 1 tsp paprika, 1 tsp cumin, ½ tsp mixed herbs, ½ tsp salt and ¼ tsp black pepper for 30 seconds.", "Pour in 400g passata and simmer for 6 minutes until slightly thickened.", "Make 4 wells and crack an egg into each. Cover and cook on low for 5–6 minutes until the whites are set and the yolks still soft.", "Warm 4 tortillas in a dry pan for 30 seconds per side. Crumble 80g feta over the shakshuka and serve from the pan with the tortillas for scooping."], "tip": "Frying the spices for 30 seconds before the passata makes the whole dish taste deeper."}},
+  {"name": "Chickpea & spinach curry", "emoji": "🥘", "time": 25, "ing": ["black pepper", "chickpeas", "chilli flakes", "chopped tomatoes", "coconut milk", "cumin", "curry paste", "fresh coriander", "garlic", "olive oil", "onions", "paprika", "rice", "salt", "spinach", "stock cubes"], "recipe": {"steps": ["Rinse 150g rice and cook in 300ml water with a pinch of salt: boil, cover, simmer on the lowest heat for 12 minutes, then rest covered.", "Dice 1 onion and chop 3 garlic cloves. Heat 1 tbsp olive oil in a large pan over medium heat and cook the onion for 4 minutes, then the garlic for 1 minute.", "Stir in 2 tbsp curry paste, 1 tsp cumin, 1 tsp paprika and ½ tsp chilli flakes for 1 minute.", "Add a 400g tin of chopped tomatoes, 200ml coconut milk (half a tin), 1 crumbled stock cube and a drained 400g tin of chickpeas. Simmer for 10 minutes until thickened.", "Stir in 150g spinach until wilted. Season with salt and black pepper.", "Serve over the rice, topped with chopped fresh coriander."], "tip": "Crush a few chickpeas against the side of the pan to thicken the sauce naturally."}},
+  {"name": "Greek chicken bowls", "emoji": "🥗", "time": 30, "ing": ["black pepper", "chicken thighs", "feta", "garlic", "lemons", "mixed herbs", "olive oil", "rice", "salt", "tomatoes", "yoghurt"], "recipe": {"steps": ["Rinse 150g rice and cook in 300ml water with a pinch of salt: boil, cover, simmer on the lowest heat for 12 minutes, then rest covered.", "Cut 4 boneless chicken thighs into chunks and toss with 1 tbsp olive oil, 1 tsp mixed herbs, the zest of 1 lemon, 1 chopped garlic clove, ½ tsp salt and ¼ tsp black pepper.", "Heat 1 tbsp olive oil in a large frying pan over high heat. Cook the chicken for 10 minutes, turning, until charred and cooked through. Squeeze over half the lemon.", "Dice 3 tomatoes and toss with 1 tbsp olive oil, the remaining lemon juice, a pinch of salt and pepper.", "Mix 150g yoghurt with 1 finely grated garlic clove and a pinch of salt.", "Build the bowls: rice, chicken, tomato salad, a spoon of garlic yoghurt and 100g crumbled feta. Finish with black pepper."], "tip": "Charred edges on the chicken are the point — keep the pan hot and don't crowd it."}},
+  {"name": "Veggie spaghetti pomodoro", "emoji": "🍅", "time": 20, "ing": ["black pepper", "garlic", "mixed herbs", "olive oil", "parmesan", "passata", "salt", "spaghetti", "tomatoes"], "recipe": {"steps": ["Cook 180g spaghetti in salted boiling water for 9–10 minutes. Keep a mug of pasta water, then drain.", "Meanwhile, thinly slice 3 garlic cloves and dice 3 tomatoes.", "Heat 3 tbsp olive oil in a large pan over medium heat and cook the garlic for 1 minute until fragrant.", "Add the tomatoes and cook for 3 minutes until they start to break down, then pour in 250g passata and 1 tsp mixed herbs. Simmer for 5 minutes.", "Season with ½ tsp salt and black pepper. Add the spaghetti and a splash of pasta water and toss for 1 minute.", "Serve with 30g grated parmesan."], "tip": "Keep the pasta al dente — it finishes cooking in the sauce."}}
 ];
 function mealPhoto(m){
-  const raw=m&&(m.image_url||MEAL_PHOTOS[m.name]);
-  return (raw&&/^https:\/\//i.test(raw))?raw:"";
+  const named=m&&(m.image_url||MEAL_PHOTOS[m.name]);
+  if(named&&/^https:\/\//i.test(named))return named;
+  const ing=Array.isArray(m&&m.ing)?m.ing:[];
+  for(const i of PHOTO_ING_ORDER){if(ing.includes(i)&&PHOTO_BY_ING[i])return PHOTO_BY_ING[i];}
+  for(const i of ing){if(PHOTO_BY_ING[i])return PHOTO_BY_ING[i];}
+  return PHOTO_FALLBACK;
 }
 function mealImgHtml(m,cls){
   const src=mealPhoto(m);
@@ -619,12 +781,13 @@ const DEFAULTS={
   menuOptions:[],   // AI-suggested meals for the week
   selected:[],      // names the user picked
   recipes:{},       // name -> {steps:[],tip}
-  orders:[], onboarded:false,
+  orders:[], onboarded:false, basketEdit:null,
 };
 let S=load();
 if(!S.prefs)S.prefs=JSON.parse(JSON.stringify(DEFAULTS.prefs));
 if(!S.prefs.preferredStore)S.prefs.preferredStore="";
 if(!S.prefs.goals)S.prefs.goals=[];
+if(S.basketEdit!=null&&!Array.isArray(S.basketEdit))S.basketEdit=null;
 let basket=[],chosenStore=null,authMode="signup",basketOpen=false,pendingCheckout=false,pendingMeals=false,obStep=1,lastAuthMsg="";
 let liveQuote=null,liveQuoteKey="",liveQuoteLoading=false; // live store prices for the current basket
 let sampleQuote=null,sampleQuoteLoading=false;
@@ -642,7 +805,7 @@ async function pushCloudState(){
   try{
     await sb.from("profiles").upsert({
       id:S.user.id,email:S.user.email,name:S.user.name,
-      state:{prefs:S.prefs,pantry:S.pantry,menuOptions:S.menuOptions,selected:S.selected,recipes:S.recipes,orders:S.orders,onboarded:S.onboarded},
+      state:{prefs:S.prefs,pantry:S.pantry,menuOptions:S.menuOptions,selected:S.selected,recipes:S.recipes,orders:S.orders,onboarded:S.onboarded,basketEdit:S.basketEdit},
       updated_at:new Date().toISOString(),
     });
   }catch(e){}
@@ -654,13 +817,17 @@ async function loadCloudState(user){
     if(data&&data.state&&data.state.prefs){
       Object.assign(S,{prefs:Object.assign({},DEFAULTS.prefs,data.state.prefs),pantry:data.state.pantry||{},
         menuOptions:data.state.menuOptions||[],selected:data.state.selected||[],
-        recipes:data.state.recipes||{},orders:data.state.orders||[],onboarded:!!data.state.onboarded});
+        recipes:data.state.recipes||{},orders:data.state.orders||[],onboarded:!!data.state.onboarded,
+        basketEdit:Array.isArray(data.state.basketEdit)?data.state.basketEdit:null});
     }
   }catch(e){}
   if(S.prefs.preferredStore)chosenStore=STORES.find(s=>s.id===S.prefs.preferredStore)||chosenStore;
   save();
 }
-const mealByName=n=>S.menuOptions.find(m=>m.name===n)||FALLBACK_MEALS.find(m=>m.name===n);
+function mealByName(n){
+  const m=S.menuOptions.find(x=>x.name===n)||FALLBACK_MEALS.find(x=>x.name===n);
+  return m?Object.assign({},m,{ing:completeIng(m)}):null;
+}
 const selectedMeals=()=>S.selected.map(mealByName).filter(Boolean);
 
 // ---------- AUTH ----------
@@ -794,6 +961,7 @@ function showObStep(step){
     syncBudgetLabel();
   }
   if(step===5)renderObMealPicks();
+  if(step===6)renderObHave();
 }
 function obBack(){
   if(obStep<=1)return;
@@ -864,28 +1032,29 @@ function sampleStoreTotal(s){
 }
 function sampleStoreQuote(s){
   const q=sampleQuote&&sampleQuote.stores&&sampleQuote.stores[s.id];
-  if(q&&q.ok)return {t:q.total/100+s.fee,live:true};
-  const shelf=SHELF_READY&&SAMPLE_WEEK_ITEMS.every(b=>shelfRow(b.name,s));
-  return {t:sampleStoreTotal(s),live:false,shelf};
+  const t=q&&q.ok?q.total/100+s.fee:sampleStoreTotal(s);
+  const live=!!(q&&q.ok);
+  const shelf=!live&&SHELF_READY&&SAMPLE_WEEK_ITEMS.every(b=>shelfRow(b.name,s));
+  return {t,pay:customerTotal(t),fee:plentryFee(t),live,shelf};
 }
 function renderObStores(){
   const sub=document.getElementById("ob-stores-sub");
   if(sub)sub.textContent=`Same 5 dinners, delivering to ${S.prefs.postcode||"you"}. Tap your shop.`;
-  const totals=STORES.map(s=>({s,...sampleStoreQuote(s)})).sort((a,b)=>a.t-b.t);
+  const totals=STORES.map(s=>({s,...sampleStoreQuote(s)})).sort((a,b)=>a.pay-b.pay);
   const best=totals[0],worst=totals[totals.length-1];
   const host=document.getElementById("ob-stores");
-  if(host)host.innerHTML=totals.map(({s,t,live,shelf},idx)=>{
+  if(host)host.innerHTML=totals.map(({s,pay,live,shelf},idx)=>{
     const mk=STORE_MARK[s.id]||{c:"#1f4a34",l:s.name[0]};
     return `<button type="button" class="store-tile ${S.prefs.preferredStore===s.id?"picked":""}${idx===0?" best":""}" onclick="pickPreferredStore('${s.id}')">
       <div class="mark" style="background:${mk.c}">${mk.l}</div>
       <div class="sname">${esc(s.name)}</div>
-      <div class="sprice">${sampleQuoteLoading&&!live?"…":"£"+t.toFixed(0)}</div>
+      <div class="sprice">${sampleQuoteLoading&&!live?"…":"£"+pay.toFixed(0)}</div>
       <div class="sdetail">${idx===0?"Cheapest this week":live?"Live prices":shelf?"Shelf prices":"Estimate"}</div>
     </button>`;
   }).join("");
   const sl=document.getElementById("ob-savings");
   if(sl)sl.textContent=(sampleQuoteLoading?"Fetching live prices… ":"")+
-    `Choosing ${best.s.name} saves about £${(worst.t-best.t).toFixed(0)} vs ${worst.s.name} on this sample week.`+
+    `Choosing ${best.s.name} saves about £${(worst.pay-best.pay).toFixed(0)} vs ${worst.s.name} on this sample week (incl. 5% fee).`+
     (totals.some(x=>x.live)?"":" "+SHELF_LABEL);
   const btn=document.getElementById("ob-store-btn");
   const picked=STORES.find(s=>s.id===S.prefs.preferredStore);
@@ -905,45 +1074,47 @@ async function fetchSampleQuote(){
   sampleQuote=(res&&res.live)?res:null;
   renderObStores();
 }
-function localParsePantry(text){
-  const t=text.toLowerCase();
-  const syn={"pasta":"spaghetti","peppers":"bell peppers","pepper":"bell peppers","tinned tomatoes":"passata","canned tomatoes":"passata","egg":"eggs","onion":"onions","potato":"potatoes","tomato":"tomatoes","lemon":"lemons","chicken":"chicken thighs","salmon":"salmon fillet","beef":"minced beef","mince":"minced beef","yogurt":"yoghurt"};
-  const out={};
-  const lvl=seg=>/almost|little|bit|last|running/.test(seg)?0.2:/half|some|couple/.test(seg)?0.5:1;
-  Object.keys(INGREDIENTS).forEach(name=>{
-    if(t.includes(name)){const i=t.indexOf(name);out[name]=lvl(t.slice(Math.max(0,i-30),i+name.length+20));}
-  });
-  Object.entries(syn).forEach(([k,v])=>{
-    if(t.includes(k)&&!out[v]){const i=t.indexOf(k);out[v]=lvl(t.slice(Math.max(0,i-30),i+k.length+20));}
-  });
-  return out;
+function haveItem(name){return (S.pantry[name]||0)>=0.5;}
+function catalogNames(){return Object.keys(INGREDIENTS);}
+function setHave(name,on){
+  if(!INGREDIENTS[name])return;
+  if(on)S.pantry[name]=1;
+  else delete S.pantry[name];
+  save();
+  if(Array.isArray(S.basketEdit)){
+    if(haveItem(name))basket=basket.filter(b=>b.i!==name);
+    else if(!basket.some(b=>b.i===name)){
+      const {buy}=needList();
+      if(buy[name])basket.push({i:name,q:buy[name]});
+    }
+    commitBasket();
+  }else syncBasketFromMeals();
+  renderPantry();renderObHave();renderMenu();
 }
-async function scanPantry(){
-  const text=document.getElementById("ob-fridge").value.trim();
-  const err=document.getElementById("scan-err");
-  if(!text){err.textContent="Describe at least a few things — or tap Skip.";return;}
-  err.textContent="";
-  const btn=document.getElementById("scan-btn");
-  btn.disabled=true;btn.innerHTML='<span class="spin">✨</span> Scanning…';
-  const res=await ai("parse_pantry",{text});
-  let pantry=(res&&res.pantry)||null;
-  if(pantry){
-    const clean={};Object.entries(pantry).forEach(([k,v])=>{if(INGREDIENTS[k])clean[k]=Math.max(0,Math.min(1,+v||0));});
-    pantry=Object.keys(clean).length?clean:null;
-  }
-  if(!pantry)pantry=localParsePantry(text);
-  S.pantry=pantry;save();
-  btn.disabled=false;btn.textContent="Scan with AI";
-  renderObPantry();
-  document.getElementById("scan-result").style.display="block";
-  if(!Object.keys(pantry).length)err.textContent="Couldn't match anything to our catalog yet — add items below or generate anyway.";
+function toggleHaveAt(i){
+  const name=STAPLES[i];
+  if(!name)return;
+  setHave(name,!haveItem(name));
 }
-function skipScan(){S.pantry={};save();beginGenerate();}
-function renderObPantry(){
-  const el=document.getElementById("ob-pantry-list");
+function haveListHtml(q){
+  const query=String(q||"").trim().toLowerCase();
+  const match=n=>!query||n.toLowerCase().includes(query);
+  const items=STAPLES.filter(match);
+  if(!items.length)return '<p class="sub">No match — try another word.</p>';
+  return items.map(n=>{
+    const i=STAPLES.indexOf(n);
+    const have=haveItem(n);
+    return `<button type="button" class="choice ${have?"sel":""}" onclick="toggleHaveAt(${i})">
+      <div class="c-ico">${have?"✓":""}</div>
+      <div><b>${esc(n)}</b><p>${esc(ingInfo(n).unit||"")}${have?" · skipped on the shop":""}</p></div>
+    </button>`;
+  }).join("");
+}
+function renderObHave(){
+  const el=document.getElementById("ob-have-list");
   if(!el)return;
-  const entries=Object.entries(S.pantry);
-  el.innerHTML=(entries.length?entries:[]).map(([i,q])=>pantryRow(i,q,"ob")).join("")||'<p class="sub">Starting with an empty pantry — it fills up with your first delivery.</p>';
+  const q=document.getElementById("ob-have-q");
+  el.innerHTML=haveListHtml(q&&q.value);
 }
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function setGen(id,label,done){
@@ -978,7 +1149,7 @@ async function loadWeekCatalog(){
 function autoPickWeek(){
   const n=S.prefs.meals||5;
   if(!S.menuOptions.length)S.menuOptions=FALLBACK_MEALS.map(normMeal);
-  const pool=shuffle([...S.menuOptions]);
+  const pool=rankCatalog(S.menuOptions);
   const s=preferredStoreObj()||STORES[0];
   const picked=[];
   let spend=s.fee;
@@ -1001,7 +1172,7 @@ function enterApp(){
   const admin=document.getElementById("nav-admin");
   if(admin)admin.style.display=isAdmin()?"":"none";
   syncHeader();
-  return Promise.resolve(ensureWeek()).catch(()=>{}).then(()=>{nav("menu");renderBasketFab();});
+  return Promise.resolve(ensureWeek()).catch(()=>{}).then(()=>{nav("menu");renderBasketFab();return hydrateOrdersFromDb();});
 }
 
 // ---------- ADMIN OPS (concierge fulfilment; founder account only) ----------
@@ -1016,7 +1187,31 @@ function adminListText(o){
 }
 async function renderAdmin(){
   const el=document.getElementById("admin-list");
-  if(!sb||!isAdmin()){el.innerHTML='<p class="sub">Admin only.</p>';return;}
+  const qel=document.getElementById("admin-newcoming");
+  if(!sb||!isAdmin()){
+    if(el)el.innerHTML='<p class="sub">Admin only.</p>';
+    if(qel)qel.innerHTML='<p class="sub">Admin only.</p>';
+    return;
+  }
+  if(qel){
+    try{
+      const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,tags,source,created_at,reviewed_at").order("created_at",{ascending:false}).limit(100);
+      const queue=(error||!data)?[]:data.filter(m=>!m.reviewed_at);
+      if(!queue.length)qel.innerHTML='<p class="sub">None waiting — the live catalog is reviewed.</p>';
+      else qel.innerHTML=queue.map(m=>{
+        const tags=mealTags(m);
+        const ings=Array.isArray(m.ing)?m.ing:[];
+        return `<div class="store" style="display:block;cursor:default">
+          <div><b>${esc(m.emoji||"")} ${esc(m.name)}</b> <span class="tag newcoming">newcoming</span></div>
+          <div class="sdetail">${esc(m.source||"")} · ${+m.time||0} min · ${esc(String(m.created_at||"").slice(0,10))}</div>
+          <div class="sdetail" style="white-space:normal">${esc(ings.join(", "))}</div>
+          <div class="tag-row">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>
+          <button type="button" class="btn sm" style="margin-top:8px" onclick="adminMarkMealReviewed(${+m.id||0})">Mark reviewed</button>
+        </div>`;
+      }).join("");
+    }catch(e){qel.innerHTML='<p class="sub">Could not load newcoming meals.</p>';}
+  }
+  if(!el)return;
   const {data,error}=await sb.from("orders")
     .select("id,email,name,postcode,store,total,items,status,created_at,payment_status,amount_held,amount_captured,address")
     .order("created_at",{ascending:false}).limit(100);
@@ -1041,11 +1236,14 @@ async function renderAdmin(){
       <div class="sdetail">${esc((o.address&&o.address.name)||o.name||"—")} · ${esc((o.address&&o.address.email)||o.email||"—")}${meals.length?` · ${meals.length} meals`:""}</div>
       <div class="sdetail">📍 ${esc(addr)}</div>
       <div class="sdetail" style="margin:6px 0;white-space:normal">${items.map(b=>`${+b.q||0}× ${esc(b.product||b.i)}`).join(" · ")}</div>
+      <div class="status-bar">
+        <button type="button" class="status-seg ${o.status==="new"?"active":"done"}" ${unpaid?"disabled":""} onclick="adminSetStatus(${o.id},'new')">New</button>
+        <button type="button" class="status-seg ${o.status==="ordered"?"active":o.status==="delivered"?"done":""}" ${unpaid?"disabled":""} onclick="adminSetStatus(${o.id},'ordered')">Ordered</button>
+        <button type="button" class="status-seg ${o.status==="delivered"?"active":""}" ${unpaid?"disabled":""} onclick="adminSetStatus(${o.id},'delivered')">Delivered</button>
+      </div>
       <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px">
         ${unpaid?`<span class="sub">Waiting for the customer to pay — do not order yet.</span>`:""}
-        ${!unpaid&&o.status==="new"?`<button class="btn sm" onclick="adminSetStatus(${o.id},'ordered')">Mark ordered</button>`:""}
-        ${o.status==="ordered"?`<button class="btn sm" onclick="adminSetStatus(${o.id},'delivered')">Mark delivered</button>`:""}
-        ${o.payment_status==="authorized"?`<input id="cap-${o.id}" type="number" step="0.01" placeholder="exact £" style="width:92px;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--text)"><button class="btn sm" onclick="adminCapture(${o.id})">Capture</button>`:""}
+        ${o.payment_status==="authorized"?`<input id="cap-${o.id}" type="number" step="0.01" placeholder="store £" style="width:92px;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--text)"><button class="btn sm" onclick="adminCapture(${o.id})">Capture +5%</button>`:""}
         <button class="btn ghost sm" onclick="navigator.clipboard.writeText(adminListText(window.__adminOrders[${o.id}])).then(()=>{this.textContent='✓ Copied'})">📋 Copy list</button>
         ${storeInfo?`<a class="btn ghost sm" style="text-decoration:none" target="_blank" rel="noopener" href="${storeInfo.home}">Open ${esc(o.store)} ↗</a>`:""}
       </div></div>`;}).join("");
@@ -1055,24 +1253,37 @@ async function adminSetStatus(id,status){
   const {error}=await sb.from("orders").update({status}).eq("id",id);
   if(!error)renderAdmin();
 }
+async function adminMarkMealReviewed(id){
+  if(!sb||!isAdmin()||!id)return;
+  const {error}=await sb.from("meals").update({reviewed_at:new Date().toISOString()}).eq("id",id);
+  if(error)alert("Could not mark reviewed.");
+  else renderAdmin();
+}
 // Capture the EXACT store total against the Stripe hold (never more than held).
 async function adminCapture(id){
   const inp=document.getElementById("cap-"+id);
-  const amt=parseFloat(inp&&inp.value);
+  const storeAmt=parseFloat(inp&&inp.value);
   const o=window.__adminOrders[id];
-  if(!amt||amt<=0)return alert("Enter the exact store total in £.");
-  if(o&&o.amount_held&&amt>o.amount_held)return alert(`Can't capture more than the £${Number(o.amount_held).toFixed(2)} hold.`);
-  const r=await payApi("capture",{order_id:id,amount_gbp:amt});
+  if(!storeAmt||storeAmt<=0)return alert("Enter the exact store total in £.");
+  const charge=customerTotal(storeAmt);
+  if(o&&o.amount_held&&charge>o.amount_held)return alert(`Store £${storeAmt.toFixed(2)} + 5% is £${charge.toFixed(2)}, above the £${Number(o.amount_held).toFixed(2)} hold.`);
+  const r=await payApi("capture",{order_id:id,amount_gbp:storeAmt});
   if(r&&r.live)renderAdmin();
   else alert("Capture failed"+(r&&r.error?": "+(r.detail||r.error):"")+".");
 }
 
 // ---------- MENU ----------
 const validMeal=m=>m&&m.name&&Array.isArray(m.ing)&&m.ing.length&&m.ing.every(i=>INGREDIENTS[i]);
-// Strip angle brackets/quotes from free-text meal fields at the source so no HTML
-// can ever be stored on a meal (ing is already whitelisted to the catalog).
 const clean=s=>String(s==null?"":s).replace(/[<>"'`]/g,"").slice(0,60);
-const normMeal=m=>({name:clean(m.name),emoji:clean(m.emoji||"🍽️").slice(0,8)||"🍽️",time:+m.time||25,ing:m.ing,image_url:mealPhoto(m)});
+const normMeal=m=>{
+  const ing=completeIng(m);
+  const out={name:clean(m.name),emoji:clean(m.emoji||"🍽️").slice(0,8)||"🍽️",time:+m.time||25,ing,image_url:mealPhoto(m),tags:mealTags({...m,ing})};
+  if(m&&m.id)out.id=+m.id;
+  if(m&&m.reviewed_at)out.reviewed_at=m.reviewed_at;
+  const r=storedRecipe(m);
+  if(r)out.recipe=r;
+  return out;
+};
 const shuffle=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
 // NOTE: the client no longer writes to the shared `meals` table — the INSERT
 // policy was dropped (security_hardening_v2.sql). The `ai` edge function
@@ -1082,13 +1293,17 @@ async function loadCatalogMeals(){
   if(sb){
     const pull=async()=>{
       try{
-        const {data,error}=await sb.from("meals").select("name,emoji,time,ing,image_url");
+        const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at");
         if(!error&&data)return data.filter(validMeal).map(normMeal);
       }catch(e){}
       try{
-        const {data}=await sb.from("meals").select("name,emoji,time,ing");
+        const {data}=await sb.from("meals").select("name,emoji,time,ing,image_url");
         if(data)return data.filter(validMeal).map(normMeal);
       }catch(e2){}
+      try{
+        const {data}=await sb.from("meals").select("name,emoji,time,ing");
+        if(data)return data.filter(validMeal).map(normMeal);
+      }catch(e3){}
       return [];
     };
     try{
@@ -1097,8 +1312,9 @@ async function loadCatalogMeals(){
     }catch(e){dbMeals=[];}
   }
   const seed=FALLBACK_MEALS.map(normMeal);
-  const extra=(dbMeals||[]).filter(m=>!seed.some(s=>s.name===m.name));
-  return [...seed,...extra];
+  if(!(dbMeals&&dbMeals.length))return seed;
+  const seen=new Set(dbMeals.map(m=>m.name));
+  return dbMeals.concat(seed.filter(m=>!seen.has(m.name)));
 }
 function mealNeedCost(m,s){
   if(!m||!s||!Array.isArray(m.ing))return 0;
@@ -1123,10 +1339,11 @@ function sanitizeMeals(){
   S.selected=(Array.isArray(S.selected)?S.selected:[]).filter(n=>names.has(n));
 }
 async function ensureWeek(){
+  try{
+    const catalog=await loadCatalogMeals();
+    if(catalog.length)S.menuOptions=catalog;
+  }catch(e){}
   sanitizeMeals();
-  if(!S.menuOptions.length){
-    try{S.menuOptions=await loadCatalogMeals();}catch(e){S.menuOptions=FALLBACK_MEALS.map(normMeal);}
-  }
   if(!S.menuOptions.length)S.menuOptions=FALLBACK_MEALS.map(normMeal);
   if(!selectedMeals().length)autoPickWeek();
   save();
@@ -1135,28 +1352,25 @@ async function loadMenuOptions(force){
   if(force&&!requireAccount("Create an account to pick a new week of dinners."))return;
   if(S.menuOptions.length&&!force){renderMenu();return;}
   const wrap=document.getElementById("menu-week");
-  if(wrap)wrap.innerHTML='<div class="card" style="text-align:center"><span class="spin" style="font-size:1.4rem">✨</span><p class="sub" style="margin:8px 0 0">Picking a new week…</p></div>';
-  const catalog=await loadCatalogMeals();
-  const exclude=[...new Set(catalog.map(m=>m.name))];
-  const res=await ai("meal_options",{pantry:S.pantry,size:S.prefs.size,budget:S.prefs.budget,count:8,exclude});
-  let fresh=(res&&Array.isArray(res.meals))?res.meals.filter(validMeal).map(normMeal).filter(m=>!exclude.includes(m.name)):[];
-  let pool=[...fresh,...shuffle(catalog).filter(m=>!fresh.some(f=>f.name===m.name))];
-  FALLBACK_MEALS.forEach(m=>{if(pool.length<12&&!pool.some(p=>p.name===m.name))pool.push(normMeal(m));});
-  S.menuOptions=pool.slice(0,16);
+  if(wrap)wrap.innerHTML='<div class="card" style="text-align:center"><p class="sub" style="margin:8px 0 0">Loading dinners from the catalog…</p></div>';
+  let catalog=[];
+  try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
+  if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
+  S.menuOptions=rankCatalog(catalog).slice(0,16);
   autoPickWeek();
-  save();
+  mealsChanged();
   renderMenu();
-  syncBasketFromMeals();
 }
 // Index-based wrappers so meal names never get inlined into onclick JS strings
 // (HTML-attribute + JS-string context can't be made safe by escaping alone).
 function toggleMealAt(i){if(!requireAccount("Create an account to choose this week's dinners."))return;const m=S.menuOptions[i];if(m)toggleMeal(m.name);}
 function showRecipeAt(i){const m=S.menuOptions[i];if(m)showRecipe(m.name);}
-function showRecipeFromOrder(id,i){const o=S.orders.find(x=>x.id===id);if(o&&o.meals&&o.meals[i]!=null)showRecipe(o.meals[i]);}
+function orderById(id){return S.orders.find(x=>x.backendId===id||x.id===id);}
+function showRecipeFromOrder(id,i){const o=orderById(id);if(o&&o.meals&&o.meals[i]!=null)showRecipe(o.meals[i]);}
 function toggleMeal(name){
   const i=S.selected.indexOf(name);
   i>=0?S.selected.splice(i,1):S.selected.push(name);
-  save();renderMenu();syncBasketFromMeals();
+  save();renderMenu();mealsChanged();
 }
 function mealCardHtml(m,idx){
   const sel=S.selected.includes(m.name);
@@ -1181,15 +1395,16 @@ function renderMenu(){
     const cost=s?storeTotalForItems(buy,s):Object.entries(buy).reduce((t,[i,q])=>t+q*ingInfo(i).price,0);
     const n=meals.length||1;
     const per=(cost-(s?s.fee:0))/n;
-    const under=(S.prefs.budget||0)-cost;
+    const pay=customerTotal(cost);
+    const under=(S.prefs.budget||0)-pay;
     const mk=s?STORE_MARK[s.id]:null;
     wrap.innerHTML=`<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
         <h1 style="margin:0;font-size:1.7rem">Your week<br><em>is ready.</em></h1>
         <button class="btn ghost sm" onclick="loadMenuOptions(true)">↻ New week</button>
       </div>
-      <p class="sub">Tap a dinner to see the recipe, swap it, or drop it from the basket.</p>
+      <p class="sub">Tap Modify to swap a dinner. Your week stays ${esc(S.prefs.meals)} meals.</p>
       <div class="week-head">
-        <div class="week-card"><div class="k">This shop</div><div class="v">${cost?"£"+cost.toFixed(0):"—"}</div></div>
+        <div class="week-card"><div class="k">This shop</div><div class="v">${cost?"£"+pay.toFixed(0):"—"}</div></div>
         <div class="week-card"><div class="k">${basket.length||Object.keys(buy).length} items</div><div class="v">${s?esc(s.name):"Pick a shop"}</div></div>
       </div>
       ${s?`<div class="store-chip"><span class="mark" style="width:18px;height:18px;border-radius:6px;background:${(mk&&mk.c)||"var(--green-d)"};display:inline-block"></span> Planned for ${esc(s.name)}</div>`:""}
@@ -1197,17 +1412,21 @@ function renderMenu(){
       ${meals.length?meals.map((m,i)=>{
         const idx=S.menuOptions.findIndex(x=>x.name===m.name);
         const mc=s?mealNeedCost(m,s):per;
-        return `<button type="button" class="day-card" onclick="showMealDetails(${idx>=0?idx:0})">
-          <div class="day-photo">${mealThumbHtml(m)}<span class="day-badge">${days[i]||("D"+(i+1))}</span></div>
-          <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min · ${esc(S.prefs.size)} people</div><span class="tag">${esc(mealTag(m))}</span></div>
-          <div class="mp">£${Number(mc||0).toFixed(2)}</div>
-        </button>`;
+        const det=idx>=0?idx:0;
+        return `<div class="day-card">
+          <div class="day-photo" onclick="showMealDetails(${det})">${mealThumbHtml(m)}<span class="day-badge">${days[i]||("D"+(i+1))}</span></div>
+          <div style="flex:1;min-width:0;cursor:pointer" onclick="showMealDetails(${det})"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min · ${esc(S.prefs.size)} people</div><div class="tag-row">${mealTagHtml(m)}</div></div>
+          <div class="day-side">
+            <div class="mp">£${Number(mc||0).toFixed(2)}</div>
+            <button type="button" class="btn ghost sm" onclick="openModify(${i})">Modify</button>
+          </div>
+        </div>`;
       }).join(""):`<div class="card"><p class="sub" style="margin:0">No dinners yet — generate a week from onboarding or tap New week.</p><button class="btn" style="width:100%;margin-top:10px" onclick="loadMenuOptions(true)">Generate my week</button></div>`}
       <p class="sub" style="text-align:center"><a href="#" style="color:var(--green)" onclick="openAdvisor();return false">Ask the meal advisor</a></p>`;
     const sticky=document.getElementById("sticky-order");
     if(sticky){
       sticky.disabled=!meals.length;
-      sticky.textContent=meals.length?(s&&cost?`Order this week · £${cost.toFixed(2)}`:"Order this week"):"Pick dinners first";
+      sticky.textContent=meals.length?(s&&cost?`Order this week · £${customerTotal(cost).toFixed(2)}`:"Order this week"):"Pick dinners first";
     }
     const menu=document.getElementById("scr-menu");
     showSticky(!!(menu&&menu.classList.contains("active")&&meals.length));
@@ -1226,6 +1445,7 @@ function showMealDetails(idx){
   openModal(`${mealImgHtml(m,"meal-hero")}
     <h2>${esc(m.name)}</h2>
     <p class="sub">${+m.time||0} min · serves ${esc(S.prefs.size)}</p>
+    <div class="tag-row" style="margin-bottom:10px">${mealTags(m).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>
     <h3>Ingredients</h3>
     ${(Array.isArray(m.ing)?m.ing:[]).map(i=>{
       const have=(S.pantry[i]||0)>=0.5;
@@ -1235,32 +1455,37 @@ function showMealDetails(idx){
       <button class="btn" style="flex:1" onclick="closeModal();showRecipeAt(${idx})">📖 Cooking instructions</button>
       <button class="btn ghost" onclick="toggleMealAt(${idx});closeModal()">${sel?"Remove from week":"Add to my week"}</button>
     </div>
-    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="openSwap(${idx})">Swap this dinner</button>`);
+    ${S.selected.indexOf(m.name)>=0?`<button class="btn ghost" style="width:100%;margin-top:8px" onclick="openModify(${S.selected.indexOf(m.name)})">Modify this dinner</button>`:""}`);
 }
-function openSwap(fromIdx){
-  const current=S.menuOptions[fromIdx];if(!current)return;
+let modifyPicks=[];
+async function openModify(selI){
+  const current=selectedMeals()[selI];
+  if(!current)return;
+  openModal(`<h2>Replace ${esc(current.name)}</h2><p class="sub">Five other dinners from the catalog…</p>`);
+  let catalog=[];
+  try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
+  if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
+  catalog.forEach(m=>{if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.push(m);});
+  const pool=catalog.filter(m=>m.name!==current.name&&!S.selected.includes(m.name));
+  modifyPicks=rankCatalog(pool).slice(0,5);
   const s=preferredStoreObj();
-  openModal(`<h2>Swap ${esc(current.name)}</h2>
-    <p class="sub">Pick another dinner. The basket updates straight away.</p>
-    ${S.menuOptions.map((m,i)=>{
-      if(m.name===current.name||S.selected.includes(m.name))return "";
-      const thumb=mealThumbHtml(m);
+  openModal(`<h2>Replace ${esc(current.name)}</h2>
+    <p class="sub">Pick one of these. Your week stays ${esc(S.prefs.meals)} dinners.</p>
+    ${modifyPicks.map((m,j)=>{
       const mc=s?mealNeedCost(m,s):0;
-      return `<button type="button" class="day-card" onclick="applySwap(${fromIdx},${i})">
-        <div class="day-photo">${thumb}</div>
-        <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min · ${esc(mealTag(m))}</div></div>
+      return `<button type="button" class="day-card" onclick="applyModify(${selI},${j})">
+        <div class="day-photo">${mealThumbHtml(m)}</div>
+        <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min</div><div class="tag-row">${mealTagHtml(m)}</div></div>
         <div class="mp">${mc?"£"+mc.toFixed(2):""}</div>
       </button>`;
-    }).join("")||'<p class="sub">No other dinners in this week\'s pool — try New week.</p>'}
-    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="showMealDetails(${fromIdx})">Back</button>`);
+    }).join("")||'<p class="sub">No other dinners in the catalog right now.</p>'}
+    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Keep this dinner</button>`);
 }
-function applySwap(fromIdx,toIdx){
-  const from=S.menuOptions[fromIdx],to=S.menuOptions[toIdx];
-  if(!from||!to)return;
-  const si=S.selected.indexOf(from.name);
-  if(si>=0)S.selected[si]=to.name;
-  else if(!S.selected.includes(to.name))S.selected.push(to.name);
-  save();closeModal();renderMenu();syncBasketFromMeals();
+function applyModify(selI,j){
+  const next=modifyPicks[j];
+  if(!next||selI<0||selI>=S.selected.length)return;
+  S.selected[selI]=next.name;
+  save();closeModal();renderMenu();mealsChanged();
 }
 
 // ---------- MEAL ADVISOR ----------
@@ -1289,10 +1514,10 @@ function renderAdvisorMeals(){
   return `<h3 style="margin-top:8px">Pick what you like:</h3>`+
     advisorProposed.map((m,i)=>`<div class="adv-meal ${advisorPicked.has(i)?'sel':''}" onclick="toggleAdvisorMeal(${i})">
       <div style="font-size:1.4rem">${esc(m.emoji)}</div>
-      <div class="am-info"><b>${esc(m.name)}</b><div class="am-meta">${+m.time||0} min · ${esc(m.ing.join(", "))}</div></div>
+      <div class="am-info"><b>${esc(m.name)}</b><div class="am-meta">${+m.time||0} min · ${esc(m.ing.join(", "))}</div><div class="tag-row">${mealTagHtml(m)}</div></div>
       <div>${advisorPicked.has(i)?"✓":""}</div>
     </div>`).join("")+
-    `<button class="btn" style="width:100%;margin-top:8px" onclick="addAdvisorMeals()" ${advisorPicked.size?"":"disabled"}>Add ${advisorPicked.size||""} to my menu →</button>`;
+    `<button class="btn" style="width:100%;margin-top:8px" onclick="addAdvisorMeals()" ${advisorPicked.size?"":"disabled"}>Add to my week (stays ${esc(S.prefs.meals)} dinners)</button>`;
 }
 function toggleAdvisorMeal(i){
   advisorPicked.has(i)?advisorPicked.delete(i):advisorPicked.add(i);
@@ -1304,7 +1529,7 @@ async function sendAdvisor(){
   if(!text)return;
   advisorMsgs.push({role:"user",content:text});
   renderAdvisor(true);
-  const res=await ai("advisor",{messages:advisorMsgs});
+  const res=await ai("advisor",{messages:advisorMsgs,goals:S.prefs.goals||[]});
   if(!res||!res.message){
     advisorMsgs.push({role:"assistant",content:"Hmm, I lost my train of thought — try again in a moment?"});
   }else{
@@ -1314,37 +1539,51 @@ async function sendAdvisor(){
   }
   renderAdvisor(false);
 }
-async function addAdvisorMeals(){
+function addAdvisorMeals(){
   const picked=advisorProposed.filter((_,i)=>advisorPicked.has(i));
   if(!picked.length)return;
-  // (the ai fn already persisted these dishes server-side when it proposed them)
+  // The ai fn already persisted these dishes. Week length stays prefs.meals:
+  // fill empty slots, then replace from Monday — never grow past N.
+  const n=Math.max(1,+S.prefs.meals||5);
   picked.forEach(m=>{
     if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.unshift(m);
-    if(!S.selected.includes(m.name))S.selected.push(m.name);
   });
+  const incoming=picked.filter(m=>!S.selected.includes(m.name));
+  const next=S.selected.slice();
+  let r=0;
+  for(const m of incoming){
+    if(next.length<n)next.push(m.name);
+    else{next[r]=m.name;r=(r+1)%n;}
+  }
+  S.selected=next.slice(0,n);
   S.menuOptions=S.menuOptions.slice(0,16);
-  save();closeModal();renderMenu();syncBasketFromMeals();
+  save();closeModal();renderMenu();mealsChanged();
 }
 
 // ---------- RECIPES ----------
 async function showRecipe(name){
   const meal=mealByName(name);if(!meal)return;
-  if(!S.recipes[name]){
+  const stored=storedRecipe(meal);
+  if(stored){
+    S.recipes[name]=stored;
+    save();
+  }else if(!S.recipes[name]){
     openModal(`<h2>${esc(meal.emoji)} ${esc(name)}</h2><p class="sub"><span class="spin">✨</span> Writing your recipe…</p>`);
     const res=await ai("recipe",{name,ing:meal.ing,servings:S.prefs.size});
     S.recipes[name]=(res&&Array.isArray(res.steps)&&res.steps.length)?{steps:res.steps,tip:res.tip||""}:{
-      steps:["Prep all ingredients: chop the vegetables, measure everything out.",
+      steps:[`Prep everything on the list: ${meal.ing.join(", ")}.`,
         `Heat a splash of olive oil in a large pan over medium heat.`,
         `Start with the aromatics and any meat or protein; cook until coloured (5–8 min).`,
-        `Add remaining ingredients in order of cooking time; season with salt and pepper.`,
+        `Add the rest of the ingredients in order of cooking time, including the salt and spices.`,
         `Simmer or cook through until everything is tender (10–15 min).`,
-        `Taste, adjust seasoning, and serve hot.`],
+        `Taste, adjust seasoning from the list, and serve hot.`],
       tip:"Read all steps once before you start — it makes everything smoother."};
     save();
   }
   const r=S.recipes[name];
+  const serves=storedRecipe(meal)?"quantities for 2":("serves "+S.prefs.size);
   openModal(`<h2>${esc(meal.emoji)} ${esc(name)}</h2>
-    <p class="sub">${+meal.time||0} min · serves ${esc(S.prefs.size)} · ${esc(meal.ing.join(", "))}</p>
+    <p class="sub">${+meal.time||0} min · ${esc(serves)} · ${esc(meal.ing.join(", "))}</p>
     ${r.steps.map((s,i)=>`<div class="recipe-step"><span class="n">${i+1}</span><span>${esc(s)}</span></div>`).join("")}
     ${r.tip?`<div class="alert ok" style="margin-top:12px">💡 ${esc(r.tip)}</div>`:""}
     <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">Done</button>`);
@@ -1352,44 +1591,21 @@ async function showRecipe(name){
 }
 
 // ---------- PANTRY ----------
-function pantryRow(i,q,prefix){
-  const pct=Math.min(100,q*100);
-  const col=q<0.3?"var(--red)":q<0.6?"var(--amber)":"var(--green)";
-  return `<div class="pantry-item">
-    <div class="pi-name">${esc(i)}<div class="stock-bar"><i style="width:${pct}%;background:${col}"></i></div></div>
-    <div class="pi-qty">${(q*100).toFixed(0)}% of ${esc(INGREDIENTS[i]?INGREDIENTS[i].unit:"unit")}</div>
-    <div class="stepper"><button onclick="adjPantry('${i}',-0.25,'${prefix}')">−</button><button onclick="adjPantry('${i}',0.25,'${prefix}')">+</button></div>
-  </div>`;
-}
 function renderPantry(){
   const list=document.getElementById("pantry-list");
-  const entries=Object.entries(S.pantry).sort((a,b)=>a[1]-b[1]);
-  list.innerHTML=entries.map(([i,q])=>pantryRow(i,q,"main")).join("")||'<p class="sub">Empty for now — it fills up with your first delivery.</p>';
-  const low=entries.filter(([,q])=>q<0.3).map(([i])=>i);
-  document.getElementById("pantry-alerts").innerHTML=low.length?
-    `<div class="alert">⚠ Running low: ${esc(low.join(", "))}. They'll be auto-added to your next basket.</div>`:
-    (entries.length?`<div class="alert ok">✓ Pantry healthy — nothing critically low.</div>`:"");
+  if(!list)return;
+  const q=document.getElementById("pantry-q");
+  list.innerHTML=haveListHtml(q&&q.value);
+  const n=Object.keys(S.pantry).filter(haveItem).length;
+  const alerts=document.getElementById("pantry-alerts");
+  if(alerts)alerts.innerHTML=n
+    ?`<div class="alert ok">${n} item${n===1?"":"s"} we'll skip on the shop.</div>`
+    :`<div class="alert">Nothing ticked yet — we'll add oils and spices to the shop. Remove extra groceries from the basket.</div>`;
 }
-function adjPantry(i,d,prefix){
-  S.pantry[i]=Math.max(0,Math.min(2,(S.pantry[i]||0)+d));
-  if(S.pantry[i]===0)delete S.pantry[i];
-  save();
-  if(prefix==="ob"){renderObPantry();syncBasketFromMeals();}
-  else{renderPantry();renderMenu();syncBasketFromMeals();}
-}
-async function rescanPantry(){
-  const text=document.getElementById("rescan-text").value.trim();
-  const err=document.getElementById("rescan-err");
-  if(!text){err.textContent="Type what changed first.";return;}
-  err.textContent="";
-  const btn=document.getElementById("rescan-btn");
-  btn.disabled=true;btn.innerHTML='<span class="spin">✨</span> Updating…';
-  const res=await ai("parse_pantry",{text});
-  let upd=(res&&res.pantry)||localParsePantry(text);
-  Object.entries(upd).forEach(([k,v])=>{if(INGREDIENTS[k])S.pantry[k]=Math.max(0,Math.min(1,+v||0));});
-  save();btn.disabled=false;btn.textContent="✨ Update with AI";
-  document.getElementById("rescan-text").value="";
-  renderPantry();renderMenu();
+function toggleStapleAt(idx){
+  const name=STAPLES[idx];
+  if(!name)return;
+  setHave(name,!haveItem(name));
 }
 
 // ---------- SHOP ----------
@@ -1398,10 +1614,8 @@ function needList(){
   selectedMeals().forEach(r=>{(r.ing||[]).forEach(i=>{need[i]=(need[i]||0)+0.5;});});
   const buy={};let pantryValue=0;
   for(const [i,q] of Object.entries(need)){
-    const have=S.pantry[i]||0;
-    const short=Math.max(0,q-have);
-    pantryValue+=Math.min(have,q)*ingInfo(i).price;
-    if(short>0)buy[i]=Math.ceil(short);
+    if(haveItem(i)){pantryValue+=q*ingInfo(i).price;continue;}
+    buy[i]=Math.ceil(q);
   }
   return {buy,pantryValue,need};
 }
@@ -1412,9 +1626,73 @@ function storeTotalForItems(buy,s){
     return t+q*(r?Number(r.price_gbp):ingInfo(i).price*s.mult);
   },0)+s.fee;
 }
-function goShop(){openBasket();}
-function openBasket(){
+function mealsChanged(){
+  S.basketEdit=null;
+  save();
   syncBasketFromMeals();
+}
+function commitBasket(){
+  S.basketEdit=basket.map(b=>({i:b.i,q:Math.max(1,Math.min(20,Math.round(+b.q||1)))}));
+  save();
+  liveQuote=null;liveQuoteKey="";
+  renderBasketDrawer();renderBasketFab();
+  const shop=document.getElementById("scr-shop");
+  if(shop&&shop.classList.contains("active"))renderShop();
+  fetchLiveQuote();
+}
+function resetBasketFromMeals(){
+  S.basketEdit=null;
+  save();
+  syncBasketFromMeals();
+}
+function basketLineHtml(idx,staple){
+  const b=basket[idx];if(!b)return "";
+  const s=preferredStoreObj();
+  const r=s?shelfRow(b.i,s):null;
+  const price=b.q*(r?Number(r.price_gbp):ingInfo(b.i).price);
+  return `<div class="bk-line">
+    <div class="nm">${esc(b.i)}<div class="meta">${esc(r?r.product_name:ingInfo(b.i).unit)}</div></div>
+    <div class="qty">
+      <button type="button" onclick="basketQtyAt(${idx},-1)">−</button>
+      <span>${+b.q}</span>
+      <button type="button" onclick="basketQtyAt(${idx},1)">+</button>
+    </div>
+    <div class="mp">£${price.toFixed(2)}</div>
+    ${staple
+      ?`<button type="button" class="btn ghost sm" onclick="alreadyHaveAt(${idx})">Already have</button>`
+      :`<button type="button" class="btn ghost sm" onclick="removeBasketAt(${idx})">Remove</button>`}
+  </div>`;
+}
+function basketQtyAt(idx,d){
+  const b=basket[idx];if(!b)return;
+  b.q=Math.max(0,Math.min(20,Math.round(+b.q||1)+d));
+  if(b.q<=0)basket.splice(idx,1);
+  commitBasket();
+}
+function removeBasketAt(idx){
+  if(idx<0||idx>=basket.length)return;
+  basket.splice(idx,1);
+  commitBasket();
+}
+function alreadyHaveAt(idx){
+  const b=basket[idx];if(!b)return;
+  setHave(b.i,true);
+}
+function addBasketFromSelect(){
+  const sel=document.getElementById("bk-add");
+  const name=sel&&sel.value;
+  if(!name||!INGREDIENTS[name])return;
+  if(basket.some(b=>b.i===name))return;
+  basket.push({i:name,q:1});
+  if((S.pantry[name]||0)>=0.5)delete S.pantry[name];
+  commitBasket();
+  renderPantry();
+}
+function openBasket(){
+  if(!Array.isArray(S.basketEdit))syncBasketFromMeals();
+  else{
+    basket=S.basketEdit.filter(b=>b&&INGREDIENTS[b.i]).map(b=>({i:b.i,q:Math.max(1,Math.round(+b.q||1))}));
+  }
   basketOpen=true;
   document.getElementById("basket-bg").classList.add("open");
   renderBasketDrawer();
@@ -1422,18 +1700,18 @@ function openBasket(){
 }
 function closeBasket(){basketOpen=false;document.getElementById("basket-bg").classList.remove("open");}
 function syncBasketFromMeals(){
-  const {buy}=needList();
-  Object.entries(S.pantry).forEach(([i,q])=>{if(q<0.3&&!buy[i])buy[i]=1;});
-  const next=Object.entries(buy).map(([i,q])=>({i,q}));
-  const key=next.map(b=>b.i+":"+b.q).sort().join("|");
-  const changed=key!==basketKey();
-  basket=next;
+  if(Array.isArray(S.basketEdit)){
+    basket=S.basketEdit.filter(b=>b&&INGREDIENTS[b.i]).map(b=>({i:b.i,q:Math.max(1,Math.round(+b.q||1))}));
+  }else{
+    const {buy}=needList();
+    basket=Object.entries(buy).map(([i,q])=>({i,q}));
+  }
   if(!chosenStore)chosenStore=preferredStoreObj();
   renderBasketFab();
   if(basketOpen)renderBasketDrawer();
   const shop=document.getElementById("scr-shop");
   if(shop&&shop.classList.contains("active"))renderShop();
-  if(changed)fetchLiveQuote();
+  fetchLiveQuote();
 }
 function renderBasketFab(){
   const fab=document.getElementById("basket-fab");
@@ -1445,37 +1723,49 @@ function renderBasketFab(){
   document.getElementById("fab-count").textContent=String(n);
   const s=preferredStoreObj();
   const q=s?storeQuote(s):null;
-  document.getElementById("fab-label").textContent=n?(q?"£"+q.t.toFixed(2):n+" item"+(n>1?"s":"")):"Basket";
+  document.getElementById("fab-label").textContent=n?(q?"£"+q.pay.toFixed(2):n+" item"+(n>1?"s":"")):"Basket";
 }
 function renderBasketDrawer(){
   const panel=document.getElementById("basket-panel");
   if(!panel)return;
   const s=preferredStoreObj();
   const q=s?storeQuote(s):null;
-  const totals=STORES.map(st=>({s:st,...storeQuote(st)})).sort((a,b)=>a.t-b.t);
+  const totals=STORES.map(st=>({s:st,...storeQuote(st)})).sort((a,b)=>a.pay-b.pay);
   const best=totals[0],worst=totals[totals.length-1];
-  const lines=basket.length
-    ?(s&&q&&q.live
-      ?q.q.lines.map(l=>`<tr><td>${esc(l.item)}</td><td>${esc(l.product)}${l.units>1?` ×${+l.units}`:""}</td><td class="right">£${(l.pence*l.units/100).toFixed(2)}</td></tr>`).join("")+
-        (q.q.unmatched||[]).map(u=>`<tr><td>${esc(u)}</td><td class="sub">picked at the store</td><td class="right">—</td></tr>`).join("")
-      :basket.map(b=>{const r=s?shelfRow(b.i,s):null;
-        return `<tr><td>${esc(b.i)}</td><td>${esc(r?r.product_name:ingInfo(b.i).unit)}${b.q>1?` ×${+b.q}`:""}</td><td class="right">£${(b.q*(r?Number(r.price_gbp):ingInfo(b.i).price)).toFixed(2)}</td></tr>`;}).join(""))
-    :`<tr><td class="sub" colspan="3">Nothing needed yet — tap a dinner to add it.</td></tr>`;
+  const groceries=[],cupboard=[];
+  basket.forEach((b,idx)=>{ (isStaple(b.i)?cupboard:groceries).push(idx); });
+  const addable=Object.keys(INGREDIENTS).filter(i=>!basket.some(b=>b.i===i));
+  const groceryHtml=groceries.length
+    ?groceries.map(idx=>basketLineHtml(idx,false)).join("")
+    :`<p class="sub">No groceries yet — add an item below or pick dinners on Menu.</p>`;
+  const cupboardHtml=cupboard.length
+    ?cupboard.map(idx=>basketLineHtml(idx,true)).join("")
+    :`<p class="sub">No oils or spices on this shop — tick fewer in Cupboard if you need a restock.</p>`;
   panel.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:10px">
       <h2 style="margin:0">Your basket</h2>
       <button class="btn ghost sm" onclick="closeBasket()">Close</button>
     </div>
-    <p class="sub">${S.selected.length} meal${S.selected.length===1?"":"s"} · only what's missing from your pantry</p>
-    <table>${lines}${pantryRows()}</table>
+    <p class="sub">${S.selected.length} meal${S.selected.length===1?"":"s"} · edit this shop, then confirm to send the order.</p>
+    ${Array.isArray(S.basketEdit)?`<p class="sub"><a href="#" style="color:var(--green)" onclick="resetBasketFromMeals();return false">Reset to this week's list</a></p>`:""}
+    <div class="bk-sec">Groceries</div>
+    ${groceryHtml}
+    <div class="bk-sec">Cupboard — oils & spices</div>
+    <p class="sub" style="margin-top:0">If you already cook with these, tap Already have.</p>
+    ${cupboardHtml}
+    <div class="bk-sec">Add a product</div>
+    <div class="row" style="margin:8px 0 12px">
+      <select id="bk-add">${addable.map(i=>`<option value="${esc(i)}">${esc(i)}</option>`).join("")||"<option value=\"\">Basket is full</option>"}</select>
+      <button class="btn ghost sm" onclick="addBasketFromSelect()" ${addable.length?"":"disabled"}>Add</button>
+    </div>
     <h3 style="margin-top:16px">Supermarket</h3>
-    <p class="sub">We order from the shop you pick after the card hold.</p>
-    <div id="drawer-stores">${totals.map(({s:st,t,live,shelf})=>
+    <p class="sub">We order from the shop you pick after you confirm.</p>
+    <div id="drawer-stores">${totals.map(({s:st,pay,live,shelf})=>
       `<div class="store ${s&&s.id===st.id?"picked":""}" onclick="pickStore('${st.id}')">
         <div><div class="sname">${esc(st.name)}${live?' <span class="badge" style="background:var(--green-d)">LIVE</span>':shelf?' <span class="badge">SHELF</span>':''}</div>
-        <div class="sdetail">Typical delivery £${st.fee.toFixed(2)}</div></div>
-        <div class="price">£${t.toFixed(2)}</div></div>`).join("")}</div>
-    <div class="alert ok" style="margin-top:8px">${liveQuoteLoading?"⏳ Fetching live prices… ":""}${best?`Choosing ${esc(best.s.name)} saves £${(worst.t-best.t).toFixed(2)} vs ${esc(worst.s.name)}. `:""}${totals.some(x=>x.live)?"":SHELF_LABEL}</div>
-    <button class="btn" style="width:100%;margin-top:8px" id="drawer-order-btn" ${!basket.length||!s?"disabled":""} onclick="confirmOrder()">${s&&q?`Place my order — £${q.t.toFixed(2)} at ${esc(s.name)} →`:"Pick a store to order"}</button>`;
+        <div class="sdetail">Typical delivery £${st.fee.toFixed(2)} · +5% fee</div></div>
+        <div class="price">£${pay.toFixed(2)}</div></div>`).join("")}</div>
+    <div class="alert ok" style="margin-top:8px">${liveQuoteLoading?"⏳ Fetching live prices… ":""}${best?`Choosing ${esc(best.s.name)} saves £${(worst.pay-best.pay).toFixed(2)} vs ${esc(worst.s.name)}. `:""}Includes a 5% Plentry fee. ${totals.some(x=>x.live)?"":SHELF_LABEL}</div>
+    <button class="btn" style="width:100%;margin-top:8px" id="drawer-order-btn" ${!basket.length||!s?"disabled":""} onclick="confirmOrder()">${s&&q?`Review & send order — £${q.pay.toFixed(2)} →`:"Pick a store to order"}</button>`;
 }
 // Rows for ingredients the meals need but the pantry already covers — shown so the
 // consumer always sees the FULL ingredient list, not just what's being bought.
@@ -1503,8 +1793,9 @@ function shelfCoverage(s){return basket.length?basket.filter(b=>shelfRow(b.i,s))
 // Live quote when available: real matched-product total (pence) + delivery fee.
 function storeQuote(s){
   const q=liveQuote&&liveQuote.stores&&liveQuote.stores[s.id];
-  if(q&&q.ok)return {t:q.total/100+s.fee,live:true,q};
-  return {t:storeTotal(s),live:false,q:null,shelf:SHELF_READY&&shelfCoverage(s)===1};
+  const live=!!(q&&q.ok);
+  const t=live?q.total/100+s.fee:storeTotal(s);
+  return {t,pay:customerTotal(t),fee:plentryFee(t),live,q:live?q:null,shelf:!live&&SHELF_READY&&shelfCoverage(s)===1};
 }
 function basketKey(){return basket.map(b=>b.i+":"+b.q).sort().join("|");}
 async function fetchLiveQuote(){
@@ -1539,15 +1830,15 @@ function renderShop(){
   }
   else tbl.innerHTML=`<tr><th>Item</th><th>Qty</th><th class="right">Est. price</th></tr>`+
     basket.map(b=>`<tr><td>${esc(b.i)} <span style="color:var(--muted);font-size:.74rem">(${esc(ingInfo(b.i).unit)})</span></td><td>${+b.q}</td><td class="right">£${(b.q*ingInfo(b.i).price).toFixed(2)}</td></tr>`).join("")+pantryRows();
-  const totals=STORES.map(s=>({s,...storeQuote(s)})).sort((a,b)=>a.t-b.t);
+  const totals=STORES.map(s=>({s,...storeQuote(s)})).sort((a,b)=>a.pay-b.pay);
   const best=totals[0],worst=totals[totals.length-1];
   const anyLive=totals.some(x=>x.live);
-  document.getElementById("store-compare").innerHTML=totals.map(({s,t,live,shelf},idx)=>
+  document.getElementById("store-compare").innerHTML=totals.map(({s,pay,live,shelf},idx)=>
     `<div class="store ${idx===0?'best':''}" onclick="pickStore('${s.id}')" id="store-${s.id}">
       <div><div class="sname">${s.name}${idx===0?'<span class="badge">CHEAPEST</span>':''}${live?' <span class="badge" style="background:var(--green-d)">LIVE</span>':shelf?' <span class="badge">SHELF</span>':''}</div>
-      <div class="sdetail">${s.dist} · delivery £${s.fee.toFixed(2)} · ${s.eta}</div></div>
-      <div class="price">£${t.toFixed(2)}</div></div>`).join("");
-  const save_=worst.t-best.t;
+      <div class="sdetail">${s.dist} · delivery £${s.fee.toFixed(2)} · +5% fee · ${s.eta}</div></div>
+      <div class="price">£${pay.toFixed(2)}</div></div>`).join("");
+  const save_=worst.pay-best.pay;
   const anyShelf=totals.some(x=>x.shelf);
   const sl=document.getElementById("savings-line");
   sl.style.display="block";
@@ -1564,8 +1855,8 @@ function pickStore(id){
   chosenStore=next;
   S.prefs.preferredStore=chosenStore.id;save();
   STORES.forEach(s=>{const el=document.getElementById("store-"+s.id);if(el)el.style.borderColor=s.id===id?"var(--green)":"var(--line)";});
-  const {t}=storeQuote(chosenStore);
-  const label=`Place my order — £${t.toFixed(2)} at ${chosenStore.name} →`;
+  const {pay}=storeQuote(chosenStore);
+  const label=`Place my order — £${pay.toFixed(2)} at ${chosenStore.name} →`;
   const btn=document.getElementById("order-btn");
   if(btn){btn.disabled=!basket.length;btn.textContent=label;}
   renderShopTableOnly();
@@ -1613,15 +1904,19 @@ function confirmOrder(){
     openAuth("Create an account so we can take the card hold and order to your door.");
     return;
   }
-  const {t,live}=storeQuote(chosenStore);
+  const {t,pay,fee,live}=storeQuote(chosenStore);
   closeBasket();
-  openModal(`<h2 style="margin-bottom:6px">We'll order this for you</h2>
-    <p class="sub">${basket.length} items · <b style="color:var(--text)">£${t.toFixed(2)}</b> at ${esc(chosenStore.name)} · typical ${esc(chosenStore.eta)}</p>
-    <div class="alert ok">A card hold ~15% above this estimate. We collect your delivery address, then place the ${esc(chosenStore.name)} order to your door. You're only charged the exact store total.</div>
+  const preview=basket.slice(0,8).map(b=>`${+b.q}× ${esc(b.i)}`).join(" · ");
+  const extra=basket.length>8?` · +${basket.length-8} more`:"";
+  openModal(`<h2 style="margin-bottom:6px">Confirm this shop</h2>
+    <p class="sub">${basket.length} items at ${esc(chosenStore.name)} · typical ${esc(chosenStore.eta)}</p>
+    <p class="sub" style="white-space:normal">${preview}${extra}</p>
+    <p class="sub" style="margin:0">Groceries £${t.toFixed(2)} · Plentry 5% £${fee.toFixed(2)} · <b style="color:var(--text)">you pay £${pay.toFixed(2)}</b></p>
+    <div class="alert ok">A card hold of about £${holdAmount(t).toFixed(2)} (~15% buffer). We collect your delivery address, then place the ${esc(chosenStore.name)} order. You're charged the exact store total plus 5%.</div>
     ${live?"":`<div class="alert">${SHELF_LABEL}</div>`}
     <div class="row">
-      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">Pay hold & place order →</button>
-      <button class="btn ghost" onclick="closeModal()">Back</button>
+      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">Pay hold & send order →</button>
+      <button class="btn ghost" onclick="closeModal();openBasket()">Edit basket</button>
     </div>`);
 }
 async function placeOrder(){
@@ -1659,7 +1954,7 @@ async function placeOrder(){
     return;
   }
   S.orders.unshift(order);
-  basket=[];liveQuote=null;liveQuoteKey="";save();
+  basket=[];S.basketEdit=null;liveQuote=null;liveQuoteKey="";save();
   renderBasketFab();closeBasket();
   for(const n of order.meals){if(!S.recipes[n])showRecipePrefetch(n);}
   location.href=pay.url;
@@ -1679,7 +1974,8 @@ function handoffText(order){
       :`${b.q}× ${b.i} (${b.unit})`).join("\n");
 }
 function openHandoffModal(order){
-  const st=STORES.find(s=>s.id===order.storeId)||STORES[0];
+  if(!order||!order.items)return;
+  const st=STORES.find(s=>s.id===order.storeId)||STORES.find(s=>s.name===order.store)||STORES[0];
   openModal(`<h2 style="margin-bottom:6px">🧾 Your ${esc(order.store)} list</h2>
     <p class="sub">Tap an item to open it in ${esc(order.store)}'s search, or copy the whole list.</p>
     <div style="max-height:38vh;overflow:auto;margin:8px 0">
@@ -1692,51 +1988,119 @@ function openHandoffModal(order){
     <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Done</button>`);
 }
 async function showRecipePrefetch(name){
-  const meal=mealByName(name);if(!meal||S.recipes[name])return;
+  const meal=mealByName(name);if(!meal||storedRecipe(meal)||S.recipes[name])return;
   const res=await ai("recipe",{name,ing:meal.ing,servings:S.prefs.size});
   if(res&&Array.isArray(res.steps)&&res.steps.length){S.recipes[name]={steps:res.steps,tip:res.tip||""};save();renderMenu();}
 }
 function markDelivered(id){
-  const o=S.orders.find(x=>x.id===id);if(!o||o.status>=3)return;
+  const o=orderById(id);if(!o||o.status>=3)return;
   o.status=3;
   o.items.forEach(b=>{S.pantry[b.i]=Math.min(2,(S.pantry[b.i]||0)+b.q);});
-  save();renderOrders();
+  o.pantrySynced=true;
+  save();renderOrders();renderProfileOrders();
 }
-async function syncOrderStatuses(){
-  if(!sb||!S.user||!S.user.id)return;
+const STATUS_N={new:1,ordered:2,delivered:3};
+function storeIdFromName(name){const s=STORES.find(x=>x.name===name);return s?s.id:"";}
+function orderFromRow(row,prev){
+  const items=(row.items&&row.items.basket)||(prev&&prev.items)||[];
+  const meals=(row.items&&row.items.meals)||(prev&&prev.meals)||[];
+  const st=STATUS_N[row.status]||1;
+  const next={
+    id:row.id,backendId:row.id,storeId:storeIdFromName(row.store),store:row.store,
+    total:Number(row.total||0),eta:(row.items&&row.items.eta)||(prev&&prev.eta)||"",
+    items,meals,date:new Date(row.created_at).toLocaleDateString("en-GB"),
+    created_at:row.created_at,status:st,payment_status:row.payment_status||"none",
+    amount_held:row.amount_held,amount_captured:row.amount_captured,
+    pantrySynced:!!(prev&&prev.pantrySynced),
+    bagUrl:(prev&&prev.bagUrl)||"",adjustUrl:(prev&&prev.adjustUrl)||"",pepestoSession:(prev&&prev.pepestoSession)||"",
+  };
+  if(st>=3&&prev&&prev.status<3&&!prev.pantrySynced){
+    items.forEach(b=>{S.pantry[b.i]=Math.min(2,(S.pantry[b.i]||0)+b.q);});
+    next.pantrySynced=true;
+  }
+  return next;
+}
+function payLabel(o){
+  const p=o.payment_status||"none";
+  if(p==="authorized")return "Paid (hold)";
+  if(p==="captured")return "Charged";
+  if(p==="canceled")return "Payment canceled";
+  if(p==="unpaid"||p==="none")return "Awaiting payment";
+  return "";
+}
+function orderStatusCopy(o){
+  const pay=o.payment_status||"none";
+  if(pay==="unpaid"||pay==="none")return {title:"Awaiting payment",sub:"Finish checkout so we can place this at the supermarket."};
+  if(pay==="canceled")return {title:"Payment canceled",sub:"The hold didn't go through. You can try paying again."};
+  if(o.status>=3)return {title:"Delivered",sub:"It's at your door — your pantry has been updated."};
+  if(o.status>=2)return {title:"Ordered",sub:`We're sending this from ${o.store}.`};
+  return {title:"Confirmed",sub:"We've got your payment — we'll place this at the supermarket shortly."};
+}
+async function hydrateOrdersFromDb(){
+  if(!sb||!S.user||!S.user.id){renderOrders();renderProfileOrders();return;}
   try{
-    const {data}=await sb.from("orders").select("id,status").eq("user_id",S.user.id);
-    if(!data)return;
-    const map={new:1,ordered:2,delivered:3};
-    let changed=false;
-    data.forEach(row=>{
-      const o=S.orders.find(x=>x.backendId===row.id);
-      const st=map[row.status]||1;
-      if(o&&st>o.status){if(st===3){o.items.forEach(b=>{S.pantry[b.i]=Math.min(2,(S.pantry[b.i]||0)+b.q);});}o.status=st;changed=true;}
-    });
-    if(changed){save();renderOrders();}
+    const {data,error}=await sb.from("orders")
+      .select("id,store,total,items,status,created_at,payment_status,amount_held,amount_captured")
+      .eq("user_id",S.user.id).order("created_at",{ascending:false}).limit(50);
+    if(error||!data){renderOrders();renderProfileOrders();return;}
+    const prevById={};
+    (S.orders||[]).forEach(o=>{prevById[o.backendId||o.id]=o;});
+    S.orders=data.map(row=>orderFromRow(row,prevById[row.id]));
+    save();
   }catch(e){}
+  renderOrders();
+  renderProfileOrders();
 }
 function renderOrders(){
-  if(!S.orders.length)return;
-  document.getElementById("orders-list").innerHTML=S.orders.map(o=>
-    `<div class="meal" style="align-items:flex-start">
+  const el=document.getElementById("orders-list");
+  if(!el)return;
+  if(!S.orders.length){
+    el.innerHTML='<p class="sub">No orders yet. Pick dinners on the Menu, then tap Order this week.</p>';
+    return;
+  }
+  el.innerHTML=S.orders.map(o=>{
+    const paid=o.payment_status==="authorized"||o.payment_status==="captured";
+    const copy=orderStatusCopy(o);
+    const pay=payLabel(o);
+    const oid=o.backendId||o.id;
+    return `<div class="meal" style="align-items:flex-start">
       <div class="emoji">📦</div>
       <div class="info">
-        <div class="name">${esc(o.store)} — £${Number(o.total||0).toFixed(2)}</div>
-        <div class="meta">${o.items.length} items · ${(o.meals||[]).length} meals · placed ${esc(o.date)} · ${esc(o.eta)}</div>
+        <div class="name">${esc(o.store)} — £${Number(o.total||0).toFixed(2)}${pay?` <span class="badge">${esc(pay)}</span>`:""}</div>
+        <div class="meta">${(o.items||[]).length} items · ${(o.meals||[]).length} meals · placed ${esc(o.date)}${o.eta?` · ${esc(o.eta)}`:""}</div>
+        <div style="font-weight:700;margin-top:8px;color:var(--green-d)">${esc(copy.title)}</div>
+        <div class="sub" style="margin:2px 0 0">${esc(copy.sub)}</div>
         <div class="timeline">
-          <div class="tstep ${o.status>=1?'done':''}">Confirmed</div>
-          <div class="tstep ${o.status>=2?'done':''}">${o.bagUrl||o.adjustUrl?"Bag created":"Ordered for you"}</div>
-          <div class="tstep ${o.status>=3?'done':''}">Delivered</div>
+          <div class="tstep ${paid?"done":"warn"}">${paid?"Paid":(o.payment_status==="canceled"?"Canceled":"Payment")}</div>
+          <div class="tstep ${o.status>=2?"done":""} ${paid&&o.status<2?"active":""}">Ordered</div>
+          <div class="tstep ${o.status>=3?"done":""} ${o.status===2?"active":""}">Delivered</div>
         </div>
-        <div class="row" style="margin-top:8px">
-          ${o.status<3&&(o.bagUrl||o.adjustUrl)?`<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${safeUrl(bagLink(o))}">🛍️ Open bag</a>`:""}
-          ${o.status<3?`<button class="btn ghost sm" onclick="openHandoffModal(S.orders.find(x=>x.id===${o.id}))">🧾 List</button>`:""}
-          ${(o.meals||[]).slice(0,3).map((n,j)=>`<button class="btn ghost sm" onclick="showRecipeFromOrder(${o.id},${j})">📖 ${esc(n.length>18?n.slice(0,17)+"…":n)}</button>`).join("")}
-          ${o.status<3?`<button class="btn sm" onclick="markDelivered(${o.id})">Arrived ✓</button>`:`<span class="tag">pantry synced</span>`}
+        <div class="row" style="margin-top:8px;flex-wrap:wrap">
+          ${!paid&&oid?`<button class="btn sm" onclick="retryPay(${oid})">Pay now →</button>`:""}
+          ${(o.items||[]).length?`<button class="btn ghost sm" onclick="openHandoffModal(orderById(${oid}))">🧾 List</button>`:""}
+          ${(o.meals||[]).slice(0,3).map((n,j)=>`<button class="btn ghost sm" onclick="showRecipeFromOrder(${oid},${j})">📖 ${esc(String(n).length>18?String(n).slice(0,17)+"…":n)}</button>`).join("")}
         </div>
-      </div></div>`).join("");
+      </div></div>`;
+  }).join("");
+}
+function renderProfileOrders(){
+  const el=document.getElementById("pr-orders");
+  if(!el)return;
+  if(!S.orders.length){
+    el.innerHTML='<p class="sub" style="margin:0">No orders on this account yet.</p>';
+    return;
+  }
+  el.innerHTML=S.orders.map(o=>{
+    const copy=orderStatusCopy(o);
+    const pay=payLabel(o);
+    return `<button type="button" class="hist" onclick="nav('orders')">
+      <div>
+        <div style="font-weight:700">${esc(o.store)} · £${Number(o.total||0).toFixed(2)}</div>
+        <div class="sdetail">${esc(o.date)} · ${esc(copy.title)}${pay?` · ${esc(pay)}`:""}</div>
+      </div>
+      <span class="badge">${esc(copy.title)}</span>
+    </button>`;
+  }).join("");
 }
 
 // ---------- PROFILE ----------
@@ -1753,6 +2117,7 @@ function renderProfile(){
     sel.value=S.prefs.preferredStore||"";
   }
   document.getElementById("pr-saved").textContent="";
+  renderProfileOrders();
 }
 function saveProfile(){
   const el=document.getElementById("pr-saved");
@@ -1803,8 +2168,8 @@ function nav(s){
     showSticky(false);
     if(s==="menu"){renderMenu();renderBasketFab();}
     if(s==="pantry"){renderPantry();renderBasketFab();}
-    if(s==="orders"){renderOrders();syncOrderStatuses();renderBasketFab();}
-    if(s==="profile"){renderProfile();renderBasketFab();}
+    if(s==="orders"){renderOrders();hydrateOrdersFromDb();renderBasketFab();}
+    if(s==="profile"){renderProfile();hydrateOrdersFromDb();renderBasketFab();}
     if(s==="admin"){renderAdmin();renderBasketFab();}
   }catch(e){
     console.error(e);
@@ -1815,22 +2180,27 @@ function openModal(html){document.getElementById("modal").innerHTML=html;documen
 function closeModal(){document.getElementById("modal-bg").classList.remove("open");}
 
 // Stripe Checkout return handling (?paid=1&order=N or ?paycancel=1&order=N)
-function handlePaymentReturn(){
+async function handlePaymentReturn(){
   const q=new URLSearchParams(location.search);
   const orderId=q.get("order");
   if(q.get("paid")){
+    history.replaceState(null,"",location.pathname);
+    await hydrateOrdersFromDb();
+    if(S.onboarded)nav("orders");
     openModal(`<h2 style="margin-bottom:6px">✅ Payment confirmed</h2>
-      <p class="sub">Your card has a temporary hold ~15% above the estimate — you'll only be charged the exact store total. We've got your delivery address and we're placing your order now. Track it in the Orders tab.</p>
+      <p class="sub">Your card has a temporary hold covering groceries + our 5% fee, with ~15% buffer. You'll only be charged the exact store total plus 5%. Track it below.</p>
       <button class="btn" style="width:100%" onclick="closeModal()">Great</button>`);
   }else if(q.get("paycancel")){
+    history.replaceState(null,"",location.pathname);
+    await hydrateOrdersFromDb();
+    if(S.onboarded)nav("orders");
     openModal(`<h2 style="margin-bottom:6px">Payment not completed</h2>
       <p class="sub">Your order is saved but won't be placed until it's paid.</p>
       <div class="row">
         <button class="btn" style="flex:1" onclick="retryPay(${Number(orderId)||0})">Pay now →</button>
         <button class="btn ghost" onclick="closeModal()">Later</button>
       </div>`);
-  }else return;
-  history.replaceState(null,"",location.pathname); // clean the URL
+  }
 }
 async function retryPay(orderId){
   if(!orderId)return closeModal();
@@ -1866,12 +2236,26 @@ async function retryPay(orderId){
     }else{
       startOnboarding();
     }
-    handlePaymentReturn();
+    await handlePaymentReturn();
   }catch(e){
     console.error(e);
     startOnboarding();
   }
 })();
+// Test / debug hook (jsdom harness in plentry/test). Mutating the returned
+// object mutates live app state. Do not use from product UI.
+if(typeof window!=="undefined"){
+  window.__plentry={
+    state:()=>S,
+    COMMISSION,HOLD_BUFFER,
+    validMeal,
+    setModifyPicks(a){modifyPicks=Array.isArray(a)?a:[];},
+    modifyPicks:()=>modifyPicks,
+    setAdvisor(proposed,idxs){advisorProposed=Array.isArray(proposed)?proposed:[];advisorPicked=new Set(idxs||[]);},
+    STAPLES,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
+    tagsFor,mealTags,MEAL_TAGS,
+  };
+}
 </script>
 </body>
 </html>

@@ -28,7 +28,23 @@ alter table public.meals add constraint meals_time_sane
 
 alter table public.meals drop constraint if exists meals_ing_shape;
 alter table public.meals add constraint meals_ing_shape
-  check (ing is null or (jsonb_typeof(ing) = 'array' and jsonb_array_length(ing) between 1 and 15));
+  check (ing is null or (jsonb_typeof(ing) = 'array' and jsonb_array_length(ing) between 1 and 20));
+
+alter table public.meals add column if not exists recipe jsonb;
+alter table public.meals drop constraint if exists meals_recipe_shape;
+alter table public.meals add constraint meals_recipe_shape
+  check (
+    recipe is null
+    or (
+      jsonb_typeof(recipe) = 'object'
+      and jsonb_typeof(recipe->'steps') = 'array'
+      and jsonb_array_length(recipe->'steps') between 1 and 20
+    )
+  );
+
+alter table public.meals add column if not exists tags jsonb;
+alter table public.meals add column if not exists reviewed_at timestamptz;
+-- Full tag whitelist + diet/dinner checks live in meals_tags.sql (applied after backfill).
 
 -- ============ 2) ORDERS: server-side validation trigger ============
 -- UK postcode (permissive official pattern). Uppercased before checking.
