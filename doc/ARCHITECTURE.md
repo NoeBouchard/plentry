@@ -29,11 +29,11 @@ Vercel is **not** git-connected. Production is `vercel deploy --prod --yes --sco
 |---|---|
 | `profiles` | One row per user; `state` JSONB (≤256 KB) |
 | `orders` | Concierge queue. `status` `new\|ordered\|delivered`. Payment columns from `orders_payment.sql` |
-| `meals` | Shared catalog. `source` `seed\|ai\|advisor`. `tags` jsonb (closed set). `reviewed_at` null = newcoming. Clients cannot INSERT (v2 hardening); founder can UPDATE (review) |
+| `meals` | Shared catalog. `source` `seed\|ai\|advisor\|ops`. `tags` jsonb (closed set). `reviewed_at` null = **New meal**. Clients cannot INSERT; founder can INSERT/UPDATE/DELETE (JWT email); `ai` inserts drafts via service role |
 | `ingredient_prices` | Shelf prices per store for quoting when Pepesto is off |
 | `rate_limits` | Used by edge functions |
 
-RLS: users see own profiles/orders; authenticated can read meals. Ops: JWT email `noyouchka.bouchard@gmail.com` can select/update all orders (`admin_policies.sql`).
+RLS: users see own profiles/orders; authenticated can read meals. Ops: JWT email `noyouchka.bouchard@gmail.com` can select/update all orders and write the meals catalog (`admin_policies.sql`).
 
 ## Edge functions
 
@@ -48,7 +48,7 @@ All under `plentry/supabase/functions/`. Shared rate limiter: `_shared/ratelimit
 | `notify-order` | webhook secret | Telegram |
 | `newcoming` | webhook secret | Telegram list of meals with `reviewed_at` null; no-op if empty |
 
-An old `orders` example function may still be deployed; it should be deleted (`supabase functions delete orders`).
+An old `orders` example function is **not** deployed (confirmed 13 Sep 2026). Do not add it back.
 
 ## Money path
 
@@ -59,4 +59,4 @@ An old `orders` example function may still be deployed; it should be deleted (`s
 
 ## Ingredient catalog
 
-Catalog keys in `CATALOG` (`ai/index.ts`) and `INGREDIENTS` (`index.html`): 27 groceries plus cupboard seasonings (salt, black pepper, paprika, cumin, chilli flakes, mixed herbs, soy sauce, stock cubes). Butter is a cupboard staple; `chopped tomatoes` and `fresh coriander` are groceries. Every meal ingredient must be in that set or the meal is dropped. Reviewed dinners store `recipe` (`steps` + `tip`) on `public.meals`; the client shows that method instead of calling `ai("recipe")`. `completeIng()` only adds salt/pepper (and dish spices on stale lists that omit salt). Re-run `supabase/catalog_review_2026_09_08.sql` to restore the reviewed catalog. Tag taxonomy: [TAGS.md](TAGS.md). Newcoming queue: [NEWCOMING-MEALS.md](NEWCOMING-MEALS.md).
+Catalog keys in `CATALOG` (`ai/index.ts`) and `INGREDIENTS` (`index.html`): 27 groceries plus cupboard seasonings (salt, black pepper, paprika, cumin, chilli flakes, mixed herbs, soy sauce, stock cubes). Butter is a cupboard staple; `chopped tomatoes` and `fresh coriander` are groceries. Every meal ingredient must be in that set or the meal is dropped. Reviewed dinners store `recipe` (`steps` + `tip`) on `public.meals`; the client shows that method instead of calling `ai("recipe")`. `completeIng()` only adds salt/pepper (and dish spices on stale lists that omit salt). Re-run `supabase/catalog_review_2026_09_08.sql` to restore the reviewed catalog. Tag taxonomy: [TAGS.md](TAGS.md). Unverified queue: [NEWCOMING-MEALS.md](NEWCOMING-MEALS.md). Founder catalog UI is the **Meals** tab.

@@ -117,6 +117,50 @@ describe("week and modify", () => {
     assert.equal(new Set(S.selected).size, 5);
   });
 
+  it("omnivore autoPick prefers meat/fish and does not fill the week with veg", async () => {
+    const { window } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.prefs.diet = "omnivore";
+    S.prefs.meals = 5;
+    S.menuOptions = extraMeals();
+    window.autoPickWeek();
+    const diets = S.selected.map((n) => window.__plentry.mealDiet(window.mealByName(n)));
+    const veg = diets.filter((d) => d === "vegetarian" || d === "vegan").length;
+    const animal = diets.filter((d) => d === "meat" || d === "fish").length;
+    assert.ok(animal >= 3, `expected mostly meat/fish, got ${diets.join(",")}`);
+    assert.ok(veg <= 2, `expected at most two veg dinners, got ${diets.join(",")}`);
+    const meat = extraMeals().find((m) => m.name.includes("Beef"));
+    const vegan = extraMeals().find((m) => m.name.includes("Chickpea"));
+    assert.ok(window.__plentry.scoreMeal(meat) > window.__plentry.scoreMeal(vegan));
+  });
+
+  it("autoPickWeek ignores unverified catalog meals when live ones exist", async () => {
+    const { window } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.prefs.meals = 3;
+    const live = extraMeals().map((m, i) => ({
+      ...m,
+      id: 200 + i,
+      reviewed_at: "2026-09-01T00:00:00.000Z",
+      tags: m.name.includes("Chickpea") || m.name.includes("Veggie") ? ["dinner", "vegan"] : ["dinner", "meat"],
+    }));
+    const draft = {
+      name: "UNVERIFIED draft stew",
+      emoji: "🍲",
+      time: 25,
+      ing: ["minced beef", "onions", "garlic", "passata", "salt", "black pepper"],
+      id: 999,
+      reviewed_at: null,
+      tags: ["dinner", "meat"],
+    };
+    S.menuOptions = live.concat([draft]);
+    window.autoPickWeek();
+    assert.equal(S.selected.includes("UNVERIFIED draft stew"), false);
+    assert.equal(S.selected.length, 3);
+    assert.equal(window.__plentry.isPublished(draft), false);
+    assert.ok(window.__plentry.publishedPool(S.menuOptions).every((m) => m.name !== draft.name));
+  });
+
   it("applyModify swaps one dinner and does not grow the week", async () => {
     const { window, document } = await loadApp({ localState: weekState() });
     const S = window.__plentry.state();
@@ -268,6 +312,24 @@ describe("basket and cupboard", () => {
     const modal = document.getElementById("modal").textContent;
     assert.ok(modal.includes("Confirm this shop"));
     assert.ok(modal.includes("Pay hold & send order"));
+  });
+
+  it("Order this week rebuilds the basket from meals after a stale empty edit", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.basketEdit = [];
+    S.basketFor = '["old"]';
+    window.openBasket();
+    const basket = window.__plentry.getBasket();
+    assert.ok(basket.length > 0);
+    assert.ok(basket.every((b) => b.q >= 1 && window.ingInfo(b.i).price > 0));
+    const panel = document.getElementById("basket-panel").textContent;
+    assert.ok(/£\d/.test(panel), panel);
+    assert.equal(window.__plentry.basketEditsThisWeek(), false);
+    window.renderMenu();
+    const week = document.getElementById("menu-week").textContent;
+    assert.ok(!week.includes("£0.00"));
+    assert.ok(/£\d/.test(week));
   });
 });
 
@@ -497,10 +559,104 @@ describe("ops", () => {
     assert.ok(html.includes("adminSetStatus(4,'delivered')"));
     assert.ok(html.includes("Capture +5%"));
     assert.ok(!html.includes("Mark ordered"));
-    assert.ok(document.getElementById("admin-newcoming").textContent.includes("None waiting"));
     await window.adminSetStatus(4, "delivered");
     assert.equal(window.__sbTables.orders[0].status, "delivered");
     await window.adminSetStatus(4, "new");
     assert.equal(window.__sbTables.orders[0].status, "new");
+  });
+
+  it("Meals screen splits new vs live and can add then verify", async () => {
+    const draft = {
+      id: 11,
+      name: "Draft keema",
+      emoji: "🍛",
+      time: 30,
+      ing: ["minced beef", "rice", "onions", "garlic", "curry paste", "salt", "black pepper"],
+      recipe: { steps: ["Brown the beef.", "Simmer with curry paste and rice."], tip: "Toast the paste." },
+      tags: ["dinner", "meat", "comfort_food"],
+      source: "advisor",
+      created_at: "2026-09-14T10:00:00.000Z",
+      reviewed_at: null,
+    };
+    const live = {
+      id: 12,
+      name: "Live salmon traybake",
+      emoji: "🐟",
+      time: 30,
+      ing: ["salmon fillet", "potatoes", "broccoli", "lemons", "olive oil", "garlic", "salt", "black pepper"],
+      recipe: { steps: ["Roast potatoes.", "Add salmon."], tip: "Hot oven." },
+      tags: ["dinner", "fish"],
+      source: "seed",
+      created_at: "2026-09-01T10:00:00.000Z",
+      reviewed_at: "2026-09-08T12:00:00.000Z",
+    };
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: { meals: [draft, live], profiles: [], ingredient_prices: [], orders: [] },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    await window.showMealsScreen();
+    const neu = document.getElementById("meals-new").textContent;
+    const pub = document.getElementById("meals-live").textContent;
+    assert.ok(neu.includes("Draft keema"));
+    assert.ok(neu.includes("Brown the beef"));
+    assert.ok(neu.includes("minced beef"));
+    assert.ok(!neu.includes("Live salmon traybake"));
+    assert.ok(pub.includes("Live salmon traybake"));
+    assert.ok(pub.includes("Roast potatoes"));
+    const det=document.getElementById("me-det-12");
+    assert.ok(det);
+    assert.equal(det.hidden, true);
+    window.toggleMealDetails("12");
+    assert.equal(det.hidden, false);
+    assert.equal(document.getElementById("me-det-btn-12").textContent, "Hide recipe");
+    assert.equal(window.__plentry.isPublished(draft), false);
+    assert.equal(window.__plentry.isPublished(live), true);
+    assert.equal(window.__plentry.adminMealReady(draft), true);
+    await window.adminVerifyMeal(11);
+    assert.ok(window.__sbTables.meals[0].reviewed_at);
+    await window.showMealsScreen();
+    assert.ok(document.getElementById("meals-live").textContent.includes("Draft keema"));
+    window.openMealEditor(null);
+    document.getElementById("me-name").value = "Ops test chilli";
+    document.getElementById("me-emoji").value = "🌶️";
+    document.getElementById("me-time").value = "25";
+    document.getElementById("me-steps").value = "Fry onions.\nAdd beef and spices.";
+    document.getElementById("me-tip").value = "Keep it moving.";
+    window.__mealIng = new Set(["minced beef", "onions", "garlic", "rice", "salt", "black pepper", "chilli flakes"]);
+    await window.saveMealEditor(false);
+    const added = window.__sbTables.meals.find((m) => m.name === "Ops test chilli");
+    assert.ok(added);
+    assert.equal(added.reviewed_at, null);
+    assert.ok(added.ing.includes("minced beef"));
+    assert.equal(JSON.stringify(Array.from(added.recipe.steps).slice(0, 2)), JSON.stringify(["Fry onions.", "Add beef and spices."]));
+  });
+
+  it("Live catalog lists every verified dinner from the week if the admin fetch is empty", async () => {
+    const liveRows = extraMeals().map((m, i) => ({
+      ...m,
+      id: 300 + i,
+      reviewed_at: "2026-09-01T00:00:00.000Z",
+      recipe: { steps: ["Cook it."], tip: "" },
+      tags: m.name.includes("Salmon") ? ["dinner", "fish"] : m.name.includes("Chickpea") || m.name.includes("Veggie") ? ["dinner", "vegan"] : ["dinner", "meat"],
+    }));
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: { meals: [], profiles: [], ingredient_prices: [], orders: [] },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    S.menuOptions = liveRows;
+    await window.showMealsScreen();
+    const pub = document.getElementById("meals-live").textContent;
+    assert.ok(pub.includes("live"));
+    liveRows.forEach((m) => {
+      assert.ok(pub.includes(m.name), `missing ${m.name}`);
+    });
+    assert.ok(!pub.includes("None in this filter"));
+    assert.ok(!pub.includes("No live dinners loaded"));
   });
 });

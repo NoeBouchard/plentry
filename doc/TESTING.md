@@ -6,7 +6,7 @@
 npm test   # from the app directory (plentry/)
 ```
 
-Runs Node’s test runner on `test/app.test.mjs` and `test/contracts.test.mjs`. **37** passing as of 9 Sep 2026. Exit 0 is required before staging UI, money, order, or XSS changes.
+Runs Node’s test runner on `test/app.test.mjs` and `test/contracts.test.mjs`. **42** passing as of 14 Sep 2026. Exit 0 is required before staging UI, money, order, or XSS changes.
 
 ## Harness
 
@@ -24,8 +24,8 @@ App globals under test: function declarations on `window` (`gbp`, `renderMenu`, 
 
 | File | Guards |
 |---|---|
-| `test/app.test.mjs` | Load, commission, XSS, postcode, week length, Modify from catalog (no AI), advisor cap, cupboard already-have, editable basket + confirm, cupboard Have list + implied seasoning, catalog `recipe` without AI, meal tags, order hydrate, Ops (incl. newcoming empty state), photos |
-| `test/contracts.test.mjs` | Commission/hold; TheMealDB photos; AI tags + newcoming; status whitelist; no `meal_options` AI on Modify; cupboard pantry (no AI); cupboard + confirm copy |
+| `test/app.test.mjs` | Load, commission, XSS, postcode, week length, Modify from catalog (no AI), advisor cap, cupboard already-have, editable basket + confirm, cupboard Have list + implied seasoning, catalog `recipe` without AI, meal tags, omnivore ranking, unpublished skipped on auto-pick, order hydrate, Ops queue, Meals add/verify, photos |
+| `test/contracts.test.mjs` | Commission/hold; TheMealDB photos; AI tags + newcoming; Meals tab ids; founder insert/delete SQL; status whitelist; no `meal_options` AI on Modify; cupboard pantry (no AI); cupboard + confirm copy |
 
 `window.__plentry` is a test/debug hook at the end of `index.html`. Do not call it from product UI.
 

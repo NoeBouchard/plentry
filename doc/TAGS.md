@@ -9,7 +9,7 @@ Closed set. A meal can have **several**. Same list in `plentry/index.html` (`MEA
 - `meat`
 - `fish`
 
-Vegan is not also tagged vegetarian. Client “veggie” matching should treat vegetarian **or** vegan as a hit.
+Vegan is not also tagged vegetarian. Client “veggie” matching should treat vegetarian **or** vegan as a hit. New week / Modify default to **omnivore** (prefer `meat`/`fish`, cap vegetarian/vegan) until `prefs.diet` is set.
 
 ## Nutrition / goal
 
@@ -38,6 +38,6 @@ Vegan is not also tagged vegetarian. Client “veggie” matching should treat v
 ## How they get set
 
 - **Current 77:** inferred from name + `ing` (`meal_tags_for` / `tagsFor`), then `reviewed_at` set (catalog review 8 Sep 2026).
-- **Advisor / AI inserts:** the model must return `tags`; the `ai` function **whitelists** and fills from ingredients so a row is never stored without tags. `reviewed_at` stays null (**newcoming**) until Ops marks it.
+- **Advisor / AI inserts:** the model must return `tags`; the `ai` function **whitelists** and fills from ingredients so a row is never stored without tags. `reviewed_at` stays null (**New meal**) until the founder verifies it on the Meals tab.
 
 Do not invent extra tag strings. See [NEWCOMING-MEALS.md](NEWCOMING-MEALS.md).

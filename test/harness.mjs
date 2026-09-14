@@ -26,8 +26,16 @@ function makeQuery(tables, table) {
     upsert() {
       return Promise.resolve({ data: null, error: null });
     },
+    insert(v) {
+      q._insert = Array.isArray(v) ? v : [v];
+      return q;
+    },
     update(v) {
       q._update = v;
+      return q;
+    },
+    delete() {
+      q._delete = true;
       return q;
     },
     async maybeSingle() {
@@ -42,8 +50,22 @@ function makeQuery(tables, table) {
     },
   };
   async function run() {
-    let rows = [...(tables[table] || [])];
+    if (!tables[table]) tables[table] = [];
+    if (q._insert) {
+      const rows = q._insert.map((row, i) => {
+        const next = Object.assign({ id: tables[table].length + 1 + i }, row);
+        tables[table].push(next);
+        return next;
+      });
+      return { data: rows, error: null };
+    }
+    let rows = [...tables[table]];
     for (const [k, v] of Object.entries(q._eq)) rows = rows.filter((r) => r[k] === v);
+    if (q._delete) {
+      const ids = new Set(rows.map((r) => r.id));
+      tables[table] = tables[table].filter((r) => !ids.has(r.id));
+      return { data: rows, error: null };
+    }
     if (q._update) rows.forEach((r) => Object.assign(r, q._update));
     return { data: rows, error: null };
   }

@@ -10,6 +10,7 @@ const pay = readFileSync(path.join(ROOT, "supabase/functions/pay/index.ts"), "ut
 const ai = readFileSync(path.join(ROOT, "supabase/functions/ai/index.ts"), "utf8");
 const checkout = readFileSync(path.join(ROOT, "supabase/functions/checkout/index.ts"), "utf8");
 const harden = readFileSync(path.join(ROOT, "supabase/security_hardening_v2.sql"), "utf8");
+const adminPol = readFileSync(path.join(ROOT, "supabase/admin_policies.sql"), "utf8");
 
 describe("source contracts", () => {
   it("keeps 5% commission in the client and pay function", () => {
@@ -47,7 +48,20 @@ describe("source contracts", () => {
     assert.match(html, /const MEAL_TAGS=/);
     assert.match(html, /function tagsFor\(/);
     assert.match(html, /adminMarkMealReviewed/);
-    assert.match(html, /id="admin-newcoming"/);
+    assert.match(html, /id="meals-new"/);
+    assert.match(html, /id="meals-live"/);
+    assert.match(html, /function openMealEditor/);
+    assert.match(html, /function toggleMealDetails/);
+    assert.match(html, /id="nav-meals"/);
+    assert.match(html, /id="scr-meals"/);
+    assert.match(html, /function publishedPool\(/);
+    assert.match(adminPol, /admin insert meals/);
+    assert.match(adminPol, /admin delete meals/);
+    assert.match(adminPol, /drop policy if exists "insert meals"/);
+    assert.match(html, /function dietPref\(/);
+    assert.match(html, /function basketEditsThisWeek\(/);
+    assert.doesNotMatch(html, /rankCatalog\(catalog\)\.slice\(0,16\)/);
+    assert.doesNotMatch(html, /id="admin-newcoming"/);
     assert.match(html, /ai\("advisor",\{messages:advisorMsgs,goals:/);
     assert.equal(html.includes("vegetarian"), true);
     assert.match(html, /"comfort_food"/);

@@ -7,27 +7,31 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 - ~~Catalog review~~ — 77 dinners: `ing`, `time`, `recipe`; three extra keys; butter staple (8 Sep).
 - ~~Meal tags + newcoming~~ — closed tag set on Postgres; advisor writes tags; Ops queue; fortnight Telegram (9 Sep). Live: 33 meat / 11 fish / 28 vegetarian / 5 vegan; queue empty.
 - ~~Static + `ai` + `newcoming`~~ — https://plentry.vercel.app (9 Sep). `npm test` 37 passing.
+- ~~Workspace + git~~ — this folder; tags already on `origin/main` (`git push` still does **not** ship Vercel).
+- ~~Auth URLs~~ — Site URL + `https://plentry.vercel.app/**` (founder, 13 Sep).
+- ~~Stripe **test** hold + capture~~ — order **#31** Tesco, grocery est. £26.10, hold £31.52, store £25.00 captured as **£26.25** (5% fee £1.25), status **ordered**. Webhook 200. Safe to rotate to live keys.
+- ~~Security pass 13 Sep~~ — see [SECURITY.md](SECURITY.md). JWT `email` is GoTrue/`auth.users`, not `user_metadata`. Leftover `orders` fn gone. `pg_net` in `public` accepted. Leaked-password is **Pro-only** (org is Free).
 
-## Now (founder / verify)
+## Now
 
-1. **You:** File → Open Folder on `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner` and start new agent chats there (old Documents path is gone).
-2. **You:** confirm Auth Site URL + redirect `https://plentry.vercel.app/**` in the [Supabase Auth URL config](https://supabase.com/dashboard/project/ucciqthwxnlkjalwlhvh/auth/url-configuration).
-3. **You:** Stripe **test** hold with `4242…`, Telegram ping, Ops toggle, capture store £ + 5%.
-4. **You:** after the advisor adds a dinner, open **Ops → Newcoming meals**, check tags/`ing`/method, then Mark reviewed (or delete). First Telegram reminder: 15 Sep 2026 09:00 UTC (then 1 Oct, …).
-5. Optional: commit the uncommitted `plentry/` tags work to GitHub (`git push` still does **not** ship Vercel).
-6. **Security audit** (separate agent): start at [SECURITY.md](SECURITY.md). Closed here: leftover `orders` fn gone; notify RPC revoked; free-beta Telegram triggers dropped; tags CHECK + newcoming secret-gated.
-7. Then Stripe **live** keys + live webhook; invite people.
+1. **You — Stripe live:** Dashboard **Live** mode (finish [account activation](https://dashboard.stripe.com) if still on KYC) → [API keys](https://dashboard.stripe.com/apikeys) (`sk_live_…`) + **new** webhook (test and live secrets are different):
+   - URL: `https://ucciqthwxnlkjalwlhvh.supabase.co/functions/v1/stripe-webhook`
+   - Events: `checkout.session.completed`, `checkout.session.expired`
+   - Then `supabase secrets set STRIPE_SECRET_KEY=sk_live_… STRIPE_WEBHOOK_SECRET=whsec_…` (do not put these in git or `doc/`). Redeploy is not required; secrets apply to the next invoke. Keep the test webhook for 4242 later if you want a sandbox.
+2. Invite people only after a **live** card hold (not 4242) round-trips to `authorized`.
+3. After the advisor (or you) add a dinner: **Meals → New meal** → check ingredients/method/tags → **Verify & publish** (or Remove). First cron ping if anything is still unverified: **15 Sep 2026 09:00 UTC**.
+4. **Deploy static** when you want the Meals tab on https://plentry.vercel.app (`cd plentry && npm test && vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj`). Postgres write policies are already live.
 
 ## Next product
 
-- **Diet / goal onboarding** that maps to tags (`vegetarian`/`vegan`/`meat`/`fish`, `gym`, `high_protein`) so the week is not only weighted by decide/shop/waste/budget.
+- **Diet / goal onboarding** as its own step (maps to tags). Profile **What we eat** already defaults to omnivore and steers New week / Modify.
 - Photo pantry scan (reuse `parse_pantry` on the `ai` function; not in the UI today).
 - Expand cupboard beyond oils/spices when the catalog grows (e.g. flour, sugar).
 - Pepesto key if we want live supermarket quotes (still concierge-fulfil unless we switch to self-checkout bags).
 - One-time photo backfill for old AI meals that still share ingredient stock shots.
 - Expand ingredient catalog beyond 35 keys when pantry math still holds.
 - Postcode → store set / honesty that fees are typical.
-- Enable leaked-password protection in Auth.
+- Enable leaked-password protection in Auth (**Pro** plan; org is Free today).
 
 ## Later
 

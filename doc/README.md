@@ -28,4 +28,4 @@ Stale copies: `plentry/README.md`, `plentry/SPEC.md`, `plentry/PLAN.md` are hist
 Live site: https://plentry.vercel.app  
 Supabase project: `ucciqthwxnlkjalwlhvh` (eu-west-1)  
 Admin / Ops email: `noyouchka.bouchard@gmail.com`  
-Last ship: 9 Sep 2026 (tags + newcoming). Next: [ROADMAP.md](ROADMAP.md).
+Last ship: 9 Sep 2026 (tags + newcoming). Test hold #31 authorized 13 Sep. Next: [ROADMAP.md](ROADMAP.md).
