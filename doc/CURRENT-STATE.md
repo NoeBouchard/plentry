@@ -51,6 +51,8 @@ Live: https://plentry.vercel.app (static). Edge functions and SQL must be deploy
 
 ## Last production ship
 
-9 Sep 2026: static aliased to https://plentry.vercel.app; `ai` + `newcoming` deployed; `meals_tags.sql` applied (columns, backfill, CHECK, Ops UPDATE, pg_cron `plentry-newcoming-fortnight`).
+14 Sep 2026: static aliased to https://plentry.vercel.app (`49a7697`). Meals tab, omnivore ranking, basket rebuild. Postgres founder insert/delete already live. Edge functions unchanged.
 
-13 Sep 2026: founder test hold **and capture** #31 (store £25 → customer £26.25). Still test keys. No production static/function redeploy.
+13 Sep 2026: founder test hold **and capture** #31 (store £25 → customer £26.25). Still test keys.
+
+9 Sep 2026: static aliased to https://plentry.vercel.app; `ai` + `newcoming` deployed; `meals_tags.sql` applied (columns, backfill, CHECK, Ops UPDATE, pg_cron `plentry-newcoming-fortnight`).
