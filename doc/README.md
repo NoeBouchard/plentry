@@ -1,31 +1,57 @@
 # Plentry vault
 
-This folder is the **source of truth** for product, architecture, current behaviour, testing, and how agents ship work. Treat it like an internal SaaS wiki: code can lag a chat; the vault must not.
+Single source of truth for product, architecture, what is live, and how agents ship. Code can lag a chat; this folder must not.
 
-**App code lives in `plentry/`.** This `doc/` folder sits at the Kitchen planner Cursor workspace root:
+**Human review:** open **[Plentry-review.docx](Plentry-review.docx)** in this folder — one Word file with the live contract (not the 77-dinner catalog, not the archive). Regenerate with `python3 doc/build-review.py` from the workspace root.
 
-`/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`
+**App code:** `plentry/` (`index.html` + Supabase Edge Functions).  
+**Workspace:** `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`  
+The same markdown is copied to `plentry/doc/` for GitHub (`cd plentry && npm run vault`). Edit **this** `doc/`, then copy.
 
-The same files are copied to `plentry/doc/` so the GitHub repo carries the vault. **Edit this folder, then copy to `plentry/doc/` when committing.** Do not use the old `Documents/EVERYTHING/…` path.
+Live: https://plentry.vercel.app · Admin: `noyouchka.bouchard@gmail.com` · Last ship: **19 Sep 2026** (`pay` v19 + static).
 
-| Read this | When |
+---
+
+## Read in this order
+
+### 1 — Product contract (locked)
+
+| File | What |
 |---|---|
-| [PRODUCT.md](PRODUCT.md) | What we are building and for whom |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | How the system is put together |
-| [CURRENT-STATE.md](CURRENT-STATE.md) | What actually works today (Sep 2026) |
+| [PRODUCT.md](PRODUCT.md) | Who it is for, pitch, money |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | **Locked MVP** — in, out, fee, hold |
+| [FLOWS.md](FLOWS.md) | Checkout, Ops, Meals — do not invent a second path |
+| [INVARIANTS.md](INVARIANTS.md) | Test IDs `I-M01`… — do not delete assertions to go green |
+
+### 2 — What is true now
+
+| File | What |
+|---|---|
+| [CURRENT-STATE.md](CURRENT-STATE.md) | What actually works in production |
 | [ROADMAP.md](ROADMAP.md) | Next steps, in order |
-| [AGENT-PLAYBOOK.md](AGENT-PLAYBOOK.md) | How any agent must work (harness, tests, vault updates) |
-| [TESTING.md](TESTING.md) | How to run the suite; what “green” means |
-| [SECURITY.md](SECURITY.md) | Threat model and audit starting points |
-| [RUNBOOK.md](RUNBOOK.md) | Deploy, secrets, Ops |
-| [CHANGELOG.md](CHANGELOG.md) | Functional history — **update on every staged change** |
-| [MEAL-INGREDIENTS-REVIEW.md](MEAL-INGREDIENTS-REVIEW.md) | All 77 dinners: ingredients + method (applied to Postgres 8 Sep 2026) |
-| [TAGS.md](TAGS.md) | Closed meal tag set (diet, nutrition, context, use case) |
-| [NEWCOMING-MEALS.md](NEWCOMING-MEALS.md) | Unreviewed AI dinners; Ops + fortnight Telegram |
+| [CHANGELOG.md](CHANGELOG.md) | Functional history — append on every staged change |
 
-Stale copies: `plentry/README.md`, `plentry/SPEC.md`, `plentry/PLAN.md` are historical. If they disagree with this vault, **this vault wins**. After a change, update the vault rather than only those files.
+### 3 — How to change it
 
-Live site: https://plentry.vercel.app  
-Supabase project: `ucciqthwxnlkjalwlhvh` (eu-west-1)  
-Admin / Ops email: `noyouchka.bouchard@gmail.com`  
-Last ship: 14 Sep 2026 (Meals tab). Next: [ROADMAP.md](ROADMAP.md).
+| File | What |
+|---|---|
+| [AGENT-PLAYBOOK.md](AGENT-PLAYBOOK.md) | Harness, tests, vault updates, deploy |
+| [ENGINEERING.md](ENGINEERING.md) | Branch → PR → CI → Bugbot/security → merge → founder deploy |
+| [TESTING.md](TESTING.md) | `cd plentry && npm test` (CI = merge gate; local = production gate) |
+| [RUNBOOK.md](RUNBOOK.md) | Deploy, secrets, Ops, Stripe float |
+| [SECURITY.md](SECURITY.md) | Threat model and closed findings |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How the pieces fit |
+
+### 4 — Catalog
+
+| File | What |
+|---|---|
+| [TAGS.md](TAGS.md) | Closed meal tag set |
+| [NEWCOMING-MEALS.md](NEWCOMING-MEALS.md) | Unreviewed AI dinners |
+| [MEAL-INGREDIENTS-REVIEW.md](MEAL-INGREDIENTS-REVIEW.md) | All 77 dinners (ingredients + method, applied 8 Sep) — too long for the Word pack |
+
+### 5 — History (do not build from)
+
+[archive/](archive/README.md) — June/July PLAN, Pepesto SPEC, old README, Forq prototype, acquisition drafts.
+
+New agent order: **REQUIREMENTS → INVARIANTS → FLOWS → CURRENT-STATE → playbook → ENGINEERING**. Do not restructure `index.html` into a framework. `npm test` must be green before production. Product changes use a PR; merge is not live.

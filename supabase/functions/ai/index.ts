@@ -9,7 +9,10 @@
 //
 // Secret needed:  supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 // Deploy:         supabase functions deploy ai
-// Tasks: parse_pantry | meal_options | recipe | advisor — all return strict JSON.
+// Tasks: recipe | advisor — both return strict JSON.
+// Retired 17 Sep 2026 (S-11): parse_pantry and meal_options. The client stopped
+// calling them on 8-9 Sep; keeping them live only left an unused LLM path open
+// to anyone holding the publishable key. They now return 400.
 
 import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
@@ -147,11 +150,13 @@ async function photoForMeal(m: any): Promise<string> {
   return photoFor(m)
 }
 
-// --- shared meals DB access (RLS-scoped via ctx.supabase) --------------------
-async function readMealNames(sb: any): Promise<string[]> {
-  const { data } = await sb.from('meals').select('name')
-  return Array.isArray(data) ? data.map((r: any) => r.name) : []
-}
+// Tasks the client no longer sends; explicit 400 so nobody can use the LLM budget
+// through them (the prompt text was deleted, not just hidden).
+const RETIRED_TASKS = ['parse_pantry', 'meal_options']
+// Per-user cap on NEW catalog drafts per day (S-11). Advisor proposes 4-6 dishes
+// per conversation; 20 fresh names/day is ample and bounds newcoming spam.
+const DRAFTS_PER_USER_PER_DAY = 20
+
 // Strip markup-significant chars so nothing that lands in the shared catalog can
 // carry HTML. ing is already whitelisted to CATALOG by VALID().
 const clean = (s: any, n: number) => String(s ?? '').replace(/[<>"'`]/g, '').slice(0, n)
@@ -186,42 +191,6 @@ async function writeMeals(admin: any, meals: any[], source: string, userId: stri
 
 function prompts(task: string, p: any) {
   const cat = CATALOG.join(', ')
-  if (task === 'parse_pantry')
-    return {
-      system: "You convert a user's free-text description of their fridge/pantry into stock levels. Respond with ONLY valid JSON, no prose.",
-      user: `Catalog (the ONLY allowed item names): ${cat}.
-User's description of what they have at home:
-"""${String(p.text || '').slice(0, 2000)}"""
-Return JSON: {"pantry":{"<catalog item>":<fraction 0..1 of a typical pack they have>}}.
-Map synonyms to catalog names (e.g. "pasta"->"spaghetti", "peppers"->"bell peppers", "tinned tomatoes"->"chopped tomatoes", "coriander"->"fresh coriander"). Skip anything not in the catalog. "some"/"half"≈0.5, "plenty"/"full"≈1, "a bit"/"almost out"≈0.2.`,
-    }
-  if (task === 'meal_options') {
-    // Every field below is attacker-controllable: clamp numbers, whitelist the
-    // pantry to the catalog, and length-cap the exclude list before it reaches
-    // the prompt (a negative "budget" or instruction-carrying string otherwise
-    // lands verbatim in the LLM prompt).
-    const size = ['1', '2', '3', '4+'].includes(String(p.size)) ? String(p.size) : '2'
-    const budget = num(p.budget, 1, 500, 60)
-    const count = num(p.count, 1, 12, 8)
-    const pantry: Record<string, number> = {}
-    for (const [k, v] of Object.entries(p.pantry || {}))
-      if (CATALOG.includes(k)) pantry[k] = num(v, 0, 2, 0)
-    const exclude = (Array.isArray(p.exclude) ? p.exclude : []).slice(0, 300).map((s: any) => clean(s, 60))
-    return {
-      system: 'You are a meal planner for a UK grocery app. Respond with ONLY valid JSON, no prose.',
-      user: `Catalog (the ONLY allowed ingredients): ${cat}.
-User pantry (fraction of pack in stock): ${JSON.stringify(pantry)}.
-Household: ${size} people. Budget: £${budget}/week.
-Propose ${count} varied, creative dinner options. Favour (but don't force) recipes using pantry items. 6-16 ingredients each, all strictly from the catalog.
-The ing array MUST be the complete shopping list for that dinner: salt, black pepper, and every spice, oil, or sauce the method uses. Use \`chopped tomatoes\` for a 400g tin, \`tomatoes\` for fresh, \`passata\` for sieved tomato sauce. Do not assume extra pantry items.
-Every meal MUST include a tags array. Use ONLY these tags (several per meal): ${TAG_LIST}. Exactly one of vegetarian|vegan|meat|fish. Always include dinner. Add nutrition / context / use-case tags that actually fit.${
-        exclude.length
-          ? `\nDo NOT propose any of these existing dishes (or close variants): ${exclude.join('; ')}.`
-          : ''
-      }
-Return JSON: {"meals":[{"name":"...","emoji":"🍛","time":<minutes>,"ing":["catalog item",...],"tags":["dinner","meat"]}]}`,
-    }
-  }
   if (task === 'recipe')
     return {
       system: 'You are a concise, encouraging recipe writer. Respond with ONLY valid JSON, no prose.',
@@ -265,26 +234,25 @@ export default {
     const key = Deno.env.get('ANTHROPIC_API_KEY')
     if (!key) return Response.json({ error: 'ai_not_configured' }, { status: 503 })
 
+    // Signed-in users get DB-aware behaviour; logged-out callers skip it.
+    const signedIn = !!ctx.userClaims
+
     // This endpoint accepts the PUBLIC publishable key (must work logged out), so
     // it's open to anyone with the browser app's key. Rate-limit by user/IP to
     // stop anonymous cost abuse. 40 calls / minute is plenty for real use.
-    if (!(await allow(ctx.supabaseAdmin, 'ai', clientIdent(req, ctx), 40, 60))) return TOO_MANY()
+    // Anonymous callers fail CLOSED if the limiter is unavailable (S-03).
+    if (!(await allow(ctx.supabaseAdmin, 'ai', clientIdent(req, ctx), 40, 60, signedIn))) return TOO_MANY()
 
     const body = await req.json().catch(() => null)
     const { task, payload } = body || {}
     const p = payload || {}
+    if (RETIRED_TASKS.includes(task)) return Response.json({ error: 'retired task' }, { status: 400 })
 
-    // Signed-in users get DB-aware behaviour; logged-out callers skip it.
-    const signedIn = !!ctx.userClaims
-
-    // Consult the shared meals DB before proposing, so it never re-invents
-    // what already exists. Advisor also gets tagged catalog rows to recommend.
-    if (task === 'meal_options' && signedIn) {
-      const known = await readMealNames(ctx.supabase)
-      p.exclude = [...new Set([...(p.exclude || []), ...known])]
-    }
+    // Advisor gets the PUBLISHED catalog (reviewed_at set) to recommend from —
+    // never the unreviewed newcoming queue, which any signed-in user can grow.
     if (task === 'advisor' && signedIn) {
-      const { data } = await ctx.supabase.from('meals').select('name,emoji,time,ing,tags').limit(80)
+      const { data } = await ctx.supabase.from('meals').select('name,emoji,time,ing,tags')
+        .not('reviewed_at', 'is', null).limit(80)
       p.catalog = Array.isArray(data) ? data : []
     }
 
@@ -308,7 +276,9 @@ export default {
       })
       if (!r.ok) {
         const t = await r.text()
-        return Response.json({ error: 'upstream', detail: t.slice(0, 300) }, { status: 502 })
+        console.error('ai upstream', r.status, t.slice(0, 300))
+        // S-15: upstream bodies (model names, quota text) only go to signed-in users.
+        return Response.json({ error: 'upstream', ...(signedIn ? { detail: t.slice(0, 300) } : {}) }, { status: 502 })
       }
       const data = await r.json()
       const text = (data.content || []).map((c: any) => c.text || '').join('')
@@ -322,15 +292,31 @@ export default {
       if (Array.isArray(out.meals)) {
         out.meals = out.meals.map((m: any) => (VALID(m) ? { ...m, tags: sanitizeTags(m) } : m))
       }
-      if ((task === 'meal_options' || task === 'advisor') && signedIn && Array.isArray(out.meals)) {
-        const fresh = out.meals.filter(VALID).filter((x: any) => !(p.exclude || []).includes(x.name))
-        const saved = await writeMeals(ctx.supabaseAdmin, fresh, task === 'advisor' ? 'advisor' : 'ai', ctx.userClaims?.sub || null)
+      if (task === 'advisor' && signedIn && Array.isArray(out.meals)) {
+        const uid = ctx.userClaims?.sub || null
+        const valid = out.meals.filter(VALID)
+        // Only names the catalog does not have yet count against the daily draft
+        // quota (S-11); existing dishes are simply re-used.
+        const names = valid.map((m: any) => clean(m.name, 60)).filter(Boolean)
+        const { data: existing } = names.length
+          ? await ctx.supabaseAdmin.from('meals').select('name').in('name', names)
+          : { data: [] }
+        const have = new Set((existing || []).map((r: any) => r.name))
+        const fresh: any[] = []
+        for (const m of valid) {
+          if (have.has(clean(m.name, 60))) continue
+          // one quota unit per new dish; fail CLOSED (no persist) if the limiter is down
+          if (!(await allow(ctx.supabaseAdmin, 'ai_drafts', String(uid), DRAFTS_PER_USER_PER_DAY, 86400, false))) break
+          fresh.push(m)
+        }
+        const saved = await writeMeals(ctx.supabaseAdmin, fresh, 'advisor', uid)
         const byName = Object.fromEntries((saved || []).map((r) => [r.name, r.image_url]))
         out.meals = out.meals.map((m: any) => (byName[m.name] ? { ...m, image_url: byName[m.name] } : m))
       }
       return Response.json(out)
     } catch (e) {
-      return Response.json({ error: 'server', detail: String(e).slice(0, 200) }, { status: 500 })
+      console.error('ai server', String(e).slice(0, 300))
+      return Response.json({ error: 'server', ...(signedIn ? { detail: String(e).slice(0, 200) } : {}) }, { status: 500 })
     }
   }),
 }

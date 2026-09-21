@@ -182,13 +182,23 @@
   .feature p{color:var(--muted);font-size:.8rem}
   .timeline{display:flex;gap:0;margin:12px 0 4px}
   .tstep{flex:1;text-align:center;font-size:.68rem;color:var(--muted);position:relative;padding-top:16px}
-  .tstep::before{content:"";position:absolute;top:4px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:var(--line)}
+  .tstep::before{content:"";position:absolute;top:4px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--line);box-sizing:border-box}
   .tstep.done{color:var(--green)}
-  .tstep.done::before{background:var(--green)}
+  .tstep.done::before{background:var(--green);border-color:var(--green)}
   .tstep.active{color:var(--green-d);font-weight:700}
-  .tstep.active::before{background:var(--green-d);box-shadow:0 0 0 3px var(--sage)}
   .tstep.warn{color:var(--amber)}
-  .tstep.warn::before{background:var(--amber)}
+  .tstep.warn::before{background:var(--amber);border-color:var(--amber)}
+  .slot-picks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+  .slot-picks button{border:1.5px solid var(--line);background:var(--card2);border-radius:10px;padding:8px 10px;font-size:.75rem;cursor:pointer;color:var(--text);font:inherit}
+  .slot-picks button.sel{background:var(--sage);border-color:var(--green);color:var(--green-d);font-weight:700}
+  .inbox-badge{display:none;min-width:16px;height:16px;border-radius:99px;background:var(--amber);color:#1a1a1a;font-size:.62rem;font-weight:800;align-items:center;justify-content:center;padding:0 4px;margin-left:4px}
+  .meal-bar{display:flex;border:1.5px solid var(--line);border-radius:99px;overflow:hidden;margin:12px 0 8px;background:var(--card2)}
+  .meal-seg{flex:1;border:none;background:transparent;padding:12px 0;font-size:.9rem;font-weight:800;color:var(--muted);cursor:pointer;font-family:inherit}
+  .meal-seg.active{background:var(--green-d);color:#fff}
+  .spice-alert{background:rgba(184,134,11,.12);border:2px solid var(--amber);color:var(--green-d);border-radius:14px;padding:12px 14px;margin:8px 0 12px}
+  .spice-alert b{display:block;font-size:.92rem;margin-bottom:4px;color:#8a6408}
+  .spice-alert p{margin:0;font-size:.82rem;line-height:1.4;color:var(--text)}
+  .btn.warn{background:#8a6408;color:#fff;border:none}
   .status-bar{display:flex;border:1.5px solid var(--line);border-radius:99px;overflow:hidden;margin:10px 0 6px;background:var(--card2)}
   .status-seg{flex:1;border:none;background:transparent;padding:9px 6px;font-size:.72rem;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;transition:background .12s,color .12s}
   .status-seg.done{background:var(--sage);color:var(--green-d)}
@@ -256,7 +266,7 @@
 
   <!-- ONBOARDING -->
   <div class="screen active" id="scr-onboard">
-    <div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="ob-back" onclick="obBack()">←</button><div class="steps" style="flex:1;margin:0"><i class="done"></i><i id="st2"></i><i id="st3"></i><i id="st4"></i><i id="st5"></i><i id="st6"></i></div></div>
+    <div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="ob-back" onclick="obBack()">←</button><div class="steps" style="flex:1;margin:0"><i class="done"></i><i id="st2"></i><i id="st3"></i><i id="st4"></i><i id="st5"></i><i id="st6"></i><i id="st7"></i></div></div>
     <div id="ob-1">
       <h1>What do you need help with?</h1>
       <p class="sub">Pick everything that's true. We'll shape the week around it.</p>
@@ -264,14 +274,24 @@
       <div style="margin-top:16px"><button class="btn" style="width:100%" id="ob-goal-btn" onclick="obNext(2)" disabled>Continue</button></div>
     </div>
     <div id="ob-2" style="display:none">
+      <h1>How should dinners feel?</h1>
+      <p class="sub">Diet plus a few tags. We'll prefer matching meals — you can change this anytime in Profile.</p>
+      <h3>What we eat</h3>
+      <div id="ob-diet" class="me-ing" style="margin-bottom:14px"></div>
+      <h3>Dinner tags</h3>
+      <p class="sub" style="margin-bottom:6px">Optional. Skip if you want a mixed week.</p>
+      <div id="ob-tags"></div>
+      <div style="margin-top:16px"><button class="btn" style="width:100%" onclick="obNext(3)">Continue</button></div>
+    </div>
+    <div id="ob-3" style="display:none">
       <h1>Choose your shop</h1>
       <p class="sub" id="ob-stores-sub">Same 5-dinner week, priced at each supermarket. You can change this later.</p>
       <div class="store-grid" id="ob-stores"></div>
       <div class="hint" id="ob-savings">We'll adapt ingredients and prices to your store.</div>
       <div class="err" id="ob-store-err"></div>
-      <div style="margin-top:8px"><button class="btn" style="width:100%" id="ob-store-btn" onclick="obNext(3)" disabled>Continue</button></div>
+      <div style="margin-top:8px"><button class="btn" style="width:100%" id="ob-store-btn" onclick="obNext(4)" disabled>Continue</button></div>
     </div>
-    <div id="ob-3" style="display:none">
+    <div id="ob-4" style="display:none">
       <h1>How many of you?</h1>
       <p class="sub">We scale portions and the shop.</p>
       <div class="counter">
@@ -280,9 +300,9 @@
         <div class="row"><button class="minus" onclick="adjSize(-1)">−</button><button class="plus" onclick="adjSize(1)">+</button></div>
       </div>
       <select id="ob-size" style="display:none"><option>1</option><option selected>2</option><option>3</option><option>4+</option></select>
-      <button class="btn" style="width:100%" onclick="obNext(4)">Continue</button>
+      <button class="btn" style="width:100%" onclick="obNext(5)">Continue</button>
     </div>
-    <div id="ob-4" style="display:none">
+    <div id="ob-5" style="display:none">
       <h1>What's your budget?</h1>
       <p class="sub">We'll fit dinners to it — groceries at store price, plus a 5% Plentry fee.</p>
       <div class="budget-val">£<span id="ob-budget-n">60</span></div>
@@ -292,16 +312,16 @@
       <div class="hint">Same basket compared across Tesco, Sainsbury's, Asda and Waitrose.</div>
       <input id="ob-postcode" value="E2 8AA" placeholder="Postcode" maxlength="8" style="margin:8px 0">
       <div class="err" id="ob-err"></div>
-      <button class="btn" style="width:100%;margin-top:8px" onclick="obNext(5)">Continue</button>
-    </div>
-    <div id="ob-5" style="display:none">
-      <h1>How many dinners?</h1>
-      <p class="sub">We'll plan that many this week.</p>
-      <div id="ob-meals-picks"></div>
-      <select id="ob-meals" style="display:none"><option>3</option><option>4</option><option selected>5</option><option>7</option></select>
-      <button class="btn" style="width:100%;margin-top:12px" onclick="obNext(6)">Continue</button>
+      <button class="btn" style="width:100%;margin-top:8px" onclick="obNext(6)">Continue</button>
     </div>
     <div id="ob-6" style="display:none">
+      <h1>How many dinners?</h1>
+      <p class="sub">Tap how many nights you want us to plan. You can change this in Profile.</p>
+      <div id="ob-meals-picks"></div>
+      <select id="ob-meals" style="display:none"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option></select>
+      <button class="btn" style="width:100%;margin-top:12px" onclick="obNext(7)">Continue</button>
+    </div>
+    <div id="ob-7" style="display:none">
       <h1>What's in the cupboard?</h1>
       <p class="sub">Tick oils and spices you already cook with. We'll skip them on the shop. Groceries you don't need can be removed from the basket later.</p>
       <input id="ob-have-q" placeholder="Search salt, oil, paprika…" oninput="renderObHave()" style="margin-bottom:10px">
@@ -342,7 +362,8 @@
   <div class="screen" id="scr-shop">
     <div class="card">
       <h2>Shopping basket</h2>
-      <p class="sub">Edit quantities in the basket, skip cupboard items you already have, then confirm to place the order.</p>
+      <p class="sub">Edit quantities in the basket. <b>Do not keep spices you already have</b> — skip them before you pay.</p>
+      <div id="shop-spice-alert"></div>
       <table id="shop-table"></table>
     </div>
     <div class="card">
@@ -368,7 +389,6 @@
         <div><label>Postcode</label><input id="pr-postcode" maxlength="8"></div>
         <div><label>Household size</label><select id="pr-size"><option>1</option><option>2</option><option>3</option><option>4+</option></select></div>
         <div><label>Weekly budget (£)</label><input id="pr-budget" type="number" min="1" max="500" step="1"></div>
-        <div><label>Dinners / week</label><select id="pr-meals"><option>3</option><option>4</option><option>5</option><option>7</option></select></div>
         <div><label>Preferred supermarket</label><select id="pr-store"><option value="">No preference</option></select></div>
         <div><label>What we eat</label><select id="pr-diet">
           <option value="omnivore">Everything (meat & fish)</option>
@@ -377,11 +397,30 @@
           <option value="vegan">Vegan</option>
         </select></div>
       </div>
+      <div style="margin-top:12px"><label>Dinners / week</label><div id="pr-meals-bar"></div><select id="pr-meals" style="display:none"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
+      <h3 style="margin-top:16px">Dinner tags</h3>
+      <p class="sub">We'll prefer these when we pick the week. Same list as onboarding.</p>
+      <div id="pr-tags"></div>
+      <h3 style="margin-top:16px">Delivery address</h3>
+      <p class="sub">We take groceries to this door, not the card billing address. Checkout will ask you to confirm it each time.</p>
+      <div class="field"><label>Name on the door</label><input id="pr-del-name" autocomplete="name"></div>
+      <div class="field"><label>Phone</label><input id="pr-del-phone" type="tel" autocomplete="tel" placeholder="07… (driver calls this)"></div>
+      <div class="field"><label>Address line 1</label><input id="pr-del-line1" autocomplete="address-line1"></div>
+      <div class="field"><label>Address line 2</label><input id="pr-del-line2" autocomplete="address-line2"></div>
+      <div class="grid2">
+        <div><label>Town / city</label><input id="pr-del-city" autocomplete="address-level2"></div>
+        <div><label>Postcode</label><input id="pr-del-postcode" maxlength="8" autocomplete="postal-code"></div>
+      </div>
       <div class="row" style="margin-top:14px">
         <button class="btn" onclick="saveProfile()">Save changes</button>
         <button class="btn ghost" onclick="signOut()">Sign out</button>
       </div>
       <div class="err ok" id="pr-saved" style="color:var(--green)"></div>
+    </div>
+    <div class="card" id="pr-security" style="display:none">
+      <h3>Security</h3>
+      <p class="sub" id="pr-mfa-status" style="margin-bottom:8px"></p>
+      <div class="row" id="pr-mfa-actions"></div>
     </div>
     <div class="card">
       <h3>Order history</h3>
@@ -390,7 +429,7 @@
     </div>
     <div class="card">
       <h3>Beta notes</h3>
-      <p class="sub" style="margin:0">Concierge beta: you pay a card hold (~15% above groceries + our 5% fee). We order to your address from Tesco, Sainsbury's, Asda or Waitrose, then charge the exact store total plus 5%. Typical delivery fees are included; the slot is confirmed when we place it.</p>
+      <p class="sub" style="margin:0">Concierge beta: you pay a card hold (~30% above groceries + our 5% fee). We order to your address from Tesco, Sainsbury's, Asda or Waitrose, then charge the exact store total plus 5%. Typical delivery fees are included; the slot is confirmed when we place it.</p>
     </div>
   </div>
 
@@ -422,8 +461,16 @@
   <div class="screen" id="scr-admin">
     <div class="card">
       <h2>Ops — order queue</h2>
-      <p class="sub">All customer orders, newest first. Use the status bar to set New, Ordered or Delivered — tap again to undo a miss-click. Delivery auto-refills the customer's pantry.</p>
+      <p class="sub">All customer orders, newest first. Hold first, then charge store £ + 5%. Shop only if the supermarket has the customer's promised window — paste <b>their</b> phone and address on that checkout, not yours. Confirm the window (Ordered) or message them first.</p>
       <div id="admin-list"><p class="sub">Loading…</p></div>
+    </div>
+  </div>
+
+  <div class="screen" id="scr-inbox">
+    <div class="card">
+      <h2>Inbox</h2>
+      <p class="sub">Open issues and slot chats. Reply here — the customer sees it on their order.</p>
+      <div id="inbox-list"><p class="sub">Loading…</p></div>
     </div>
   </div>
 
@@ -435,6 +482,7 @@
     <button data-s="profile" onclick="nav('profile')"><span class="ico">👤</span>Profile</button>
     <button data-s="meals" id="nav-meals" style="display:none" onclick="nav('meals')"><span class="ico">📒</span>Meals</button>
     <button data-s="admin" id="nav-admin" style="display:none" onclick="nav('admin')"><span class="ico">🧑‍🍳</span>Ops</button>
+    <button data-s="inbox" id="nav-inbox" style="display:none" onclick="nav('inbox')"><span class="ico">📨</span>Inbox<span class="inbox-badge" id="inbox-badge">0</span></button>
   </nav>
   <div class="sticky-cta" id="sticky-cta">
     <button class="btn" id="sticky-order" onclick="openBasket()">Order this week</button>
@@ -452,7 +500,9 @@
   <div class="modal" id="modal"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Vendored supabase-js (S-07): pinned copy from the npm package, no third-party
+     CDN at runtime. Update: see doc/RUNBOOK.md "Vendored supabase-js". -->
+<script src="/vendor/supabase-js-2.116.0.js"></script>
 <script>
 // ---------- BACKEND (Supabase) ----------
 const SUPABASE_URL="https://ucciqthwxnlkjalwlhvh.supabase.co";
@@ -513,14 +563,18 @@ async function checkoutApi(task,payload){
 async function payApi(task,payload){
   try{
     if(!sb)return null;
+    if(task==="capture"){
+      try{if(sb.auth&&sb.auth.refreshSession)await sb.auth.refreshSession();}catch(e){}
+    }
     const {data}=await sb.auth.getSession();
     const accessToken=data&&data.session?data.session.access_token:null;
     if(!accessToken)return null;
     const r=await fetch(SUPABASE_URL+"/functions/v1/pay",{method:"POST",
       headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+accessToken},
       body:JSON.stringify({task,payload})});
-    if(!r.ok)return null;
-    return await r.json();
+    const j=await r.json().catch(()=>null);
+    if(!r.ok)return j||{error:"http",detail:"HTTP "+r.status};
+    return j;
   }catch(e){return null;}
 }
 
@@ -541,11 +595,59 @@ const STORES=[
 const STORE_MARK={tesco:{c:"#00539F",l:"T"},sains:{c:"#F06C00",l:"S"},asda:{c:"#68A51C",l:"A"},wait:{c:"#7BB01B",l:"W"}};
 const SHELF_LABEL="Own-brand shelf prices — Tesco estimated Sep 2026, others checked 5 Jul. Final price confirms at the store. Delivery is a typical fee, not a live slot.";
 const COMMISSION=0.05;
-const HOLD_BUFFER=0.15;
+const HOLD_BUFFER=0.30;
 function gbp(n){return Math.round(Number(n||0)*100)/100;}
 function plentryFee(shop){return gbp(shop*COMMISSION);}
 function customerTotal(shop){return gbp(Number(shop||0)+plentryFee(shop));}
 function holdAmount(shop){return gbp(customerTotal(shop)*(1+HOLD_BUFFER));}
+function captureChargePence(storeGbp){
+  const storePence=Math.round(Number(storeGbp)*100);
+  if(!storePence||storePence<=0)return 0;
+  return Math.round(storePence*(1+COMMISSION));
+}
+function cleanAddrLine(v,n){return String(v==null?"":v).replace(/[<>]/g,"").trim().slice(0,n||80);}
+function normPhone(v){return String(v||"").replace(/[^\d+ ]/g,"").slice(0,20);}
+function isUkPhone(v){
+  const raw=String(v||"").replace(/[\s()-]/g,"");
+  if(!/^(\+44|0)[1-9]\d{8,12}$/.test(raw))return false;
+  const n=raw.replace(/^\+44/,"0").replace(/\D/g,"");
+  return n.length>=10&&n.length<=13;
+}
+function deliveryFrom(raw){
+  if(!raw||typeof raw!=="object")return null;
+  const d={
+    name:cleanAddrLine(raw.name,60),
+    phone:normPhone(raw.phone),
+    line1:cleanAddrLine(raw.line1,80),
+    line2:cleanAddrLine(raw.line2,80),
+    city:cleanAddrLine(raw.city,40),
+    postcode:normPostcode(raw.postcode)||"",
+  };
+  if(!d.name||!d.line1||!d.city||!d.postcode||!isUkPhone(d.phone))return null;
+  return d;
+}
+function stripeShipToDelivery(ship){
+  if(!ship||typeof ship!=="object")return null;
+  const a=ship.address||{};
+  return deliveryFrom({name:ship.name,phone:ship.phone,line1:a.line1,line2:a.line2,city:a.city,postcode:a.postal_code||a.postcode});
+}
+function orderDelivery(o){
+  const addr=o&&o.address;
+  if(addr&&addr.delivery)return deliveryFrom(addr.delivery);
+  if(addr&&addr.shipping)return stripeShipToDelivery(addr.shipping);
+  return null;
+}
+function deliveryLabel(d){
+  if(!d)return "";
+  return [d.name,d.line1,d.line2,d.city,d.postcode].filter(Boolean).join(", ");
+}
+function orderDeliverTo(o){
+  const d=orderDelivery(o);
+  if(d)return deliveryLabel(d)+(d.phone?` · ${d.phone}`:"");
+  const ship=o&&o.address&&o.address.shipping&&o.address.shipping.address;
+  if(ship)return [ship.line1,ship.line2,ship.city,ship.postal_code].filter(Boolean).join(", ");
+  return (o&&o.postcode)||"—";
+}
 const SAMPLE_WEEK_ITEMS=[
   {name:"chicken thighs",qty:1,unit:"500g"},{name:"salmon fillet",qty:1,unit:"2 pc"},
   {name:"minced beef",qty:1,unit:"500g"},{name:"halloumi",qty:1,unit:"225g"},
@@ -715,7 +817,26 @@ function mealTags(m){
 function mealTagHtml(m){
   return mealTags(m).slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
 }
+const USER_MEAL_TAGS=[
+  {id:"quick",ico:"⚡",t:"Quick",d:"On the table in about 20 minutes"},
+  {id:"meal_prep",ico:"🍱",t:"Meal prep",d:"Cook once, eat again"},
+  {id:"gym",ico:"💪",t:"Gym",d:"Training weeks, higher protein"},
+  {id:"high_protein",ico:"🥩",t:"High protein",d:"Chicken, fish, eggs, halloumi"},
+  {id:"low_calorie",ico:"🥬",t:"Lighter",d:"Lower calorie dinners"},
+  {id:"low_carb",ico:"🥦",t:"Low carb",d:"Fewer pasta and rice nights"},
+  {id:"comfort_food",ico:"🍝",t:"Comfort",d:"Curries, pastas, traybakes"},
+];
+function clampMeals(n){
+  const x=Math.round(+n);
+  return x>=1&&x<=7?x:5;
+}
+function mealCountCopy(n){
+  return ({1:"One dinner this week",2:"A couple of nights",3:"A light week",4:"Most weeknights",5:"A full week of dinners",6:"Almost every night",7:"Every night"})[n]||"A full week of dinners";
+}
 function wantedTags(){
+  const allowed=USER_MEAL_TAGS.map(t=>t.id);
+  const direct=(Array.isArray(S.prefs.tags)?S.prefs.tags:[]).filter(t=>allowed.indexOf(t)>=0);
+  if(direct.length)return direct.filter((x,i,a)=>a.indexOf(x)===i);
   const g=Array.isArray(S.prefs.goals)?S.prefs.goals:[];
   const t=[];
   if(g.indexOf("decide")>=0)t.push("quick");
@@ -859,7 +980,7 @@ function mealThumbHtml(m){
 // ---------- STATE ----------
 const DEFAULTS={
   user:null,
-  prefs:{meals:5,size:"2",budget:60,postcode:"E2 8AA",preferredStore:"",goals:[],diet:"omnivore"},
+  prefs:{meals:5,size:"2",budget:60,postcode:"E2 8AA",preferredStore:"",goals:[],tags:[],diet:"omnivore",delivery:null},
   pantry:{},
   menuOptions:[],   // AI-suggested meals for the week
   selected:[],      // names the user picked
@@ -870,7 +991,10 @@ let S=load();
 if(!S.prefs)S.prefs=JSON.parse(JSON.stringify(DEFAULTS.prefs));
 if(!S.prefs.preferredStore)S.prefs.preferredStore="";
 if(!S.prefs.goals)S.prefs.goals=[];
+if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
 if(!S.prefs.diet)S.prefs.diet="omnivore";
+S.prefs.meals=clampMeals(S.prefs.meals);
+S.prefs.delivery=deliveryFrom(S.prefs.delivery);
 if(S.basketEdit!=null&&!Array.isArray(S.basketEdit))S.basketEdit=null;
 if(Array.isArray(S.basketEdit)&&!S.basketEdit.length)S.basketEdit=null;
 let basket=[],chosenStore=null,authMode="signup",basketOpen=false,pendingCheckout=false,pendingMeals=false,obStep=1,lastAuthMsg="";
@@ -909,15 +1033,160 @@ async function loadCloudState(user){
   }catch(e){}
   if(S.prefs.preferredStore)chosenStore=STORES.find(s=>s.id===S.prefs.preferredStore)||chosenStore;
   if(!S.prefs.diet)S.prefs.diet="omnivore";
+  if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
+  S.prefs.budget=normBudget(S.prefs.budget,60); // cloud blob is user-writable JSON, never trust its shape (S-12)
+  S.prefs.meals=clampMeals(S.prefs.meals);
+  S.prefs.delivery=deliveryFrom(S.prefs.delivery);
   save();
+  await refreshMfa();
 }
+
+// ---------- 2-STEP VERIFICATION (TOTP; founder account; S-06) ----------
+// Supabase MFA. Enrol from Profile -> Security (QR + first code). Once a factor
+// is verified every login is aal1 until the code is entered; while a code is
+// pending isAdmin() is false, so Ops/Meals stay hidden. Server side:
+// supabase/admin_mfa.sql (RLS needs aal2) and REQUIRE_ADMIN_MFA=1 on `pay`
+// (capture needs aal2) — apply both only AFTER enrolling, or you lock yourself out.
+let mfa={level:"aal1",next:"aal1",factorId:null};
+const mfaApi=()=>sb&&sb.auth&&sb.auth.mfa?sb.auth.mfa:null;
+async function refreshMfa(){
+  mfa={level:"aal1",next:"aal1",factorId:null};
+  const api=mfaApi();
+  if(!api||!S.user||!S.user.id)return mfa;
+  try{
+    const {data}=await api.getAuthenticatorAssuranceLevel();
+    if(data){mfa.level=data.currentLevel||"aal1";mfa.next=data.nextLevel||"aal1";}
+    const f=await api.listFactors();
+    const totp=(f&&f.data&&Array.isArray(f.data.totp)?f.data.totp:[]).find(x=>x&&x.status==="verified");
+    mfa.factorId=totp?String(totp.id):null;
+  }catch(e){}
+  return mfa;
+}
+function mfaPending(){
+  if(S.user&&S.user.email===ADMIN_EMAIL&&mfa.factorId&&mfa.level!=="aal2")return true;
+  return mfa.next==="aal2"&&mfa.level!=="aal2";
+}
+const mfaCode=()=>{const el=document.getElementById("mfa-code");return String(el?el.value:"").replace(/\D/g,"");};
+const mfaFactorIdOk=id=>/^[0-9a-f-]{36}$/i.test(String(id||""));
+function openMfaChallenge(){
+  openModal(`<h2>Enter your 6-digit code</h2>
+    <p class="sub">2-step verification is on for this account. Open your authenticator app.</p>
+    <div class="field"><label>Code</label><input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></div>
+    <div class="err" id="mfa-err"></div>
+    <button class="btn" style="width:100%" id="mfa-btn" onclick="submitMfaChallenge()">Verify →</button>
+    <p class="sub" style="margin:12px 0 0;text-align:center"><a href="#" style="color:var(--green)" onclick="signOut();return false">Sign out</a></p>`);
+}
+async function submitMfaChallenge(){
+  const code=mfaCode();
+  const err=document.getElementById("mfa-err");
+  if(code.length!==6){err.textContent="Enter the 6-digit code.";return;}
+  if(!mfa.factorId){err.textContent="Could not load your authenticator. Sign out and back in.";return;}
+  try{
+    const {error}=await mfaApi().challengeAndVerify({factorId:mfa.factorId,code});
+    if(error)throw error;
+  }catch(e){err.textContent=e.message||"That code didn't work.";return;}
+  try{if(sb&&sb.auth&&sb.auth.refreshSession)await sb.auth.refreshSession();}catch(e){}
+  await refreshMfa();
+  closeModal();
+  const pending=window.__pendingCapture;
+  window.__pendingCapture=null;
+  await enterApp();
+  if(pending&&pending.id){
+    nav("admin");
+    await renderAdmin();
+    const inp=document.getElementById("cap-"+pending.id);
+    if(inp)inp.value=pending.storeAmt;
+    window.__capArmed=window.__capArmed||{};
+    window.__capArmed[pending.id]=captureChargePence(pending.storeAmt);
+    await adminCapture(pending.id);
+  }
+}
+function renderSecurityCard(){
+  const card=document.getElementById("pr-security");
+  if(!card)return;
+  const show=!!(S.user&&S.user.email===ADMIN_EMAIL&&mfaApi());
+  card.style.display=show?"":"none";
+  if(!show)return;
+  const st=document.getElementById("pr-mfa-status"),act=document.getElementById("pr-mfa-actions");
+  if(mfa.factorId){
+    st.textContent="2-step verification is on. You'll be asked for a code from your authenticator app at each login.";
+    act.innerHTML=`<button class="btn ghost" onclick="disableMfa()">Turn off 2-step verification</button>`;
+  }else{
+    st.textContent="Protect Ops with an authenticator app (Google Authenticator, 1Password, Authy). Your password alone is one factor.";
+    act.innerHTML=`<button class="btn" onclick="startMfaEnrol()">Turn on 2-step verification</button>`;
+  }
+}
+async function startMfaEnrol(){
+  let f;
+  try{
+    const {data,error}=await mfaApi().enroll({factorType:"totp",friendlyName:"Plentry founder"});
+    if(error)throw error;
+    f=data||{};
+  }catch(e){
+    openModal(`<h2>Could not start</h2><p class="sub">${esc(e.message||"Try again in a moment.")}</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
+    return;
+  }
+  const qr=String((f.totp&&f.totp.qr_code)||"");
+  const qrOk=/^data:image\/svg\+xml[;,]/i.test(qr); // Supabase returns an SVG data URL; never inject anything else as src
+  const secret=String((f.totp&&f.totp.secret)||"");
+  const fid=mfaFactorIdOk(f.id)?f.id:"";
+  openModal(`<h2>Set up 2-step verification</h2>
+    <p class="sub">Scan this in your authenticator app, then enter the code it shows.</p>
+    ${qrOk?`<img src="${esc(qr)}" alt="QR code" style="width:180px;height:180px;display:block;margin:8px auto;background:#fff;border-radius:8px">`:""}
+    <p class="sub" style="text-align:center;word-break:break-all">Or enter this key manually: <b style="color:var(--text)">${esc(secret)}</b></p>
+    <div class="field"><label>6-digit code</label><input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></div>
+    <div class="err" id="mfa-err"></div>
+    <div class="row">
+      <button class="btn" style="flex:1" onclick="finishMfaEnrol('${fid}')">Turn on →</button>
+      <button class="btn ghost" onclick="cancelMfaEnrol('${fid}')">Cancel</button>
+    </div>`);
+}
+async function finishMfaEnrol(factorId){
+  const code=mfaCode();
+  const err=document.getElementById("mfa-err");
+  if(!mfaFactorIdOk(factorId)){err.textContent="Setup expired — close and try again.";return;}
+  if(code.length!==6){err.textContent="Enter the 6-digit code.";return;}
+  try{
+    const {error}=await mfaApi().challengeAndVerify({factorId,code});
+    if(error)throw error;
+  }catch(e){err.textContent=e.message||"That code didn't work — try the next one.";return;}
+  await refreshMfa();
+  closeModal();
+  renderProfile();
+  const el=document.getElementById("pr-saved");
+  if(el){el.style.color="var(--green)";el.textContent="✓ 2-step verification is on. You'll be asked for a code at each login.";}
+}
+async function cancelMfaEnrol(factorId){
+  if(mfaFactorIdOk(factorId)){try{await mfaApi().unenroll({factorId});}catch(e){}}
+  closeModal();
+}
+async function disableMfa(){
+  const el=document.getElementById("pr-saved");
+  if(!mfa.factorId)return;
+  try{
+    const {error}=await mfaApi().unenroll({factorId:mfa.factorId});
+    if(error)throw error;
+  }catch(e){if(el){el.style.color="var(--red)";el.textContent=e.message||"Could not turn off 2-step verification.";}return;}
+  await refreshMfa();
+  renderProfile();
+  if(el){el.style.color="var(--green)";el.textContent="2-step verification is off.";}
+}
+const mealCache={}; // name -> normalised catalog row fetched for an old order (see catalogMealByName)
 function mealByName(n){
-  const m=S.menuOptions.find(x=>x.name===n)||FALLBACK_MEALS.find(x=>x.name===n);
+  const m=S.menuOptions.find(x=>x.name===n)||FALLBACK_MEALS.find(x=>x.name===n)||mealCache[n];
   return m?Object.assign({},m,{ing:completeIng(m)}):null;
 }
 const selectedMeals=()=>S.selected.map(mealByName).filter(Boolean);
 
 // ---------- AUTH ----------
+// S-14: keep in step with Supabase Auth -> Providers -> Email -> "Minimum password length".
+const PASSWORD_MIN=8;
+// S-10: only ever navigate to a real Stripe Checkout page. `pay.url` comes from
+// our own function, but the function is not the last line of defence.
+function stripeCheckoutUrl(u){
+  try{const x=new URL(String(u==null?"":u));return x.protocol==="https:"&&x.hostname==="checkout.stripe.com"?x.href:null;}
+  catch(e){return null;}
+}
 function authFormHtml(){
   const signup=authMode==="signup";
   return `<h2 id="auth-title">${signup?"Create your account":"Welcome back"}</h2>
@@ -956,7 +1225,7 @@ async function submitAuth(){
   const err=document.getElementById("auth-err");
   const btn=document.getElementById("auth-btn");
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){err.textContent="Enter a valid email address.";return;}
-  if(pass.length<6){err.textContent="Password must be at least 6 characters.";return;}
+  if(pass.length<PASSWORD_MIN){err.textContent=`Password must be at least ${PASSWORD_MIN} characters.`;return;}
   if(authMode==="signup"&&!name){err.textContent="Tell us your name.";return;}
   err.textContent="";
   if(sb){
@@ -1018,6 +1287,8 @@ function startOnboarding(){
   document.getElementById("main-nav").classList.remove("show");
   showSticky(false);
   renderObGoals();
+  renderObDiet();
+  renderUserTags("ob-tags");
   renderObMealPicks();
   syncSizeLabel();
   syncBudgetLabel();
@@ -1032,23 +1303,24 @@ function saveHousehold(){
   S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("ob-size").value;
   S.prefs.budget=normBudget(document.getElementById("ob-budget").value,60);
-  S.prefs.meals=+document.getElementById("ob-meals").value;
+  S.prefs.meals=clampMeals(document.getElementById("ob-meals").value);
   save();
   return true;
 }
 function showObStep(step){
   obStep=step;
-  ["ob-1","ob-2","ob-3","ob-4","ob-5","ob-6"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.style.display=step===i+1?"block":"none";});
-  ["st2","st3","st4","st5","st6"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.className=step>=i+2?"done":"";});
-  if(step===2){renderObStores();fetchSampleQuote();}
-  if(step===3)syncSizeLabel();
-  if(step===4){
+  ["ob-1","ob-2","ob-3","ob-4","ob-5","ob-6","ob-7"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.style.display=step===i+1?"block":"none";});
+  ["st2","st3","st4","st5","st6","st7"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.className=step>=i+2?"done":"";});
+  if(step===2){renderObDiet();renderUserTags("ob-tags");}
+  if(step===3){renderObStores();fetchSampleQuote();}
+  if(step===4)syncSizeLabel();
+  if(step===5){
     const b=document.getElementById("ob-budget");if(b)b.value=S.prefs.budget||60;
     const pc=document.getElementById("ob-postcode");if(pc&&S.prefs.postcode)pc.value=S.prefs.postcode;
     syncBudgetLabel();
   }
-  if(step===5)renderObMealPicks();
-  if(step===6)renderObHave();
+  if(step===6)renderObMealPicks();
+  if(step===7)renderObHave();
 }
 function obBack(){
   if(obStep<=1)return;
@@ -1056,12 +1328,12 @@ function obBack(){
 }
 function obNext(step){
   if(step===2&&!(S.prefs.goals&&S.prefs.goals.length))return;
-  if(step===3&&!S.prefs.preferredStore){
+  if(step===4&&!S.prefs.preferredStore){
     const e=document.getElementById("ob-store-err");
     if(e)e.textContent="Tap the supermarket you want us to order from.";
     return;
   }
-  if(step>=5&&!saveHousehold())return;
+  if(step>=6&&!saveHousehold())return;
   showObStep(step);
 }
 function renderObGoals(){
@@ -1079,6 +1351,42 @@ function toggleGoal(id){
   const i=S.prefs.goals.indexOf(id);
   i>=0?S.prefs.goals.splice(i,1):S.prefs.goals.push(id);
   save();renderObGoals();
+}
+const OB_DIETS=[
+  {id:"omnivore",t:"Everything",d:"Meat and fish are fine"},
+  {id:"pescatarian",t:"Fish, no meat",d:"No red meat or chicken"},
+  {id:"vegetarian",t:"Vegetarian",d:"No meat or fish"},
+  {id:"vegan",t:"Vegan",d:"No animal products"},
+];
+function renderObDiet(){
+  const el=document.getElementById("ob-diet");if(!el)return;
+  const cur=dietPref();
+  el.innerHTML=OB_DIETS.map(d=>
+    `<button type="button" class="choice ${cur===d.id?"sel":""}" onclick="pickDiet('${d.id}')">
+      <div class="c-ico">🥗</div><div><b>${esc(d.t)}</b><p>${esc(d.d)}</p></div>
+    </button>`).join("");
+}
+function pickDiet(id){
+  S.prefs.diet=id==="vegetarian"||id==="vegan"||id==="pescatarian"?id:"omnivore";
+  save();renderObDiet();
+  const pr=document.getElementById("pr-diet");if(pr)pr.value=S.prefs.diet;
+}
+function renderUserTags(elId){
+  const el=document.getElementById(elId);if(!el)return;
+  const cur=Array.isArray(S.prefs.tags)?S.prefs.tags:[];
+  el.innerHTML=USER_MEAL_TAGS.map(t=>
+    `<button type="button" class="choice ${cur.indexOf(t.id)>=0?"sel":""}" onclick="toggleUserTag('${t.id}')">
+      <div class="c-ico">${t.ico}</div><div><b>${esc(t.t)}</b><p>${esc(t.d)}</p></div>
+    </button>`).join("");
+}
+function toggleUserTag(id){
+  if(USER_MEAL_TAGS.every(t=>t.id!==id))return;
+  S.prefs.tags=Array.isArray(S.prefs.tags)?S.prefs.tags.slice():[];
+  const i=S.prefs.tags.indexOf(id);
+  i>=0?S.prefs.tags.splice(i,1):S.prefs.tags.push(id);
+  save();
+  renderUserTags("ob-tags");
+  renderUserTags("pr-tags");
 }
 function sizeNum(){const v=S.prefs.size;return v==="4+"?4:Math.max(1,+v||2);}
 function syncSizeLabel(){
@@ -1099,17 +1407,28 @@ function syncBudgetLabel(){
 }
 function renderObMealPicks(){
   const el=document.getElementById("ob-meals-picks");if(!el)return;
-  const n=S.prefs.meals||5;
-  const copy={3:"A light week",4:"Most weeknights",5:"A full week of dinners",7:"Every night"};
-  el.innerHTML=[3,4,5,7].map(x=>
-    `<button type="button" class="choice ${x===n?"sel":""}" onclick="pickMealCount(${x})">
-      <div class="c-ico">🍽️</div><div><b>${x} dinners</b><p>${copy[x]}</p></div>
-    </button>`).join("");
+  const n=clampMeals(S.prefs.meals);
+  el.innerHTML=`<div class="meal-bar" role="group" aria-label="Dinners per week">${[1,2,3,4,5,6,7].map(x=>
+    `<button type="button" class="meal-seg ${x===n?"active":""}" onclick="pickMealCount(${x})">${x}</button>`
+  ).join("")}</div><p class="sub" style="text-align:center;margin:0">${esc(mealCountCopy(n))}</p>`;
+  const sel=document.getElementById("ob-meals");if(sel)sel.value=String(n);
+}
+function renderPrMealBar(){
+  const el=document.getElementById("pr-meals-bar");if(!el)return;
+  const n=clampMeals(S.prefs.meals);
+  el.className="meal-bar";
+  el.setAttribute("role","group");
+  el.setAttribute("aria-label","Dinners per week");
+  el.innerHTML=[1,2,3,4,5,6,7].map(x=>
+    `<button type="button" class="meal-seg ${x===n?"active":""}" onclick="pickMealCount(${x})">${x}</button>`
+  ).join("");
+  const sel=document.getElementById("pr-meals");if(sel)sel.value=String(n);
 }
 function pickMealCount(n){
-  S.prefs.meals=n;
-  const sel=document.getElementById("ob-meals");if(sel)sel.value=String(n);
-  save();renderObMealPicks();
+  S.prefs.meals=clampMeals(n);
+  const ob=document.getElementById("ob-meals");if(ob)ob.value=String(S.prefs.meals);
+  const pr=document.getElementById("pr-meals");if(pr)pr.value=String(S.prefs.meals);
+  save();renderObMealPicks();renderPrMealBar();
 }
 function sampleStoreTotal(s){
   return SAMPLE_WEEK_ITEMS.reduce((t,b)=>{
@@ -1211,8 +1530,8 @@ function setGen(id,label,done){
   if(s)s.textContent=done?"✓":label;
 }
 async function beginGenerate(){
-  if(!S.prefs.preferredStore){activateScreen("scr-onboard");showObStep(2);return;}
-  if(!saveHousehold()){showObStep(4);activateScreen("scr-onboard");return;}
+  if(!S.prefs.preferredStore){activateScreen("scr-onboard");showObStep(3);return;}
+  if(!saveHousehold()){showObStep(5);activateScreen("scr-onboard");return;}
   activateScreen("scr-generating");
   document.getElementById("main-nav").classList.remove("show");
   showSticky(false);
@@ -1234,7 +1553,7 @@ async function loadWeekCatalog(){
   save();
 }
 function autoPickWeek(){
-  const n=S.prefs.meals||5;
+  const n=clampMeals(S.prefs.meals);
   if(!S.menuOptions.length)S.menuOptions=FALLBACK_MEALS.map(normMeal);
   const pool=rankCatalog(publishedPool(S.menuOptions));
   const s=preferredStoreObj()||STORES[0];
@@ -1270,21 +1589,129 @@ function enterApp(){
   document.getElementById("main-nav").classList.add("show");
   const admin=document.getElementById("nav-admin");
   if(admin)admin.style.display=isAdmin()?"":"none";
+  const inboxNav=document.getElementById("nav-inbox");
+  if(inboxNav)inboxNav.style.display=isAdmin()?"":"none";
   const mealsNav=document.getElementById("nav-meals");
   if(mealsNav)mealsNav.style.display=isAdmin()?"":"none";
   syncHeader();
-  return Promise.resolve(ensureWeek()).catch(()=>{}).then(()=>{nav("menu");renderBasketFab();return hydrateOrdersFromDb();});
+  // S-06: a verified authenticator exists but this session has not entered the
+  // code yet — ask before anything admin-shaped can render.
+  if(mfaPending())openMfaChallenge();
+  return Promise.resolve(ensureWeek()).catch(()=>{}).then(()=>{nav("menu");renderBasketFab();refreshInboxBadge();return hydrateOrdersFromDb();});
 }
 
 // ---------- ADMIN OPS (concierge fulfilment; founder account only) ----------
 // RLS does the real gating (supabase/admin_policies.sql) — hiding the nav
 // button is just UI. Statuses: new -> ordered -> delivered.
+// isAdmin() is false while a 2-step code is pending (S-06).
 const ADMIN_EMAIL="noyouchka.bouchard@gmail.com";
-function isAdmin(){return !!(S.user&&S.user.email===ADMIN_EMAIL);}
+function isAdmin(){return !!(S.user&&S.user.email===ADMIN_EMAIL)&&!mfaPending();}
 function adminListText(o){
   const items=(o.items&&o.items.basket)||[];
-  return `Plentry order #${o.id} — ${o.store} (£${Number(o.total||0).toFixed(2)})\n${o.name||""} · ${o.postcode||""}\n`+
-    items.map(b=>`${b.q}× ${b.product||b.i}${b.pack?` (${b.pack})`:""}${b.search?`\n  ${b.search}`:""}`).join("\n");
+  const d=orderDelivery(o);
+  const phone=d&&d.phone?d.phone:(o.address&&o.address.phone)||"";
+  const who=d?deliveryLabel(d):`${o.name||""} · ${o.postcode||""}`;
+  const window=promisedSlotLabel(o);
+  return [`Plentry order #${o.id} — ${o.store} (£${Number(o.total||0).toFixed(2)})`,
+    phone?`PHONE: ${phone}`:"PHONE: missing — ask the customer before shopping",
+    window?`MUST book: ${window}`:"",
+    `Deliver to: ${who}`,
+    items.map(b=>`${b.q}× ${b.product||b.i}${b.pack?` (${b.pack})`:""}${b.search?`\n  ${b.search}`:""}`).join("\n")
+  ].filter(Boolean).join("\n");
+}
+function adminCapPreview(id){
+  const inp=document.getElementById("cap-"+id);
+  const prev=document.getElementById("cap-prev-"+id);
+  const btn=document.getElementById("cap-btn-"+id);
+  const o=window.__adminOrders&&window.__adminOrders[id];
+  if(window.__capArmed&&window.__capArmed[id])delete window.__capArmed[id];
+  if(!prev)return;
+  const storeAmt=parseFloat(inp&&inp.value);
+  if(!storeAmt||storeAmt<=0){prev.textContent="Enter the supermarket till total — we'll add 5%.";prev.style.color="";if(btn){btn.disabled=false;btn.textContent="Charge customer";}return;}
+  const pence=captureChargePence(storeAmt);
+  const charge=pence/100;
+  const held=Number(o&&o.amount_held||0);
+  const heldPence=Math.round(held*100);
+  const over=heldPence>0&&pence>heldPence;
+  const eat=over?gbp(charge-held):0;
+  prev.textContent=over
+    ?`£${storeAmt.toFixed(2)} + 5% is £${charge.toFixed(2)} — above the £${held.toFixed(2)} hold. We'll charge the hold; Plentry covers £${eat.toFixed(2)}.`
+    :`Customer will be charged £${charge.toFixed(2)} (store £${storeAmt.toFixed(2)} + 5%). Remainder of the £${held.toFixed(2)} hold is released.`;
+  prev.style.color=over?"var(--amber)":"";
+  if(btn){btn.disabled=false;btn.textContent=over?"Charge hold £"+held.toFixed(2):"Charge £"+charge.toFixed(2);}
+}
+function adminPayPanel(o){
+  const pay=o.payment_status||"none";
+  const held=Number(o.amount_held||0);
+  const cap=Number(o.amount_captured||0);
+  const storeInfo=STORES.find(x=>x.name===o.store);
+  if(pay==="unpaid"||pay==="canceled")return `<span class="sub">Waiting for the customer to pay — do not shop yet.</span>`;
+  if(pay==="authorized")return `<div class="hint">Hold £${held.toFixed(2)} is on their card — not taken yet. Type the till total after you shop at ${esc(o.store)}, or <b>1.00</b> to charge £1.05 as a money test. We'll add 5%, take that, and drop the rest of the hold.</div>
+    <div class="row" style="flex-wrap:wrap;margin-top:6px">
+      <input id="cap-${o.id}" type="number" step="0.01" min="0.3" inputmode="decimal" placeholder="store £" oninput="adminCapPreview(${o.id})" style="width:110px;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--text)">
+      <button class="btn sm" id="cap-btn-${o.id}" onclick="adminCapture(${o.id})">Charge customer</button>
+    </div>
+    <p class="sub" id="cap-prev-${o.id}" style="margin:6px 0 0">Enter the supermarket till total — we'll add 5%.</p>`;
+  if(pay==="captured")return `<div class="alert ok"><b>Money received — £${cap.toFixed(2)} is in Stripe.</b><br>The customer was charged that amount (store total + 5%) and the leftover hold is gone. Next: book <b>${esc(o.store)}</b> to <b>their</b> phone and address for the promised window below.
+    ${storeInfo?`<div class="row" style="margin-top:8px"><a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener" href="${storeInfo.home}">Open ${esc(o.store)} ↗</a></div>`:""}</div>`;
+  return "";
+}
+// Supermarket delivery slot, typed by Ops once the shop is booked. Shown to the
+// customer as "{store} delivers {slot}" instead of the ETA_DAYS estimate.
+function adminSlotPanel(o){
+  const pay=o.payment_status||"none";
+  const st=STATUS_N[o.status]||1;
+  if(pay!=="captured"&&st<2)return "";
+  const promised=promisedSlotLabel(o);
+  const booked=normSlot(o.delivery_slot);
+  if(o.slot_date&&o.slot_start){
+    return `<div class="hint" style="margin-top:8px"><b>Promised window</b> ${esc(promised)}. Shop this at ${esc(o.store)} only if that exact slot exists — paste their phone on the supermarket checkout.</div>
+      <div class="row" style="flex-wrap:wrap;margin-top:8px;gap:6px">
+        <button class="btn sm" id="slot-btn-${o.id}" onclick="adminConfirmSlot(${o.id})">${booked?"Window already confirmed":"Confirm this window"}</button>
+        <button class="btn ghost sm" onclick="openIssueThread(${o.id},true)">Message customer</button>
+      </div>
+      <p class="sub" style="margin:4px 0 0">${booked?`Customer sees “${esc(o.store)} delivers ${esc(booked)}”.`:"Confirming marks the order Ordered. If the shop cannot do it, message them first — do not book a different slot."}</p>`;
+  }
+  const slot=booked;
+  const eta=etaDate(o.created_at);
+  return `<div class="row" style="flex-wrap:wrap;margin-top:8px;align-items:center;gap:6px">
+      <input id="slot-${o.id}" maxlength="${SLOT_MAX}" placeholder="${esc(o.store)} slot, e.g. Tue 23 Sep 14:00–16:00" value="${esc(slot)}" style="flex:1;min-width:210px;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--text)">
+      <button class="btn sm" id="slot-btn-${o.id}" onclick="adminSaveSlot(${o.id})">${slot?"Update slot":"Save slot"}</button>
+      <button class="btn ghost sm" onclick="openIssueThread(${o.id},true)">Message customer</button>
+    </div>
+    <p class="sub" style="margin:4px 0 0">${slot?`Customer sees “${esc(o.store)} delivers ${esc(slot)}”.`:`Legacy order — no promised window. Customer currently sees “Expected by ${eta?esc(fmtDay(eta)):"—"}”. Type the ${esc(o.store)} window; saving marks Ordered.`}</p>`;
+}
+async function adminConfirmSlot(id){
+  if(!sb||!isAdmin())return;
+  const o=window.__adminOrders&&window.__adminOrders[id];
+  const label=promisedSlotLabel(o);
+  if(!label)return alert("This order has no promised window.");
+  const btn=document.getElementById("slot-btn-"+id);
+  if(btn){btn.disabled=true;btn.textContent="Saving…";}
+  const {error}=await sb.from("orders").update({delivery_slot:label,status:"ordered"}).eq("id",id);
+  if(error){
+    if(btn){btn.disabled=false;btn.textContent="Confirm this window";}
+    alert("Could not confirm the window: "+(error.message||"try again"));
+    return;
+  }
+  renderAdmin();
+}
+async function adminSaveSlot(id){
+  if(!sb||!isAdmin())return;
+  const inp=document.getElementById("slot-"+id);
+  const slot=normSlot(inp&&inp.value);
+  const o=window.__adminOrders&&window.__adminOrders[id];
+  const patch={delivery_slot:slot||null};
+  if(slot&&o&&(o.status==="new"||!o.status))patch.status="ordered";
+  const btn=document.getElementById("slot-btn-"+id);
+  if(btn){btn.disabled=true;btn.textContent="Saving…";}
+  const {error}=await sb.from("orders").update(patch).eq("id",id);
+  if(error){
+    if(btn){btn.disabled=false;btn.textContent="Save slot";}
+    alert("Could not save the slot: "+(error.message||"try again"));
+    return;
+  }
+  renderAdmin();
 }
 const MEAL_DIET=["meat","fish","vegetarian","vegan"];
 function adminMealReady(m){
@@ -1577,37 +2004,40 @@ async function renderAdmin(){
   if(!el)return;
   if(!sb||!isAdmin()){el.innerHTML='<p class="sub">Admin only.</p>';return;}
   const {data,error}=await sb.from("orders")
-    .select("id,email,name,postcode,store,total,items,status,created_at,payment_status,amount_held,amount_captured,address")
+    .select("id,email,name,postcode,store,total,items,status,created_at,payment_status,amount_held,amount_captured,address,delivery_slot,slot_date,slot_start,slot_end,issue_status")
     .order("created_at",{ascending:false}).limit(100);
   if(error||!data){el.innerHTML='<p class="sub">Could not load orders — run supabase/admin_policies.sql?</p>';return;}
   if(!data.length){el.innerHTML='<p class="sub">No orders yet.</p>';return;}
   window.__adminOrders={};data.forEach(o=>window.__adminOrders[o.id]=o);
   const st={new:["🆕 New","var(--green)"],ordered:["🛒 Ordered","var(--muted)"],delivered:["✅ Delivered","var(--muted)"]};
-  const pst={none:"",unpaid:"⏳ awaiting payment",authorized:"💳 PAID (hold)",captured:"💳 captured",canceled:"❌ payment canceled"};
+  const pst={none:"",unpaid:"⏳ awaiting payment",authorized:"💳 hold",captured:"💳 money received",canceled:"❌ payment canceled"};
   el.innerHTML=data.map(o=>{
     const items=(o.items&&o.items.basket)||[];const meals=(o.items&&o.items.meals)||[];
     const s=st[o.status]||st.new;
     const storeInfo=STORES.find(x=>x.name===o.store);
-    const ship=o.address&&o.address.shipping&&o.address.shipping.address;
-    const addr=ship?[ship.line1,ship.line2,ship.city,ship.postal_code].filter(Boolean).join(", "):(o.postcode||"—");
+    const addr=orderDeliverTo(o);
     const paidBadge=pst[o.payment_status||"none"];
     const unpaid=o.payment_status==="unpaid"||o.payment_status==="canceled";
+    const door=orderDelivery(o);
+    const promised=promisedSlotLabel(o);
     return `<div class="store" style="display:block;cursor:default;${o.status==="new"&&!unpaid?"border-color:var(--green)":""}${unpaid?"opacity:.55":""}">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><b>#${+o.id||0}</b> · ${esc(o.store)} · £${Number(o.total||0).toFixed(2)} <span class="badge" style="background:${s[1]}">${s[0]}</span>${paidBadge?` <span class="badge">${paidBadge}${o.payment_status==="authorized"?` £${Number(o.amount_held||0).toFixed(2)}`:o.payment_status==="captured"?` £${Number(o.amount_captured||0).toFixed(2)}`:""}</span>`:""}</div>
+        <div><b>#${+o.id||0}</b> · ${esc(o.store)} · est. £${Number(o.total||0).toFixed(2)} <span class="badge" style="background:${s[1]}">${s[0]}</span>${paidBadge?` <span class="badge">${paidBadge}${o.payment_status==="authorized"?` hold £${Number(o.amount_held||0).toFixed(2)}`:o.payment_status==="captured"?` received £${Number(o.amount_captured||0).toFixed(2)}`:""}</span>`:""}${o.issue_status==="open"?` <span class="badge" style="background:var(--amber)">issue</span>`:""}</div>
         <div class="sdetail">${new Date(o.created_at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
       </div>
       <div class="sdetail">${esc((o.address&&o.address.name)||o.name||"—")} · ${esc((o.address&&o.address.email)||o.email||"—")}${meals.length?` · ${meals.length} meals`:""}</div>
-      <div class="sdetail">📍 ${esc(addr)}</div>
+      <div class="sdetail"><b>Phone</b> ${esc((door&&door.phone)||"missing — do not shop")}</div>
+      <div class="sdetail"><b>Deliver to</b> ${esc(door?deliveryLabel(door):addr)}</div>
+      ${!unpaid&&o.status!=="delivered"?`<div class="sdetail">🚚 ${promised?`<b>MUST book</b> ${esc(promised)}${normSlot(o.delivery_slot)?` · booked ${esc(normSlot(o.delivery_slot))}`:""}`:normSlot(o.delivery_slot)?`<b>${esc(o.store)} slot</b> ${esc(normSlot(o.delivery_slot))}`:`customer expects it by <b>${etaDate(o.created_at)?esc(fmtDay(etaDate(o.created_at))):"—"}</b> (order + ${ETA_DAYS} days) — no slot saved yet`}</div>`:""}
       <div class="sdetail" style="margin:6px 0;white-space:normal">${items.map(b=>`${+b.q||0}× ${esc(b.product||b.i)}`).join(" · ")}</div>
       <div class="status-bar">
         <button type="button" class="status-seg ${o.status==="new"?"active":"done"}" ${unpaid?"disabled":""} onclick="adminSetStatus(${o.id},'new')">New</button>
         <button type="button" class="status-seg ${o.status==="ordered"?"active":o.status==="delivered"?"done":""}" ${unpaid?"disabled":""} onclick="adminSetStatus(${o.id},'ordered')">Ordered</button>
         <button type="button" class="status-seg ${o.status==="delivered"?"active":""}" ${unpaid?"disabled":""} onclick="adminSetStatus(${o.id},'delivered')">Delivered</button>
       </div>
+      <div style="margin-top:8px">${adminPayPanel(o)}</div>
+      ${adminSlotPanel(o)}
       <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px">
-        ${unpaid?`<span class="sub">Waiting for the customer to pay — do not order yet.</span>`:""}
-        ${o.payment_status==="authorized"?`<input id="cap-${o.id}" type="number" step="0.01" placeholder="store £" style="width:92px;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--text)"><button class="btn sm" onclick="adminCapture(${o.id})">Capture +5%</button>`:""}
         <button class="btn ghost sm" onclick="navigator.clipboard.writeText(adminListText(window.__adminOrders[${o.id}])).then(()=>{this.textContent='✓ Copied'})">📋 Copy list</button>
         ${storeInfo?`<a class="btn ghost sm" style="text-decoration:none" target="_blank" rel="noopener" href="${storeInfo.home}">Open ${esc(o.store)} ↗</a>`:""}
       </div></div>`;}).join("");
@@ -1620,14 +2050,47 @@ async function adminSetStatus(id,status){
 // Capture the EXACT store total against the Stripe hold (never more than held).
 async function adminCapture(id){
   const inp=document.getElementById("cap-"+id);
+  const btn=document.getElementById("cap-btn-"+id);
+  const prev=document.getElementById("cap-prev-"+id);
   const storeAmt=parseFloat(inp&&inp.value);
-  const o=window.__adminOrders[id];
-  if(!storeAmt||storeAmt<=0)return alert("Enter the exact store total in £.");
-  const charge=customerTotal(storeAmt);
-  if(o&&o.amount_held&&charge>o.amount_held)return alert(`Store £${storeAmt.toFixed(2)} + 5% is £${charge.toFixed(2)}, above the £${Number(o.amount_held).toFixed(2)} hold.`);
+  const o=window.__adminOrders&&window.__adminOrders[id];
+  if(!storeAmt||storeAmt<=0)return alert("Enter the supermarket till total in £.");
+  const pence=captureChargePence(storeAmt);
+  const charge=pence/100;
+  const held=Number(o&&o.amount_held||0);
+  const heldPence=Math.round(held*100);
+  const over=heldPence>0&&pence>heldPence;
+  const take=over?held:charge;
+  window.__capArmed=window.__capArmed||{};
+  if(window.__capArmed[id]!==pence){
+    window.__capArmed[id]=pence;
+    if(btn)btn.textContent="Confirm £"+take.toFixed(2);
+    if(prev){prev.style.color="";prev.textContent=over
+      ?`Tap Confirm to charge the £${held.toFixed(2)} hold (shop is over). Plentry covers £${gbp(charge-held).toFixed(2)}.`
+      :`Tap Confirm to charge £${charge.toFixed(2)} (store £${storeAmt.toFixed(2)} + 5%) and release the rest of the £${held.toFixed(2)} hold.`;}
+    return;
+  }
+  window.__capArmed[id]=null;
+  if(btn){btn.disabled=true;btn.textContent="Charging…";}
   const r=await payApi("capture",{order_id:id,amount_gbp:storeAmt});
+  if(r&&r.error==="mfa_required"){
+    if(btn){btn.disabled=false;btn.textContent="Charge £"+take.toFixed(2);}
+    await refreshMfa();
+    if(!mfa.factorId){
+      if(prev){prev.style.color="var(--red)";prev.textContent="Sign out, sign in, and enter your 6-digit code, then charge again.";}
+      alert("2-step verification is on. Sign out, sign back in, enter the code from your authenticator, then charge again.");
+      return;
+    }
+    window.__pendingCapture={id,storeAmt};
+    openMfaChallenge();
+    return;
+  }
   if(r&&r.live)renderAdmin();
-  else alert("Capture failed"+(r&&r.error?": "+(r.detail||r.error):"")+".");
+  else{
+    if(btn){btn.disabled=false;btn.textContent="Charge £"+take.toFixed(2);}
+    if(prev){prev.style.color="var(--red)";prev.textContent="Could not charge"+(r&&(r.detail||r.error)?": "+(r.detail||r.error):". Try again.");}
+    alert("Could not charge"+(r&&(r.detail||r.error)?": "+(r.detail||r.error):". Try again."));
+  }
 }
 
 // ---------- MENU ----------
@@ -1728,7 +2191,30 @@ async function loadMenuOptions(force){
 function toggleMealAt(i){if(!requireAccount("Create an account to choose this week's dinners."))return;const m=S.menuOptions[i];if(m)toggleMeal(m.name);}
 function showRecipeAt(i){const m=S.menuOptions[i];if(m)showRecipe(m.name);}
 function orderById(id){return S.orders.find(x=>x.backendId===id||x.id===id);}
-function showRecipeFromOrder(id,i){const o=orderById(id);if(o&&o.meals&&o.meals[i]!=null)showRecipe(o.meals[i]);}
+async function showRecipeFromOrder(id,i){
+  const o=orderById(id);
+  if(!o||!o.meals||o.meals[i]==null)return;
+  const name=o.meals[i];
+  await showRecipe(name, recipeFromOrder(o, name));
+}
+function recipeFromOrder(o, name){
+  const list=o&&Array.isArray(o.recipes)?o.recipes:[];
+  const row=list.find(r=>r&&r.name===name);
+  if(!row)return null;
+  const rec=row.recipe&&Array.isArray(row.recipe.steps)&&row.recipe.steps.length
+    ?{steps:row.recipe.steps.map(s=>String(s)),tip:String(row.recipe.tip||"")}
+    :null;
+  return {name:row.name,emoji:row.emoji||"🍽️",time:+row.time||25,ing:Array.isArray(row.ing)?row.ing:[],recipe:rec};
+}
+function orderRecipesPayload(){
+  return (S.selected||[]).slice(0,7).map(n=>{
+    const local=mealByName(n);
+    const fallback=FALLBACK_MEALS.find(x=>x.name===n);
+    const stored=storedRecipe(local)||storedRecipe(fallback)||S.recipes[n]||null;
+    const base=local||fallback||{name:n,emoji:"🍽️",time:25,ing:[]};
+    return {name:base.name,emoji:base.emoji||"🍽️",time:+base.time||25,ing:completeIng(base),recipe:stored};
+  });
+}
 function toggleMeal(name){
   const i=S.selected.indexOf(name);
   i>=0?S.selected.splice(i,1):S.selected.push(name);
@@ -1768,7 +2254,7 @@ function renderMenu(){
         <div class="week-card"><div class="k">${basket.length||Object.keys(buy).length} items</div><div class="v">${s?esc(s.name):"Pick a shop"}</div></div>
       </div>
       ${s?`<div class="store-chip"><span class="mark" style="width:18px;height:18px;border-radius:6px;background:${(mk&&mk.c)||"var(--green-d)"};display:inline-block"></span> Planned for ${esc(s.name)}</div>`:""}
-      <div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${S.prefs.budget} budget`:`£${Math.abs(under).toFixed(0)} over your £${S.prefs.budget} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>
+      <div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${esc(S.prefs.budget)} budget`:`£${Math.abs(under).toFixed(0)} over your £${esc(S.prefs.budget)} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>
       ${meals.length?meals.map((m,i)=>{
         const idx=S.menuOptions.findIndex(x=>x.name===m.name);
         const mc=mealNeedCost(m,s);
@@ -1904,7 +2390,7 @@ function addAdvisorMeals(){
   if(!picked.length)return;
   // The ai fn already persisted these dishes. Week length stays prefs.meals:
   // fill empty slots, then replace from Monday — never grow past N.
-  const n=Math.max(1,+S.prefs.meals||5);
+  const n=clampMeals(S.prefs.meals);
   picked.forEach(m=>{
     if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.unshift(m);
   });
@@ -1921,13 +2407,37 @@ function addAdvisorMeals(){
 }
 
 // ---------- RECIPES ----------
-async function showRecipe(name){
-  const meal=mealByName(name);if(!meal)return;
+// Ordered dinners must stay readable after the week moves on or on another
+// device: fall back to the catalog row by name (customers can read `meals`).
+async function catalogMealByName(name){
+  const key=String(name==null?"":name).trim();
+  if(!key)return null;
+  if(mealCache[key])return mealCache[key];
+  if(!sb)return null;
+  try{
+    const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at").eq("name",key).limit(1);
+    const row=!error&&Array.isArray(data)?data.find(validMeal):null;
+    if(row){mealCache[key]=normMeal(row);return mealCache[key];}
+  }catch(e){}
+  return null;
+}
+async function showRecipe(name, snapshot){
+  const snap=snapshot&&storedRecipe(snapshot)?snapshot:null;
+  let meal=snap||mealByName(name);
+  if(!meal){
+    openModal(`<h2>${esc(name)}</h2><p class="sub"><span class="spin">✨</span> Fetching the recipe…</p>`);
+    meal=await catalogMealByName(name);
+    if(!meal){
+      openModal(`<h2>${esc(name)}</h2><p class="sub">This dinner is no longer in the catalog, so we can't show its method here. Message us and we'll send the recipe over.</p>
+        <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">OK</button>`);
+      return;
+    }
+  }
   const stored=storedRecipe(meal);
   if(stored){
     S.recipes[name]=stored;
     save();
-  }else if(!S.recipes[name]){
+  }else if(!snap&&!S.recipes[name]){
     openModal(`<h2>${esc(meal.emoji)} ${esc(name)}</h2><p class="sub"><span class="spin">✨</span> Writing your recipe…</p>`);
     const res=await ai("recipe",{name,ing:meal.ing,servings:S.prefs.size});
     S.recipes[name]=(res&&Array.isArray(res.steps)&&res.steps.length)?{steps:res.steps,tip:res.tip||""}:{
@@ -1940,10 +2450,15 @@ async function showRecipe(name){
       tip:"Read all steps once before you start — it makes everything smoother."};
     save();
   }
-  const r=S.recipes[name];
-  const serves=storedRecipe(meal)?"quantities for 2":("serves "+S.prefs.size);
-  openModal(`<h2>${esc(meal.emoji)} ${esc(name)}</h2>
-    <p class="sub">${+meal.time||0} min · ${esc(serves)} · ${esc(meal.ing.join(", "))}</p>
+  const r=stored||S.recipes[name];
+  if(!r||!Array.isArray(r.steps)||!r.steps.length){
+    openModal(`<h2>${esc(name)}</h2><p class="sub">We don't have the method for this dinner on the order. Message us and we'll send it over.</p>
+      <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">OK</button>`);
+    return;
+  }
+  const serves=stored?"quantities for 2":("serves "+S.prefs.size);
+  openModal(`<h2>${esc(meal.emoji||"🍽️")} ${esc(name)}</h2>
+    <p class="sub">${+meal.time||0} min · ${esc(serves)} · ${esc((meal.ing||[]).join(", "))}</p>
     ${r.steps.map((s,i)=>`<div class="recipe-step"><span class="n">${i+1}</span><span>${esc(s)}</span></div>`).join("")}
     ${r.tip?`<div class="alert ok" style="margin-top:12px">💡 ${esc(r.tip)}</div>`:""}
     <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">Done</button>`);
@@ -2027,7 +2542,7 @@ function basketLineHtml(idx,staple){
     </div>
     <div class="mp">£${price.toFixed(2)}</div>
     ${staple
-      ?`<button type="button" class="btn ghost sm" onclick="alreadyHaveAt(${idx})">Already have</button>`
+      ?`<button type="button" class="btn sm warn" onclick="alreadyHaveAt(${idx})">I already have — skip</button>`
       :`<button type="button" class="btn ghost sm" onclick="removeBasketAt(${idx})">Remove</button>`}
   </div>`;
 }
@@ -2096,6 +2611,17 @@ function renderBasketFab(){
   const q=s?storeQuote(s):null;
   document.getElementById("fab-label").textContent=n?(q?"£"+q.pay.toFixed(2):n+" item"+(n>1?"s":"")):"Basket";
 }
+function spiceSkipAlertHtml(){
+  return `<div class="spice-alert" role="alert">
+    <b>Do NOT keep spices you already have</b>
+    <p>Salt, pepper, paprika and the rest get bought if they stay on this list. Skip every spice you already cook with — do not keep them “just in case”.</p>
+  </div>`;
+}
+function renderShopSpiceAlert(){
+  const el=document.getElementById("shop-spice-alert");if(!el)return;
+  const has=basket.some(b=>isStaple(b.i));
+  el.innerHTML=has?spiceSkipAlertHtml():`<div class="hint">Oils and spices you already have are off this shop. Open the basket if a spice still slipped through.</div>`;
+}
 function renderBasketDrawer(){
   const panel=document.getElementById("basket-panel");
   if(!panel)return;
@@ -2111,7 +2637,7 @@ function renderBasketDrawer(){
     :`<p class="sub">No groceries yet — add an item below or pick dinners on Menu.</p>`;
   const cupboardHtml=cupboard.length
     ?cupboard.map(idx=>basketLineHtml(idx,true)).join("")
-    :`<p class="sub">No oils or spices on this shop — tick fewer in Cupboard if you need a restock.</p>`;
+    :"";
   panel.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:10px">
       <h2 style="margin:0">Your basket</h2>
       <button class="btn ghost sm" onclick="closeBasket()">Close</button>
@@ -2121,7 +2647,7 @@ function renderBasketDrawer(){
     <div class="bk-sec">Groceries</div>
     ${groceryHtml}
     <div class="bk-sec">Cupboard — oils & spices</div>
-    <p class="sub" style="margin-top:0">If you already cook with these, tap Already have.</p>
+    ${cupboard.length?spiceSkipAlertHtml():`<p class="sub" style="margin-top:0">No oils or spices on this shop — we skipped what you already have. Tick fewer in Cupboard if you need a restock.</p>`}
     ${cupboardHtml}
     <div class="bk-sec">Add a product</div>
     <div class="row" style="margin:8px 0 12px">
@@ -2207,7 +2733,7 @@ function renderShop(){
   document.getElementById("store-compare").innerHTML=totals.map(({s,pay,live,shelf},idx)=>
     `<div class="store ${idx===0?'best':''}" onclick="pickStore('${s.id}')" id="store-${s.id}">
       <div><div class="sname">${s.name}${idx===0?'<span class="badge">CHEAPEST</span>':''}${live?' <span class="badge" style="background:var(--green-d)">LIVE</span>':shelf?' <span class="badge">SHELF</span>':''}</div>
-      <div class="sdetail">${s.dist} · delivery £${s.fee.toFixed(2)} · +5% fee · ${s.eta}</div></div>
+      <div class="sdetail">${s.dist} · delivery £${s.fee.toFixed(2)} · +5% fee · arrives in about ${ETA_DAYS} days</div></div>
       <div class="price">£${pay.toFixed(2)}</div></div>`).join("");
   const save_=worst.pay-best.pay;
   const anyShelf=totals.some(x=>x.shelf);
@@ -2219,6 +2745,7 @@ function renderShop(){
   if(chosenStore)pickStore(chosenStore.id);
   else if(S.prefs.preferredStore)pickStore(S.prefs.preferredStore);
   else{const btn=document.getElementById("order-btn");if(btn){btn.disabled=true;btn.textContent="Select a store to order";}}
+  renderShopSpiceAlert();
 }
 function pickStore(id){
   const next=STORES.find(s=>s.id===id);
@@ -2267,6 +2794,29 @@ function orderItemsPayload(){
     return {i:b.i,q:b.q,unit:ingInfo(b.i).unit,product,pack,shelf_price:price,search};
   });
 }
+function deliveryFormHtml(d){
+  d=d||{};
+  return `<div class="field"><label>Name on the door</label><input id="del-name" value="${esc(d.name||(S.user&&S.user.name)||"")}" autocomplete="name"></div>
+    <div class="field"><label>Phone</label><input id="del-phone" type="tel" value="${esc(d.phone||"")}" autocomplete="tel" placeholder="07… so the driver can call you"></div>
+    <div class="field"><label>Address line 1</label><input id="del-line1" value="${esc(d.line1||"")}" autocomplete="address-line1"></div>
+    <div class="field"><label>Address line 2</label><input id="del-line2" value="${esc(d.line2||"")}" autocomplete="address-line2"></div>
+    <div class="grid2">
+      <div><label>Town / city</label><input id="del-city" value="${esc(d.city||"")}" autocomplete="address-level2"></div>
+      <div><label>Postcode</label><input id="del-postcode" maxlength="8" value="${esc(d.postcode||S.prefs.postcode||"")}" autocomplete="postal-code"></div>
+    </div>
+    <div class="err" id="del-err"></div>`;
+}
+function readDeliveryForm(prefix){
+  const g=id=>document.getElementById((prefix||"del-")+id);
+  return deliveryFrom({
+    name:g("name")&&g("name").value,
+    phone:g("phone")&&g("phone").value,
+    line1:g("line1")&&g("line1").value,
+    line2:g("line2")&&g("line2").value,
+    city:g("city")&&g("city").value,
+    postcode:g("postcode")&&g("postcode").value,
+  });
+}
 function confirmOrder(){
   if(!chosenStore||!basket.length)return;
   if(!S.user||!S.user.id){
@@ -2279,16 +2829,34 @@ function confirmOrder(){
   closeBasket();
   const preview=basket.slice(0,8).map(b=>`${+b.q}× ${esc(b.i)}`).join(" · ");
   const extra=basket.length>8?` · +${basket.length-8} more`:"";
+  const saved=deliveryFrom(S.prefs.delivery);
+  const replace=!!window.__deliveryReplace;
+  const addrBlock=saved&&!replace
+    ?`<div class="hint"><b>Deliver to this address?</b><br>${esc(deliveryLabel(saved))}<br>${esc(saved.phone)}</div>
+      <button type="button" class="btn ghost sm" onclick="window.__deliveryReplace=true;confirmOrder()">Use a different address</button>`
+    :`<p class="sub" style="margin:8px 0 6px">Where should this shop be delivered? This is not the card billing address. Phone is for the driver.</p>
+      ${saved?`<button type="button" class="btn ghost sm" onclick="window.__deliveryReplace=false;confirmOrder()">Use the saved address</button>`:""}
+      ${deliveryFormHtml(saved)}`;
   openModal(`<h2 style="margin-bottom:6px">Confirm this shop</h2>
-    <p class="sub">${basket.length} items at ${esc(chosenStore.name)} · typical ${esc(chosenStore.eta)}</p>
+    <p class="sub">${basket.length} items at ${esc(chosenStore.name)} · pick a 2-hour window at least 3 days out</p>
     <p class="sub" style="white-space:normal">${preview}${extra}</p>
     <p class="sub" style="margin:0">Groceries £${t.toFixed(2)} · Plentry 5% £${fee.toFixed(2)} · <b style="color:var(--text)">you pay £${pay.toFixed(2)}</b></p>
-    <div class="alert ok">A card hold of about £${holdAmount(t).toFixed(2)} (~15% buffer). We collect your delivery address, then place the ${esc(chosenStore.name)} order. You're charged the exact store total plus 5%.</div>
+    ${basket.some(b=>isStaple(b.i))?spiceSkipAlertHtml():""}
+    ${addrBlock}
+    ${slotPickerHtml()}
+    <div class="alert ok">A card hold of about £${holdAmount(t).toFixed(2)} (~30% buffer). Stripe will ask for card billing separately. You're charged the exact store total plus 5% after we shop.</div>
     ${live?"":`<div class="alert">${SHELF_LABEL}</div>`}
-    <div class="row">
-      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">Pay hold & send order →</button>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">${saved&&!replace?"Yes — pay hold & send →":"Pay hold & send order →"}</button>
       <button class="btn ghost" onclick="closeModal();openBasket()">Edit basket</button>
     </div>`);
+}
+function persistDelivery(d){
+  S.prefs.delivery=d;
+  S.prefs.postcode=d.postcode;
+  save();
+  const pc=document.getElementById("pr-postcode");if(pc)pc.value=d.postcode;
+  const dpc=document.getElementById("pr-del-postcode");if(dpc)dpc.value=d.postcode;
 }
 async function placeOrder(){
   if(!chosenStore||!basket.length)return;
@@ -2297,18 +2865,39 @@ async function placeOrder(){
     openAuth("Log in so we can take the card hold and deliver to you.");
     return;
   }
+  const saved=deliveryFrom(S.prefs.delivery);
+  const replace=!!window.__deliveryReplace;
+  let d=saved&&!replace?saved:readDeliveryForm("del-");
+  if(!d){
+    const err=document.getElementById("del-err");
+    if(err)err.textContent="Add the door address and a UK phone so the driver can call you.";
+    else{window.__deliveryReplace=true;confirmOrder();}
+    return;
+  }
+  const slot=validSlot(window.__chosenSlot&&window.__chosenSlot.date,window.__chosenSlot&&window.__chosenSlot.start);
+  if(!slot){
+    const err=document.getElementById("slot-err")||document.getElementById("del-err");
+    if(err)err.textContent="Pick a delivery day (3+ days out) and a 2-hour window.";
+    else confirmOrder();
+    return;
+  }
+  persistDelivery(d);
+  window.__deliveryReplace=false;
   const cbtn=document.getElementById("confirm-btn");
   if(cbtn){cbtn.disabled=true;cbtn.textContent="Starting checkout…";}
   const {t}=storeQuote(chosenStore);
   const items=orderItemsPayload();
   const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total:t,eta:chosenStore.eta,
     items,meals:[...S.selected],
+    slot_date:slot.slot_date,slot_start:slot.slot_start,slot_end:slot.slot_end,
     date:new Date().toLocaleDateString("en-GB"),status:1,bagUrl:"",adjustUrl:"",pepestoSession:""};
   try{
     const {data,error}=await sb.from("orders").insert({
-      user_id:S.user.id,email:S.user.email,name:S.user.name,postcode:S.prefs.postcode,
+      user_id:S.user.id,email:S.user.email,name:d.name||S.user.name,postcode:d.postcode,
       store:order.store,total:order.total,payment_status:"unpaid",
-      items:{basket:order.items,meals:order.meals,eta:order.eta,mode:"manual"},
+      address:{delivery:d,name:d.name,phone:d.phone},
+      items:{basket:order.items,meals:order.meals,recipes:orderRecipesPayload(),eta:order.eta,mode:"manual"},
+      slot_date:slot.slot_date,slot_start:slot.slot_start,slot_end:slot.slot_end,
     }).select("id").single();
     if(error||!data)throw error||new Error("Could not save order");
     order.backendId=data.id;
@@ -2317,7 +2906,8 @@ async function placeOrder(){
     return;
   }
   const pay=await payApi("checkout",{order_id:order.backendId});
-  if(!(pay&&pay.live&&pay.url)){
+  const payUrl=pay&&pay.live?stripeCheckoutUrl(pay.url):null;
+  if(!payUrl){
     openModal(`<h2>Payments aren't ready yet</h2>
       <p class="sub">We saved your basket but haven't charged you, and we won't place this order until card checkout is live. We'll message you when you can finish.</p>
       <button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
@@ -2328,7 +2918,7 @@ async function placeOrder(){
   basket=[];S.basketEdit=null;liveQuote=null;liveQuoteKey="";save();
   renderBasketFab();closeBasket();
   for(const n of order.meals){if(!S.recipes[n])showRecipePrefetch(n);}
-  location.href=pay.url;
+  location.href=payUrl;
 }
 function bagLink(o){return (IS_MOBILE&&o.bagUrl)?o.bagUrl:(o.adjustUrl||o.bagUrl);}
 function openBagModal(order,bag){
@@ -2372,14 +2962,128 @@ function markDelivered(id){
 }
 const STATUS_N={new:1,ordered:2,delivered:3};
 function storeIdFromName(name){const s=STORES.find(x=>x.name===name);return s?s.id:"";}
+// Delivery: customer picks a 2-hour window ≥ 3 London days out (hard promise).
+// Ops books that exact window or messages first. delivery_slot is the booked snapshot.
+const ETA_DAYS=4;
+const SLOT_MAX=80;
+const SLOT_LEAD_DAYS=3;
+const SLOT_HORIZON_DAYS=10;
+const SLOT_STARTS=[8,10,12,14,16,18,20];
+const MSG_MAX=1000;
+function pad2(n){return String(n).padStart(2,"0");}
+function londonYmd(d){
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit"}).format(d||new Date());
+}
+function addYmd(ymd,n){
+  const [y,m,day]=String(ymd).split("-").map(Number);
+  const t=new Date(Date.UTC(y,m-1,day+n));
+  return t.getUTCFullYear()+"-"+pad2(t.getUTCMonth()+1)+"-"+pad2(t.getUTCDate());
+}
+function slotDays(){
+  const today=londonYmd(new Date());
+  const out=[];
+  for(let i=SLOT_LEAD_DAYS;i<=SLOT_HORIZON_DAYS;i++)out.push(addYmd(today,i));
+  return out;
+}
+function slotWindows(){return SLOT_STARTS.map(h=>({start:pad2(h)+":00",end:pad2(h+2)+":00"}));}
+function normTime(t){
+  const m=String(t==null?"":t).match(/^(\d{1,2}):(\d{2})/);
+  if(!m)return "";
+  return pad2(m[1])+":"+m[2];
+}
+function validSlot(date,start){
+  const days=slotDays();
+  if(!days.includes(String(date||"")))return null;
+  const w=slotWindows().find(x=>x.start===normTime(start));
+  if(!w)return null;
+  return {slot_date:date,slot_start:w.start,slot_end:w.end};
+}
+function pickSlot(date,start){
+  const slot=validSlot(date,start);
+  window.__chosenSlot=slot?{date:slot.slot_date,start:slot.slot_start}: {date,start:normTime(start)};
+  const modal=document.getElementById("modal-bg");
+  if(modal&&modal.classList.contains("open"))confirmOrder();
+  return slot;
+}
+function slotPickerHtml(){
+  const chosen=window.__chosenSlot||{};
+  const days=slotDays();
+  const wins=slotWindows();
+  const fmt=ymd=>{
+    const [y,m,d]=ymd.split("-").map(Number);
+    return new Date(Date.UTC(y,m-1,d)).toLocaleDateString("en-GB",{timeZone:"UTC",weekday:"short",day:"numeric",month:"short"});
+  };
+  return `<div style="margin-top:10px"><b>Delivery window</b>
+    <p class="sub" style="margin:4px 0 0">We only shop if ${esc((chosenStore&&chosenStore.name)||"the shop")} has this exact 2-hour slot. Earliest is 3 days from today.</p>
+    <div class="slot-picks" id="slot-days">${days.map(ymd=>`<button type="button" class="${chosen.date===ymd?"sel":""}" onclick="pickSlot('${ymd}','${esc(chosen.start||"")}')">${esc(fmt(ymd))}</button>`).join("")}</div>
+    <div class="slot-picks" id="slot-wins">${wins.map(w=>`<button type="button" class="${chosen.start===w.start?"sel":""}" onclick="pickSlot('${esc(chosen.date||days[0])}','${w.start}')">${w.start}–${w.end}</button>`).join("")}</div>
+    ${chosen.date&&chosen.start?`<div class="spice-alert" style="margin:0 0 8px"><b>Be in for this window</b><p>Someone needs to be at the door. The driver will call the phone on this order.</p></div>`:""}
+    <div class="err" id="slot-err"></div>
+  </div>`;
+}
+function fmtSlot(date,start,end){
+  const ymd=String(date||"");
+  const a=normTime(start),b=normTime(end);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(ymd)||!a||!b)return "";
+  const [y,m,d]=ymd.split("-").map(Number);
+  const day=new Date(Date.UTC(y,m-1,d)).toLocaleDateString("en-GB",{timeZone:"UTC",weekday:"short",day:"numeric",month:"short"});
+  return `${day}, ${a}–${b}`;
+}
+function promisedSlotLabel(o){
+  if(!o)return "";
+  return fmtSlot(o.slot_date,o.slot_start,o.slot_end);
+}
+function slotEndMs(o){
+  const date=o&&o.slot_date,end=normTime(o&&o.slot_end);
+  if(!date||!end)return null;
+  const t=new Date(`${date}T${end}:00`);
+  return isNaN(t.getTime())?null:t.getTime();
+}
+function slotEnded(o){
+  const ms=slotEndMs(o);
+  return ms!=null&&Date.now()>=ms;
+}
+function deliveredDone(o){
+  return (o&&o.status|0)>=3||slotEnded(o);
+}
+function issueAllowed(o){
+  const p=(o&&o.payment_status)||"";
+  return p==="authorized"||p==="captured"||(o&&o.status|0)>=3;
+}
+function cleanMsg(s){return String(s==null?"":s).replace(/[<>]/g,"").replace(/\s+/g," ").trim().slice(0,MSG_MAX);}
+function normSlot(s){return String(s==null?"":s).replace(/[<>]/g,"").replace(/\s+/g," ").trim().slice(0,SLOT_MAX);}
+function etaDate(created){
+  const d=new Date(created||NaN);if(isNaN(d.getTime()))return null;
+  d.setDate(d.getDate()+ETA_DAYS);return d;
+}
+const fmtDay=d=>d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
+function deliveryCopy(o){
+  const pay=(o&&o.payment_status)||"none";
+  if(pay==="unpaid"||pay==="none"||pay==="canceled")return "";
+  if((o.status|0)>=3)return "Delivered";
+  if(slotEnded(o)&& (o.status|0)<3)return "Should have arrived — tap Issue if it didn't";
+  const promised=promisedSlotLabel(o);
+  if(promised&&(o.status|0)>=2)return `${o.store} delivers ${promised}`;
+  if(promised)return `We'll deliver ${promised}`;
+  const slot=normSlot(o.delivery_slot);
+  if(slot)return `${o.store} delivers ${slot}`;
+  const d=etaDate(o.created_at);
+  return d?`Expected by ${fmtDay(d)} — about ${ETA_DAYS} days from your order. We'll show the exact ${o.store} slot once it's booked.`:"";
+}
 function orderFromRow(row,prev){
   const items=(row.items&&row.items.basket)||(prev&&prev.items)||[];
   const meals=(row.items&&row.items.meals)||(prev&&prev.meals)||[];
+  const recipes=(row.items&&Array.isArray(row.items.recipes)&&row.items.recipes)||(prev&&prev.recipes)||[];
   const st=STATUS_N[row.status]||1;
   const next={
     id:row.id,backendId:row.id,storeId:storeIdFromName(row.store),store:row.store,
     total:Number(row.total||0),eta:(row.items&&row.items.eta)||(prev&&prev.eta)||"",
-    items,meals,date:new Date(row.created_at).toLocaleDateString("en-GB"),
+    delivery_slot:normSlot(row.delivery_slot),
+    slot_date:row.slot_date||(prev&&prev.slot_date)||null,
+    slot_start:normTime(row.slot_start)||(prev&&prev.slot_start)||"",
+    slot_end:normTime(row.slot_end)||(prev&&prev.slot_end)||"",
+    issue_status:row.issue_status||(prev&&prev.issue_status)||null,
+    items,meals,recipes,date:new Date(row.created_at).toLocaleDateString("en-GB"),
     created_at:row.created_at,status:st,payment_status:row.payment_status||"none",
     amount_held:row.amount_held,amount_captured:row.amount_captured,
     pantrySynced:!!(prev&&prev.pantrySynced),
@@ -2394,7 +3098,7 @@ function orderFromRow(row,prev){
 function payLabel(o){
   const p=o.payment_status||"none";
   if(p==="authorized")return "Paid (hold)";
-  if(p==="captured")return "Charged";
+  if(p==="captured")return o.amount_captured!=null&&o.amount_captured!==""?`Charged £${Number(o.amount_captured).toFixed(2)}`:"Charged";
   if(p==="canceled")return "Payment canceled";
   if(p==="unpaid"||p==="none")return "Awaiting payment";
   return "";
@@ -2404,14 +3108,15 @@ function orderStatusCopy(o){
   if(pay==="unpaid"||pay==="none")return {title:"Awaiting payment",sub:"Finish checkout so we can place this at the supermarket."};
   if(pay==="canceled")return {title:"Payment canceled",sub:"The hold didn't go through. You can try paying again."};
   if(o.status>=3)return {title:"Delivered",sub:"It's at your door — your pantry has been updated."};
-  if(o.status>=2)return {title:"Ordered",sub:`We're sending this from ${o.store}.`};
-  return {title:"Confirmed",sub:"We've got your payment — we'll place this at the supermarket shortly."};
+  if(pay==="captured"&&o.status<2)return {title:"Charged",sub:`£${Number(o.amount_captured||0).toFixed(2)} is taken. We'll place this at ${o.store}.`};
+  if(o.status>=2)return {title:"Ordered",sub:pay==="captured"?`Charged £${Number(o.amount_captured||0).toFixed(2)}. We're sending this from ${o.store}.`:`We're sending this from ${o.store}.`};
+  return {title:"Hold placed",sub:"We've reserved a hold. We'll charge the exact shop plus 5% after we order."};
 }
 async function hydrateOrdersFromDb(){
   if(!sb||!S.user||!S.user.id){renderOrders();renderProfileOrders();return;}
   try{
     const {data,error}=await sb.from("orders")
-      .select("id,store,total,items,status,created_at,payment_status,amount_held,amount_captured")
+      .select("id,store,total,items,status,created_at,payment_status,amount_held,amount_captured,delivery_slot,slot_date,slot_start,slot_end,issue_status")
       .eq("user_id",S.user.id).order("created_at",{ascending:false}).limit(50);
     if(error||!data){renderOrders();renderProfileOrders();return;}
     const prevById={};
@@ -2434,23 +3139,30 @@ function renderOrders(){
     const copy=orderStatusCopy(o);
     const pay=payLabel(o);
     const oid=o.backendId||o.id;
+    const arrive=deliveryCopy(o);
+    const meals=o.meals||[];
     return `<div class="meal" style="align-items:flex-start">
       <div class="emoji">📦</div>
       <div class="info">
         <div class="name">${esc(o.store)} — £${Number(o.total||0).toFixed(2)}${pay?` <span class="badge">${esc(pay)}</span>`:""}</div>
-        <div class="meta">${(o.items||[]).length} items · ${(o.meals||[]).length} meals · placed ${esc(o.date)}${o.eta?` · ${esc(o.eta)}`:""}</div>
+        <div class="meta">${(o.items||[]).length} items · ${meals.length} meals · placed ${esc(o.date)}</div>
         <div style="font-weight:700;margin-top:8px;color:var(--green-d)">${esc(copy.title)}</div>
         <div class="sub" style="margin:2px 0 0">${esc(copy.sub)}</div>
+        ${arrive?`<div class="sub" style="margin:6px 0 0;color:var(--text)">🚚 ${esc(arrive)}</div>`:""}
         <div class="timeline">
           <div class="tstep ${paid?"done":"warn"}">${paid?"Paid":(o.payment_status==="canceled"?"Canceled":"Payment")}</div>
-          <div class="tstep ${o.status>=2?"done":""} ${paid&&o.status<2?"active":""}">Ordered</div>
-          <div class="tstep ${o.status>=3?"done":""} ${o.status===2?"active":""}">Delivered</div>
+          <div class="tstep ${o.status>=2?"done":""}${paid&&o.status<2?" active":""}">Ordered</div>
+          <div class="tstep ${deliveredDone(o)?"done":""}${o.status===2&&!deliveredDone(o)?" active":""}">Delivered</div>
         </div>
         <div class="row" style="margin-top:8px;flex-wrap:wrap">
           ${!paid&&oid?`<button class="btn sm" onclick="retryPay(${oid})">Pay now →</button>`:""}
+          ${issueAllowed(o)&&oid?`<button class="btn ghost sm" onclick="openIssueThread(${oid})">${o.issue_status==="open"?"View issue":"Issue"}</button>`:""}
           ${(o.items||[]).length?`<button class="btn ghost sm" onclick="openHandoffModal(orderById(${oid}))">🧾 List</button>`:""}
-          ${(o.meals||[]).slice(0,3).map((n,j)=>`<button class="btn ghost sm" onclick="showRecipeFromOrder(${oid},${j})">📖 ${esc(String(n).length>18?String(n).slice(0,17)+"…":n)}</button>`).join("")}
         </div>
+        ${meals.length?`<div class="sub" style="margin:10px 0 4px">Cooking instructions</div>
+        <div class="row" style="flex-wrap:wrap">
+          ${meals.map((n,j)=>`<button class="btn ghost sm" onclick="showRecipeFromOrder(${oid},${j})">📖 ${esc(String(n).length>24?String(n).slice(0,23)+"…":n)}</button>`).join("")}
+        </div>`:""}
       </div></div>`;
   }).join("");
 }
@@ -2474,6 +3186,126 @@ function renderProfileOrders(){
   }).join("");
 }
 
+// ---------- ISSUE THREAD + OPS INBOX ----------
+let issuePoll=null;
+function stopIssuePoll(){if(issuePoll){clearInterval(issuePoll);issuePoll=null;}}
+function startIssuePoll(orderId,asOps){
+  stopIssuePoll();
+  issuePoll=setInterval(()=>{
+    const modal=document.getElementById("modal-bg");
+    if(!modal||!modal.classList.contains("open")||!document.getElementById("issue-thread")){stopIssuePoll();return;}
+    loadIssueThread(orderId,asOps);
+  },8000);
+}
+function issueOrder(orderId,asOps){
+  if(asOps)return window.__adminOrders&&window.__adminOrders[orderId];
+  return orderById(orderId);
+}
+async function openIssueThread(orderId,asOps){
+  asOps=!!asOps;
+  if(asOps&&!isAdmin())return;
+  let o=issueOrder(orderId,asOps);
+  if(asOps&&!o&&sb){
+    const {data}=await sb.from("orders").select("id,store,email,name,issue_status,slot_date,slot_start,slot_end,delivery_slot,status,payment_status,created_at").eq("id",orderId).maybeSingle();
+    o=data;
+    if(o){window.__adminOrders=window.__adminOrders||{};window.__adminOrders[o.id]=o;}
+  }
+  if(!o)return;
+  if(!asOps&&!issueAllowed(o))return;
+  window.__issueCtx={orderId,asOps};
+  if(asOps&&sb){
+    await sb.from("orders").update({issue_status:"open"}).eq("id",orderId);
+    if(window.__adminOrders&&window.__adminOrders[orderId])window.__adminOrders[orderId].issue_status="open";
+    await refreshInboxBadge();
+  }
+  const promised=promisedSlotLabel(o);
+  openModal(`<h2 style="margin-bottom:6px">${asOps?"Message customer":"Issue"}</h2>
+    <p class="sub">Order #${esc(String(o.backendId||o.id))} · ${esc(o.store||"")}${promised?` · ${esc(promised)}`:""}</p>
+    <div id="issue-thread" class="sub">Loading…</div>
+    <textarea id="issue-body" maxlength="${MSG_MAX}" rows="3" placeholder="${asOps?"The shop cannot do that window — suggest another.":"What went wrong?"}" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--text);font:inherit"></textarea>
+    <div class="err" id="issue-err"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" style="flex:1" onclick="sendIssue()">Send</button>
+      ${asOps?`<button class="btn ghost" onclick="resolveIssue()">Resolve</button>`:""}
+      <button class="btn ghost" onclick="closeModal()">Close</button>
+    </div>`);
+  await loadIssueThread(orderId,asOps);
+  startIssuePoll(orderId,asOps);
+}
+async function loadIssueThread(orderId,asOps){
+  const el=document.getElementById("issue-thread");
+  if(!el||!sb)return;
+  const {data,error}=await sb.from("order_messages").select("id,author_role,body,created_at").eq("order_id",orderId).order("created_at",{ascending:true}).limit(100);
+  if(error){el.textContent="Could not load messages.";return;}
+  if(!data||!data.length){el.textContent=asOps?"No messages yet — tell them if the window is unavailable.":"No messages yet.";return;}
+  el.innerHTML=data.map(m=>{
+    const mine=asOps?m.author_role==="ops":m.author_role==="customer";
+    const who=mine?"You":(m.author_role==="ops"?"Plentry":"Customer");
+    const when=m.created_at?new Date(m.created_at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"";
+    return `<div style="margin:8px 0"><b>${esc(who)}</b> <span class="sub">${esc(when)}</span><div>${esc(m.body)}</div></div>`;
+  }).join("");
+}
+async function sendIssue(){
+  const ctx=window.__issueCtx||{};
+  const orderId=ctx.orderId;
+  const asOps=!!ctx.asOps;
+  if(!orderId||!sb)return;
+  if(asOps&&!isAdmin())return;
+  const raw=document.getElementById("issue-body")&&document.getElementById("issue-body").value;
+  const body=cleanMsg(raw);
+  const err=document.getElementById("issue-err");
+  if(!body){if(err)err.textContent="Write a short message.";return;}
+  const {error}=await sb.from("order_messages").insert({order_id:orderId,author_role:asOps?"ops":"customer",body});
+  if(error){if(err)err.textContent=error.message||"Could not send.";return;}
+  const ta=document.getElementById("issue-body");if(ta)ta.value="";
+  const o=issueOrder(orderId,asOps);
+  if(o)o.issue_status="open";
+  await loadIssueThread(orderId,asOps);
+  if(asOps)await refreshInboxBadge();
+  renderOrders();
+}
+async function resolveIssue(){
+  if(!isAdmin()||!sb)return;
+  const ctx=window.__issueCtx||{};
+  if(!ctx.orderId)return;
+  await sb.from("orders").update({issue_status:"resolved"}).eq("id",ctx.orderId);
+  if(window.__adminOrders&&window.__adminOrders[ctx.orderId])window.__adminOrders[ctx.orderId].issue_status="resolved";
+  await refreshInboxBadge();
+  await renderInbox();
+  closeModal();
+}
+async function renderInbox(){
+  const el=document.getElementById("inbox-list");
+  if(!el)return;
+  if(!sb||!isAdmin()){el.innerHTML='<p class="sub">Admin only.</p>';return;}
+  const {data,error}=await sb.from("orders")
+    .select("id,store,email,name,issue_status,slot_date,slot_start,slot_end,delivery_slot,status,payment_status,created_at")
+    .eq("issue_status","open").order("created_at",{ascending:false}).limit(50);
+  if(error){el.innerHTML='<p class="sub">Could not load inbox.</p>';return;}
+  if(!data||!data.length){el.innerHTML='<p class="sub">No open threads.</p>';return;}
+  window.__adminOrders=window.__adminOrders||{};
+  data.forEach(o=>{window.__adminOrders[o.id]=Object.assign(window.__adminOrders[o.id]||{},o);});
+  el.innerHTML=data.map(o=>{
+    const promised=promisedSlotLabel(o);
+    return `<div class="store" style="display:block;cursor:default">
+      <div><b>#${+o.id||0}</b> · ${esc(o.store||"")} · ${esc(o.name||o.email||"")}</div>
+      <div class="sdetail">${promised?esc(promised):"No promised window"} · ${esc(o.payment_status||"")}</div>
+      <button class="btn sm" style="margin-top:8px" onclick="openIssueThread(${o.id},true)">Open thread</button>
+    </div>`;
+  }).join("");
+}
+async function refreshInboxBadge(){
+  const badge=document.getElementById("inbox-badge");
+  if(!badge)return;
+  if(!sb||!isAdmin()){badge.style.display="none";badge.textContent="0";return;}
+  try{
+    const {data}=await sb.from("orders").select("id").eq("issue_status","open").limit(50);
+    const n=(data||[]).length;
+    badge.textContent=String(n);
+    badge.style.display=n?"flex":"none";
+  }catch(e){badge.style.display="none";}
+}
+
 // ---------- PROFILE ----------
 function renderProfile(){
   document.getElementById("pr-hello").textContent=S.user?`Hey ${S.user.name} 👋`:"Your kitchen";
@@ -2481,7 +3313,7 @@ function renderProfile(){
   document.getElementById("pr-postcode").value=S.prefs.postcode;
   document.getElementById("pr-size").value=S.prefs.size;
   document.getElementById("pr-budget").value=S.prefs.budget;
-  document.getElementById("pr-meals").value=S.prefs.meals;
+  renderPrMealBar();
   const sel=document.getElementById("pr-store");
   if(sel){
     sel.innerHTML='<option value="">No preference</option>'+STORES.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");
@@ -2489,7 +3321,12 @@ function renderProfile(){
   }
   const diet=document.getElementById("pr-diet");
   if(diet)diet.value=dietPref();
+  renderUserTags("pr-tags");
+  const del=deliveryFrom(S.prefs.delivery);
+  const set=(id,v)=>{const el=document.getElementById("pr-del-"+id);if(el)el.value=v||"";};
+  set("name",del&&del.name);set("phone",del&&del.phone);set("line1",del&&del.line1);set("line2",del&&del.line2);set("city",del&&del.city);set("postcode",(del&&del.postcode)||S.prefs.postcode);
   document.getElementById("pr-saved").textContent="";
+  renderSecurityCard();
   renderProfileOrders();
 }
 function saveProfile(){
@@ -2500,10 +3337,17 @@ function saveProfile(){
   S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("pr-size").value;
   S.prefs.budget=normBudget(document.getElementById("pr-budget").value,S.prefs.budget);
-  S.prefs.meals=+document.getElementById("pr-meals").value;
+  S.prefs.meals=clampMeals(document.getElementById("pr-meals").value);
   S.prefs.preferredStore=document.getElementById("pr-store").value;
   const dietEl=document.getElementById("pr-diet");
   S.prefs.diet=dietEl?dietEl.value:dietPref();
+  if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
+  const del=readDeliveryForm("pr-del-");
+  const anyDel=["name","phone","line1","line2","city","postcode"].some(k=>{const n=document.getElementById("pr-del-"+k);return n&&n.value.trim();});
+  if(anyDel){
+    if(!del){el.style.color="var(--red)";el.textContent="Delivery needs name, UK phone, line 1, city and a UK postcode.";return;}
+    persistDelivery(del);
+  }
   chosenStore=preferredStoreObj();
   save();renderMenu();syncBasketFromMeals();
   el.textContent="✓ Saved — tap New week on Menu if you want dinners to match."
@@ -2545,7 +3389,8 @@ function nav(s){
     if(s==="pantry"){renderPantry();renderBasketFab();}
     if(s==="orders"){renderOrders();hydrateOrdersFromDb();renderBasketFab();}
     if(s==="profile"){renderProfile();hydrateOrdersFromDb();renderBasketFab();}
-    if(s==="admin"){renderAdmin();renderBasketFab();}
+    if(s==="admin"){renderAdmin();refreshInboxBadge();renderBasketFab();}
+    if(s==="inbox"){renderInbox();refreshInboxBadge();renderBasketFab();}
     if(s==="meals"){showMealsScreen();renderBasketFab();}
   }catch(e){
     console.error(e);
@@ -2553,7 +3398,7 @@ function nav(s){
   }
 }
 function openModal(html){document.getElementById("modal").innerHTML=html;document.getElementById("modal-bg").classList.add("open");}
-function closeModal(){document.getElementById("modal-bg").classList.remove("open");}
+function closeModal(){window.__deliveryReplace=false;stopIssuePoll();document.getElementById("modal-bg").classList.remove("open");}
 
 // Stripe Checkout return handling (?paid=1&order=N or ?paycancel=1&order=N)
 async function handlePaymentReturn(){
@@ -2564,7 +3409,7 @@ async function handlePaymentReturn(){
     await hydrateOrdersFromDb();
     if(S.onboarded)nav("orders");
     openModal(`<h2 style="margin-bottom:6px">✅ Payment confirmed</h2>
-      <p class="sub">Your card has a temporary hold covering groceries + our 5% fee, with ~15% buffer. You'll only be charged the exact store total plus 5%. Track it below.</p>
+      <p class="sub">Your card has a temporary hold covering groceries + our 5% fee, with ~30% buffer. You'll only be charged the exact store total plus 5%. Track it below.</p>
       <button class="btn" style="width:100%" onclick="closeModal()">Great</button>`);
   }else if(q.get("paycancel")){
     history.replaceState(null,"",location.pathname);
@@ -2581,7 +3426,8 @@ async function handlePaymentReturn(){
 async function retryPay(orderId){
   if(!orderId)return closeModal();
   const pay=await payApi("checkout",{order_id:orderId});
-  if(pay&&pay.live&&pay.url)location.href=pay.url;
+  const payUrl=pay&&pay.live?stripeCheckoutUrl(pay.url):null;
+  if(payUrl)location.href=payUrl;
   else openModal(`<h2>Payments aren't ready yet</h2><p class="sub">We can't take a card hold right now, so we won't place this order. Try again shortly.</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
 }
 
@@ -2624,12 +3470,14 @@ if(typeof window!=="undefined"){
   window.__plentry={
     state:()=>S,
     COMMISSION,HOLD_BUFFER,
+    ETA_DAYS,SLOT_MAX,etaDate,fmtDay,deliveryCopy,normSlot,catalogMealByName,mealCache,recipeFromOrder,orderRecipesPayload,
+    isUkPhone,validSlot,slotDays,fmtSlot,promisedSlotLabel,deliveredDone,issueAllowed,cleanMsg,
     validMeal,
     setModifyPicks(a){modifyPicks=Array.isArray(a)?a:[];},
     modifyPicks:()=>modifyPicks,
     setAdvisor(proposed,idxs){advisorProposed=Array.isArray(proposed)?proposed:[];advisorPicked=new Set(idxs||[]);},
     STAPLES,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
-    tagsFor,mealTags,MEAL_TAGS,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,
+    tagsFor,mealTags,MEAL_TAGS,USER_MEAL_TAGS,wantedTags,clampMeals,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,deliveryFrom,orderDeliverTo,captureChargePence,
   };
 }
 </script>

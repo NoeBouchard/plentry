@@ -52,10 +52,10 @@ An old `orders` example function is **not** deployed (confirmed 13 Sep 2026). Do
 
 ## Money path
 
-1. Client inserts `orders` row (`payment_status=unpaid`, `total` = grocery+delivery estimate).
-2. `pay` `checkout` recomputes total, opens Stripe Checkout (manual capture, GB address + phone).
-3. Webhook → `authorized` → DB trigger → Telegram.
-4. Ops sets status New/Ordered/Delivered (toggle; reversible). Capture = store £ + 5%.
+1. Client inserts `orders` row (`payment_status=unpaid`, `total` = grocery+delivery estimate, `address.delivery` = door).
+2. `pay` `checkout` recomputes total, opens Stripe Checkout (manual capture, **card billing** + PI shipping from `address.delivery`). Stripe `shipping_address_collection` only if delivery is missing.
+3. Webhook → `authorized` (keeps `address.delivery`) → DB trigger → Telegram.
+4. Ops shops from the founder float. Status New/Ordered/Delivered (toggle; reversible). Capture = store £ + 5%, never above hold. Stripe payouts are **not** Tesco cash (days later).
 
 ## Ingredient catalog
 

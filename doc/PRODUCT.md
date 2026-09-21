@@ -18,7 +18,7 @@ Busy UK households (pilot: London-ish postcodes, founder-led concierge). First p
 
 - **Groceries:** store shelf / till price (we do not mark food up).
 - **Plentry:** **5% of the store total** (including typical delivery fee as shown).
-- **Hold:** `(groceries + 5%) × 1.15` so the till can come in a bit high.
+- **Hold:** `(groceries + 5%) × 1.30` so the till can come in high (raised from 1.15 on 19 Sep after Waitrose was ~15% above shelf).
 - **Capture:** Ops types the real supermarket total; the `pay` function charges that **plus 5%**, never more than the hold.
 - **Not yet:** live Pepesto quotes (optional), subscriptions, split-store baskets.
 

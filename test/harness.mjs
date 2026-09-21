@@ -72,24 +72,64 @@ function makeQuery(tables, table) {
   return q;
 }
 
-function createMockSb(tables, session) {
+function createMockSb(tables, session, mfa) {
+  const auth = {
+    getSession: async () =>
+      session
+        ? { data: { session: { access_token: "test-token", user: session } } }
+        : { data: { session: null } },
+    signUp: async () => ({ data: { user: null, session: null }, error: { message: "unit-test" } }),
+    signInWithPassword: async () => ({
+      data: { user: null, session: null },
+      error: { message: "unit-test" },
+    }),
+    signOut: async () => ({ error: null }),
+  };
+  // Supabase MFA surface is opt-in per test (absent = no 2-step configured).
+  if (mfa) auth.mfa = mfa;
   return {
     from(table) {
       return makeQuery(tables, table);
     },
-    auth: {
-      getSession: async () =>
-        session
-          ? { data: { session: { access_token: "test-token", user: session } } }
-          : { data: { session: null } },
-      signUp: async () => ({ data: { user: null, session: null }, error: { message: "unit-test" } }),
-      signInWithPassword: async () => ({
-        data: { user: null, session: null },
-        error: { message: "unit-test" },
-      }),
-      signOut: async () => ({ error: null }),
+    auth,
+  };
+}
+
+/**
+ * Fake `sb.auth.mfa` with one optional verified TOTP factor.
+ * `state.level` flips to aal2 when challengeAndVerify gets `goodCode`.
+ */
+export function mockMfa({ enrolled = false, goodCode = "123456", qr = "data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3C%2Fsvg%3E" } = {}) {
+  const state = { level: "aal1", factors: enrolled ? [{ id: "11111111-2222-4333-8444-555555555555", status: "verified" }] : [], calls: [] };
+  const api = {
+    state,
+    getAuthenticatorAssuranceLevel: async () => ({
+      data: { currentLevel: state.level, nextLevel: state.factors.some((f) => f.status === "verified") ? "aal2" : "aal1" },
+      error: null,
+    }),
+    listFactors: async () => ({ data: { totp: state.factors.filter((f) => f.status === "verified"), all: state.factors }, error: null }),
+    enroll: async (args) => {
+      state.calls.push(["enroll", args]);
+      const f = { id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", status: "unverified" };
+      state.factors.push(f);
+      return { data: { id: f.id, type: "totp", totp: { qr_code: qr, secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/x" } }, error: null };
+    },
+    challengeAndVerify: async ({ factorId, code }) => {
+      state.calls.push(["challengeAndVerify", { factorId, code }]);
+      const f = state.factors.find((x) => x.id === factorId);
+      if (!f || code !== goodCode) return { data: null, error: { message: "Invalid TOTP code" } };
+      f.status = "verified";
+      state.level = "aal2";
+      return { data: { access_token: "aal2-token" }, error: null };
+    },
+    unenroll: async ({ factorId }) => {
+      state.calls.push(["unenroll", { factorId }]);
+      state.factors = state.factors.filter((x) => x.id !== factorId);
+      state.level = "aal1";
+      return { data: { id: factorId }, error: null };
     },
   };
+  return api;
 }
 
 function sleep(ms) {
@@ -103,6 +143,7 @@ function sleep(ms) {
  * @param {object|null} [opts.session] Supabase user if logged in
  * @param {object} [opts.localState] written to localStorage before the app script runs
  * @param {string} [opts.url]
+ * @param {object} [opts.mfa] fake `sb.auth.mfa` (see mockMfa); omitted = no MFA surface
  */
 export async function loadApp(opts = {}) {
   const tables = opts.tables || {
@@ -112,10 +153,8 @@ export async function loadApp(opts = {}) {
     ingredient_prices: [],
   };
   let html = readFileSync(INDEX, "utf8");
-  html = html.replace(
-    /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\/dist\/umd\/supabase\.min\.js"><\/script>\s*/,
-    "",
-  );
+  // Drop the vendored supabase-js tag; the fake client is injected in beforeParse.
+  html = html.replace(/<script src="\/vendor\/supabase-js-[0-9.]+\.js"><\/script>\s*/, "");
 
   const virtualConsole = new VirtualConsole();
   virtualConsole.sendTo(console, { omitJSDOMErrors: true });
@@ -135,7 +174,7 @@ export async function loadApp(opts = {}) {
         window.localStorage.setItem("plentry_v1", JSON.stringify(opts.localState));
       }
       window.__sbTables = tables;
-      window.__mockSb = createMockSb(tables, opts.session || null);
+      window.__mockSb = createMockSb(tables, opts.session || null, opts.mfa || null);
       window.supabase = { createClient: () => window.__mockSb };
     },
   });

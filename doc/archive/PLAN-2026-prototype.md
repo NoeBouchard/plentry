@@ -1,4 +1,4 @@
-# Plentry — Product Plan & MVP Roadmap
+# Kitchen Planner — Product Plan & MVP Roadmap
 
 ## One-liner
 AI-automated meal planning and grocery replenishment. Like HelloFresh, but no boxes, no packing, no rigid menus — the AI plans your meals, compares prices across nearby supermarkets, and orders ingredients delivered from local stores.
