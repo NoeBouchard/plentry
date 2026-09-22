@@ -5,9 +5,11 @@ alwaysApply: true
 
 # Plentry SaaS workflow
 
-- Product truth lives in `doc/`. Read `doc/CURRENT-STATE.md` before coding. `README.md` and `SPEC.md` are stale if they disagree.
+- Product truth lives in `doc/`. Read `doc/REQUIREMENTS.md`, `doc/INVARIANTS.md`, `doc/FLOWS.md`, then `doc/CURRENT-STATE.md` before coding. `doc/archive/` and `README.md` are not the contract.
 - App code is `index.html` plus `supabase/functions/`. Do not introduce React, Next, or a bundler.
 - Before staging UI, money, order, or XSS changes: `npm test` must pass.
+- Product changes: `feat/…` or `fix/…` → PR → GitHub Actions **test** green. Do not push product work to `main`. Do not deploy from a PR. Money/XSS/RLS: `/review-bugbot` and `/review-security` before merge. See `doc/ENGINEERING.md`.
+- **Production gate:** `npm test` must exit 0 before `vercel deploy --prod` or `supabase functions deploy`. Merge is not live. `git push` is not production.
 - After staging, update `doc/CURRENT-STATE.md` and append `doc/CHANGELOG.md`. Also update workspace-root `../doc/` if that folder exists.
 - Commission is 5% in both `index.html` and `pay/index.ts`. Change them together.
 - Customer pays Plentry via Stripe (manual capture). Ops types the store total; the server adds 5%.

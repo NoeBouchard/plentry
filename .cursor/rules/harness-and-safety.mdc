@@ -12,4 +12,5 @@ alwaysApply: false
 - Ops status is reversible: `new` | `ordered` | `delivered`. Unpaid orders stay locked.
 - Modify a dinner replaces one slot; week length stays `prefs.meals`.
 - If a change needs a new guarantee, add a test in `test/` in the same change.
+- GitHub Actions **test** must be green before merge. Do not push product work to `main`.
 ---

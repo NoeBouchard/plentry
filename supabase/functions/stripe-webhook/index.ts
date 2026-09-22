@@ -11,6 +11,7 @@
 // once the money is held. Signature verified with WebCrypto (no SDK).
 
 import { withSupabase } from 'npm:@supabase/server'
+import { ukPostcode } from '../_shared/orders.ts'
 
 async function verifySignature(payload: string, header: string, secret: string): Promise<boolean> {
   try {
@@ -48,28 +49,80 @@ export default {
 
     const evt = JSON.parse(payload)
     const s = evt.data?.object
-    const orderId = s?.metadata?.order_id
-    if (!orderId) return Response.json({ received: true })
+    const orderId = Number(s?.metadata?.order_id)
+    if (!Number.isInteger(orderId) || orderId <= 0) return Response.json({ received: true })
+    const sessionId = typeof s?.id === 'string' && /^cs_[A-Za-z0-9_]+$/.test(s.id) ? s.id.slice(0, 120) : null
+
+    // S-05: a DB error must surface as 5xx so Stripe retries. Before this, a
+    // failed update returned 200 and a held payment could sit at `unpaid`.
+    const dbFail = (what: string, err: unknown) => {
+      console.error('stripe-webhook', evt.id, what, String((err as any)?.message || err).slice(0, 300))
+      return Response.json({ error: 'db', what }, { status: 500 })
+    }
 
     if (evt.type === 'checkout.session.completed') {
-      // shipping details moved between Stripe API versions — accept either shape
-      const shipping = s.shipping_details || s.collected_information?.shipping_details || null
-      await ctx.supabaseAdmin.from('orders').update({
+      const stripeShip = s.shipping_details || s.collected_information?.shipping_details || null
+      const { data: row, error: readErr } = await ctx.supabaseAdmin.from('orders')
+        .select('address,postcode,payment_status').eq('id', orderId).maybeSingle()
+      if (readErr) return dbFail('read', readErr)
+      if (!row) { console.error('stripe-webhook', evt.id, 'unknown order', orderId); return Response.json({ received: true }) }
+      const prev = row.address && typeof row.address === 'object' && !Array.isArray(row.address) ? row.address : {}
+      const sa = stripeShip && stripeShip.address
+      const fromStripe = sa
+        ? {
+            name: stripeShip.name || '',
+            phone: stripeShip.phone || '',
+            line1: sa.line1 || '',
+            line2: sa.line2 || '',
+            city: sa.city || '',
+            postcode: sa.postal_code || '',
+          }
+        : null
+      const delivery = prev.delivery && prev.delivery.line1 ? prev.delivery : fromStripe
+      // S-05: only write a UK-shaped postcode; otherwise keep what the row has
+      // (the validate_order trigger would reject the update and lose the event).
+      const postcode = ukPostcode(delivery && delivery.postcode) || row.postcode
+      // S-09: record the hold Stripe actually authorised (pence -> £) and the
+      // session that produced it, so capture caps against the real ceiling.
+      const heldGbp = Number.isFinite(Number(s.amount_total)) && Number(s.amount_total) > 0
+        ? Math.round(Number(s.amount_total)) / 100
+        : null
+      const update: Record<string, unknown> = {
         payment_status: 'authorized',
         payment_intent: s.payment_intent || null,
+        checkout_session: sessionId,
+        postcode,
         address: {
-          shipping,
-          email: s.customer_details?.email || null,
-          name: s.customer_details?.name || null,
-          phone: s.customer_details?.phone || null,
+          ...prev,
+          delivery,
+          shipping: stripeShip,
+          email: s.customer_details?.email || prev.email || null,
+          name: (delivery && delivery.name) || s.customer_details?.name || prev.name || null,
+          phone: (delivery && delivery.phone) || s.customer_details?.phone || prev.phone || null,
         },
-      }).eq('id', orderId)
+      }
+      if (heldGbp) update.amount_held = heldGbp
+      // S-05: never regress a captured (or already authorised) order. A late or
+      // duplicate `completed` event is acknowledged and ignored.
+      const { data: updated, error } = await ctx.supabaseAdmin.from('orders')
+        .update(update)
+        .eq('id', orderId)
+        .in('payment_status', ['unpaid', 'none', 'canceled'])
+        .select('id')
+      if (error) return dbFail('authorize', error)
+      if (!updated || !updated.length) console.log('stripe-webhook', evt.id, 'order', orderId, 'already', row.payment_status, '- ignored')
     }
 
     if (evt.type === 'checkout.session.expired') {
-      await ctx.supabaseAdmin.from('orders')
+      // S-09: only the CURRENT session may cancel the order (pay expires the
+      // previous one on purpose when it opens a fresh session). Rows from before
+      // checkout_session existed (null) still cancel as before.
+      let q = ctx.supabaseAdmin.from('orders')
         .update({ payment_status: 'canceled' })
         .eq('id', orderId).eq('payment_status', 'unpaid')
+      q = sessionId ? q.or(`checkout_session.eq.${sessionId},checkout_session.is.null`) : q.is('checkout_session', null)
+      const { error } = await q
+      if (error) return dbFail('cancel', error)
     }
 
     return Response.json({ received: true })

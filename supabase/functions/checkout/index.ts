@@ -27,6 +27,17 @@ import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 
 const PEPESTO = 'https://s.pepesto.com/api'
+const APP_ORIGIN = 'https://plentry.vercel.app'
+
+// S-10: exact-origin check for the post-basket bounce. Returns the URL or null.
+export function appRedirect(u: unknown): string | null {
+  try {
+    const x = new URL(String(u ?? ''))
+    return x.origin === APP_ORIGIN ? x.href.slice(0, 300) : null
+  } catch {
+    return null
+  }
+}
 
 // Plentry store id -> Pepesto supermarket domain.
 const STORE_DOMAINS: Record<string, string> = {
@@ -167,10 +178,9 @@ export default {
           supermarket_domain: domain,
           user_locale: 'en-GB',
           // Only ever bounce back to the app — a client-chosen redirect_url would
-          // let an attacker turn the Pepesto flow into an open redirect.
-          ...(String(p.redirect_url || '').startsWith('https://plentry.vercel.app')
-            ? { redirect_url: String(p.redirect_url).slice(0, 300) }
-            : {}),
+          // let an attacker turn the Pepesto flow into an open redirect. Exact
+          // origin match (S-10): a prefix check let plentry.vercel.app.evil.tld through.
+          ...(appRedirect(p.redirect_url) ? { redirect_url: appRedirect(p.redirect_url) } : {}),
           skus: m.skus,
           unresolved_items: m.unmatched.slice(0, 20),
         })
@@ -189,7 +199,9 @@ export default {
       return Response.json({ error: 'unknown task' }, { status: 400 })
     } catch (e) {
       console.error(e)
-      return Response.json({ error: 'server', detail: String(e).slice(0, 200) }, { status: 500 })
+      console.error('checkout server', String(e).slice(0, 300))
+      // S-15: internal error text only for signed-in callers.
+      return Response.json({ error: 'server', ...(ctx.userClaims ? { detail: String(e).slice(0, 200) } : {}) }, { status: 500 })
     }
   }),
 }

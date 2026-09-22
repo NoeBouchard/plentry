@@ -1,0 +1,12 @@
+# Plentry static deploy — ALLOW-LIST (S-17, 17 Sep 2026).
+# Without this file Vercel published the whole folder: edge-function source,
+# SQL (RLS/trigger logic), test harness and the internal vault (doc/*.md) were
+# all readable at plentry.vercel.app/<path>. Only the app assets ship now.
+# Post-deploy check: curl -s -o /dev/null -w '%{http_code}' https://plentry.vercel.app/doc/SECURITY.md  -> 404
+/*
+!/index.html
+!/sw.js
+!/manifest.json
+!/icons
+!/vendor
+!/vercel.json

@@ -1,26 +1,32 @@
 # Current state
 
-Updated: **14 Sep 2026**. If you ship behaviour, change this file in the same change.
+Updated: **21 Sep 2026**. If you ship behaviour, change this file in the same change.
+
+**Agents:** start at [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Do not restructure the SPA.
 
 Live: https://plentry.vercel.app (static). Edge functions and SQL must be deployed separately.
 
+**Security batch 17 Sep 2026 (see [SECURITY.md](SECURITY.md) status table).** Live Postgres has the hardening: rate limiter, `validate_order` (v3: INSERT forces `unpaid/new`, no client-set holds), `checkout_session`, Vault-backed webhook secret, closed default function privileges. **Live edge functions (19 Sep):** `pay` **v19** (30% hold, over-hold captures the hold, capture reads `ctx.jwtClaims.aal`); others unchanged since 17 Sep (`ai` v22, `checkout` v15, `stripe-webhook` v15, `notify-order` v17, `newcoming` v7). **Live static (19 Sep, `plentry-11vcbs682`):** hold 30%, MFA capture modal, cooking methods + 4-day tracking. **This scrum (21 Sep, not yet static-deployed):** UK phone required, promised 2-hour slot, hollow timeline, Issue + Inbox. SQL `orders_slot_issue` **applied live**. `notify-order` code updated (needs deploy for PHONE/MUST book/issue pings). **Founder steps done 18 Sep 13:25 BST:** TOTP enrolled, `admin_mfa.sql` applied (migration `admin_mfa_aal2_policies`), `REQUIRE_ADMIN_MFA=1`, dashboard min password 8. **All 17 findings closed.** Order **#38** captured £55.76, slot saved, status **ordered**. Next: static + `notify-order` deploy, then invite.
+
 **Workspace:** `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`  
-(moved off `Documents/EVERYTHING/…`. App git repo is `plentry/`. Vault is workspace-root `doc/`, copied to `plentry/doc/`.)
+(moved off `Documents/EVERYTHING/…`. App git repo is `plentry/` → PRs + Actions **test**. Merge is not Vercel. See [ENGINEERING.md](ENGINEERING.md). Vault is workspace-root `doc/`, copied to `plentry/doc/`.)
 
 ## Works in product
 
 - **Auth:** email/password (Supabase). Site URL + redirect `https://plentry.vercel.app/**` confirmed 13 Sep.
-- **Onboarding:** goals, supermarket, household size, budget, dinners/week, then a searchable cupboard list (oils, aromatics, spices).
-- **Week:** exactly N dinners (`prefs.meals`). **Modify** (and New week) pick from **verified** meals in Postgres (`reviewed_at` set), never the AI. Unverified rows stay off New week / Modify. Week length stays N. Catalog dinners have **tags**; New week / Modify / auto-pick **weight** meals whose tags match onboarding goals (quick, meal_prep, low_calorie) **and diet**. Default diet is **omnivore** (meat/fish first, at most one vegetarian/vegan dinner) until Profile → What we eat is vegetarian / vegan / pescatarian. Goal weighting does not hide the rest of the live catalog.
+- **Onboarding:** goals, then **diet + dinner tags** (optional), supermarket, household size, budget, dinners/week **1–7 bar**, then a searchable cupboard list (oils, aromatics, spices). Diet and tags can be changed in **Profile**.
+- **Week:** exactly N dinners (`prefs.meals`, 1–7). **Modify** (and New week) pick from **verified** meals in Postgres (`reviewed_at` set), never the AI. Unverified rows stay off New week / Modify. Week length stays N. Catalog dinners have **tags**; New week / Modify / auto-pick **weight** meals whose tags match `prefs.tags` if set, otherwise onboarding goals (quick, meal_prep, low_calorie) **and diet**. Default diet is **omnivore** (meat/fish first, at most one vegetarian/vegan dinner) until onboarding/Profile → What we eat is vegetarian / vegan / pescatarian. Tag weighting does not hide the rest of the live catalog.
 - **Advisor:** the only meal-generation AI chat. Adding proposals fills empty slots then replaces from Monday, still capped at `prefs.meals`. Every meal it writes to Postgres has a closed **tags** array; new rows stay in **Meals → New meal** (`reviewed_at` null) until the founder verifies them. The advisor is told the tagged catalog and user goals so it prefers existing dinners.
 - **Cupboard (Pantry tab):** oils, butter, garlic, onions, lemons, curry paste, plus salt, black pepper, paprika, cumin, chilli flakes, mixed herbs, soy sauce, stock cubes. Tick what you already have — we skip those on the shop. Groceries stay in the basket. **Every recipe `ing` includes salt, pepper, and the spices that dish uses.** `completeIng()` only invents extra spices when a list has no salt (stale copy); reviewed lists are used as-is.
-- **Basket:** missing ingredients priced at Tesco / Sainsbury’s / Asda / Waitrose. **Order this week** (and login) always fills the basket from this week’s meals unless the user edited *this same week*. Empty or leftover `basketEdit` is ignored. User can still add/remove products; **Reset to this week's list** restores meal prices. Edits persist until they reset, change the week, or check out.
-- **Checkout:** Stripe card **hold** (still **test** keys until live `sk_live_` + live webhook secret are set). Address + phone on Stripe. Unpaid orders do not ping Telegram. Test path proven 13 Sep: order **#31** hold £31.52 then **captured £26.25** (store £25 + 5%); Ops status **ordered**.
-- **Customer Orders tab:** timeline Payment → Ordered → Delivered, loaded from **Postgres**, not only localStorage. After Stripe return, land on Orders.
-- **Profile → Order history:** same orders, tap through to Orders.
-- **Ops (founder email):** order queue only. Status **bar** New | Ordered | Delivered (reversible; locked while unpaid). Capture field is **store £**; server adds 5%.
+- **Basket:** missing ingredients priced at Tesco / Sainsbury’s / Asda / Waitrose. **Order this week** (and login) always fills the basket from this week’s meals unless the user edited *this same week*. Empty or leftover `basketEdit` is ignored. User can still add/remove products; **Reset to this week's list** restores meal prices. Edits persist until they reset, change the week, or check out. Cupboard lines show an amber **Do NOT keep spices you already have** alert and **I already have — skip**. Same warning on Shop and Confirm.
+- **Checkout:** Stripe card **hold**. Confirm modal asks for a **door address + UK phone** (not card billing) and a **2-hour window** (day ≥ today+3, 08:00–22:00). After they pick a window, an amber note: **Be in for this window** — the driver will call. First order / missing phone: full form (phone labelled for the driver). Later with a complete saved address: **Deliver to this address?** (shows phone) with **Use a different address**. Saved on Profile (`prefs.delivery`) and `orders.address.delivery`. Stripe billing stays on Stripe. Unpaid orders do not ping Telegram. Test path proven 13 Sep: order **#31** hold £31.52 then **captured £26.25** (store £25 + 5%); Ops status **ordered**. Founder hold **#33** Tesco £3.79, hold £4.58, `authorized` 16 Sep — Stripe shipping was Exeter EX1 2FW (card), postcode E2 8AA; not captured yet. After this ship, Ops: type `1.00` → Charge £1.05 → Confirm.
+- **Customer Orders tab:** timeline Payment → Ordered → Delivered (hollow white until done, green when done), loaded from **Postgres**, not only localStorage. After Stripe return, land on Orders. After the hold: **We'll deliver {promised window}**. After Ops confirms that shop slot: **{store} delivers {window}**. After `slot_end` if not marked delivered: **Should have arrived**. After capture, copy says **Charged £X**. **Issue** on paid orders (open: **View issue**). Each dinner has a **Cooking instructions** button; the method is stored on the order (`items.recipes`), not looked up from this week's menu.
+- **Profile → Order history:** same orders, tap through to Orders. **Delivery address** fields (name, **UK phone**, line 1/2, city, postcode) saved in `prefs.delivery`. Phone is required if any delivery field is filled.
+- **Ops (founder email):** order queue only. Status **bar** New | Ordered | Delivered (reversible; locked while unpaid). Authorized: **Phone** first, then type **store £**, live preview of **customer charge (store + 5%)**, tap **Charge £X**, tap **Confirm £X**. After capture: **Money received — £X is in Stripe** plus **Open {store}**. **Confirm this window** if the supermarket has the customer's slot (marks Ordered); otherwise **Message customer**. Delivery line prefers `address.delivery`, not card billing. `payApi` shows Stripe error text if capture fails. Baskets shown to Ops/Telegram are **server-built** by `pay` at checkout (catalog keys, shelf product names, whitelisted store search links) — live since `pay` v17.
+- **Inbox (founder):** open issue threads. Same composer as the customer Issue modal. Badge = open count. Hidden until `isAdmin()` (2-step code entered).
+- **Profile → Security (founder email only, live 18 Sep):** **Turn on 2-step verification** → QR + first code (Supabase TOTP). Once on, every login asks for the 6-digit code before Ops/Meals appear (`isAdmin()` is false until then). Server enforcement (`admin_mfa.sql`, `REQUIRE_ADMIN_MFA=1`) is a founder step **after** enrolling — see RUNBOOK.
 - **Meals (founder email, own nav tab):** every catalog dinner. **New meal** = unverified (`reviewed_at` null) with ingredients + method shown. **Live catalog** = verified, grouped by meat / fish / vegetarian / vegan (searchable); ingredients and instructions sit behind **Ingredients & method**. Flow: Add meal → ingredients/instructions/tags → **Verify & publish**. That sets `reviewed_at`; customers pick it on New week / Modify from Postgres (no extra deploy). Unpublish sends it back to New meal. Telegram still pings the unreviewed queue on the 1st and 15th.
-- **5% fee:** shown in UI totals (`customerTotal`). Hold = fee × 1.15. Capture adds 5% on the server (`pay/index.ts`).
+- **5% fee:** shown in UI totals (`customerTotal`). Hold = fee × **1.30**. Capture adds 5% on the server (`pay/index.ts`). If till + 5% is above the hold, Ops charges the hold and Plentry covers the rest.
 - **Photos:** 40 seed dishes have Unsplash URLs. AI meals without a unique URL use an ingredient fallback in the client. **Newly generated** meals search TheMealDB by dish name **once** and store `image_url`.
 - **Meals `ing`:** production catalog (**77** rows) updated 8 Sep 2026 from the founder review: salt/pepper/spices plus three new keys (`chopped tomatoes`, `butter`, `fresh coriander`). Client `completeIng()` still fills stale local copies that omit salt.
 - **Catalog recipes:** each `meals` row has `recipe` JSON (`steps` + `tip`) from the same review. Cooking instructions in the app use that method (quantities for 2) instead of generating a new AI recipe. New advisor dinners still get an AI method until they are reviewed.
@@ -29,30 +35,46 @@ Live: https://plentry.vercel.app (static). Edge functions and SQL must be deploy
 ## Intentionally not live / degraded
 
 - **Pepesto** off unless `PEPESTO_API_KEY` is set → shelf/estimate prices, concierge shops manually.
-- **Delivery fees & ETAs** are typical constants, not live slots.
+- **Delivery fees** are typical constants, not live supermarket availability. The customer-chosen 2-hour window is the fulfilment target; Ops confirms it or chats. Legacy rows without `slot_date` still show order + 4 days until Ops types `delivery_slot`.
 - **Stores** are the four UK names, not geolocated from postcode (postcode is format-checked).
 - **35 catalog keys** (27 groceries + 8 cupboard seasonings). Every meal ingredient must be in that set. `chopped tomatoes` = 400g tin; `tomatoes` = fresh; `passata` = sieved sauce.
-- **Stripe live keys** not set yet. Auth URLs confirmed. Telegram depends on secrets (see RUNBOOK).
-- README/SPEC still describe an older “pay the supermarket directly / no Plentry payment” model. **Ignore that.** Concierge + Stripe + 5% is current.
-- **Onboarding does not yet ask diet** (vegetarian / vegan / gym) as its own step. Profile **What we eat** (`prefs.diet`, default omnivore) already steers New week / Modify. Full diet/goal onboarding still on the roadmap.
+- Auth URLs confirmed. Telegram depends on secrets (see RUNBOOK). Do not put Stripe keys in git.
+- README stubs and `doc/archive/` describe older models (pay the supermarket, simulated prices). **Ignore those.** Concierge + Stripe + 5% is current.
 
 ## Money constants (must stay in sync)
 
 | Name | Value | Where |
 |---|---|---|
 | Commission | 5% | `index.html` `COMMISSION`, `pay/index.ts` `COMMISSION` |
-| Hold buffer | 15% | `HOLD_BUFFER` / `HOLD_MULTIPLIER` |
-| Max grocery total | £500 | DB trigger + `pay` `MAX_ORDER_GBP` |
-| Admin email | `noyouchka.bouchard@gmail.com` | `index.html`, `pay/index.ts`, `admin_policies.sql` |
+| Hold buffer | **30%** | `HOLD_BUFFER` / `HOLD_MULTIPLIER` (raised 19 Sep from 15%) |
+| Max grocery total | £500 | `pay` `MAX_ORDER_GBP` **and** the DB trigger `validate_order` (live since 17 Sep 2026, v3) |
+| Order INSERT | forced `unpaid` / `new`, no intent / session / hold / captured | `validate_order` v3 (live) |
+| Rate limits | `ai` 40/min, `pay` 15/min, `checkout` per function; `ai_drafts` 20/user/day | `check_rate_limit()` (live), `_shared/ratelimit.ts`, `ai/index.ts` |
+| Password minimum | 8 | `index.html` `PASSWORD_MIN`; Supabase Auth setting (founder to raise from 6) |
+| Admin email | `noyouchka.bouchard@gmail.com` **+ `aal2`** | `index.html` (`isAdmin()`), `pay/index.ts` (`REQUIRE_ADMIN_MFA=1`), `admin_mfa.sql` (live RLS; `admin_policies.sql` is the email-only fallback) |
+| Catalog keys | 35 | `index.html` `INGREDIENTS`, `ai/index.ts` `CATALOG`, `_shared/orders.ts` `CATALOG` — test asserts all three equal |
+| supabase-js | 2.116.0 vendored | `/vendor/supabase-js-2.116.0.js`; sha384 pinned in `contracts.test.mjs` |
 
 ## Tests
 
-`npm test` inside `plentry/` — **42** passing (jsdom: money, XSS, Modify, cupboard/basket, orders, admin Meals add/verify, live catalog fallback, `tagsFor`, omnivore ranking, unpublished skipped on auto-pick, source contracts). See [TESTING.md](TESTING.md). Must be green before staging UI/money/order/XSS changes. `window.__plentry` is a test hook only.
+`npm test` inside `plentry/` — **105** passing across `test/app.test.mjs` (jsdom), `test/contracts.test.mjs` (source contracts), `test/edge.test.mjs` (real unit tests on `_shared/ratelimit.ts` + `_shared/orders.ts`, plus a parse check of every edge function). Covers money, XSS, Modify, cupboard/basket, orders, Meals add/verify, Ops capture + over-hold + unpaid lock, `payApi` errors, delivery address, **UK phone (I-O08–10)**, **promised window (I-O16)**, **Issue + Inbox (I-O18)**, **order recipes (I-O15)**, **and** the 17 Sep security invariants (I-S01, I-O11–14, I-X02–03, I-A04–11). See [TESTING.md](TESTING.md) and [INVARIANTS.md](INVARIANTS.md). Must be green before staging UI/money/order/XSS changes. `window.__plentry` is a test hook only.
 
 ## Last production ship
 
-14 Sep 2026: static aliased to https://plentry.vercel.app (`49a7697`). Meals tab, omnivore ranking, basket rebuild. Postgres founder insert/delete already live. Edge functions unchanged.
+21 Sep 2026 (**database only**): migration `orders_slot_issue` — `orders.slot_date` / `slot_start` / `slot_end` / `issue_status`, `order_messages` (RLS customer own vs founder aal2), open-issue trigger, Telegram issue ping function. Verified live: four columns, two triggers, four policies. Static + `notify-order` still the 19 Sep build until you deploy.
 
-13 Sep 2026: founder test hold **and capture** #31 (store £25 → customer £26.25). Still test keys.
+19 Sep 2026 (**static + `pay` v19**): `npm test` 103/103 then `vercel deploy --prod` → https://plentry.vercel.app ← `plentry-11vcbs682-noebouchards-projects.vercel.app`. `supabase functions deploy pay` → **v19**. Capture now reads `ctx.jwtClaims.aal` (the previous `userClaims.aal` check 403'd every charge after 2FA). Hold buffer 30%; over-hold charges the hold; Ops MFA modal; cooking methods + 4-day tracking. RUNBOOK static checks: `/doc/SECURITY.md`, `/supabase/functions/pay/index.ts`, `/test/harness.mjs` → 404; `/` and vendor 200; CSP + HSTS + nosniff + DENY + Referrer-Policy + Permissions-Policy present; live HTML has `HOLD_BUFFER=0.30`; `pay` without JWT → 401.
+
+19 Sep 2026 (**database, recipes + slot guard):** `orders.delivery_slot` already live; new trigger `orders_clear_slot_on_insert` forces the slot null on INSERT. Backfilled `items.recipes` onto paid/authorized orders that could pass `validate_order` (friend **#38** Waitrose: 4 dinners, all with steps).
+
+18 Sep 2026 13:25 BST (**database + function secret**, S-06/S-14 close-out): migration `admin_mfa_aal2_policies` (five founder policies → `is_founder_aal2()`), `supabase secrets set REQUIRE_ADMIN_MFA=1`. Verified: `pg_policies` shows `is_founder_aal2()` on all five; RLS probe with a founder JWT — aal1 sees 5 own orders / 0 others, aal2 sees 30 / 25 others; a worst-case 60-line server-built basket write passes `validate_order` (rolled back). Founder set dashboard min password length 8.
+
+18 Sep 2026 13:04 BST (**static**, founder-run after `vercel login`): https://plentry.vercel.app ← `plentry-p1413liv3-noebouchards-projects.vercel.app`. RUNBOOK checks passed: `/doc/SECURITY.md`, `/supabase/functions/pay/index.ts`, `/supabase/security_hardening_v2.sql`, `/test/harness.mjs`, `/SPEC.md`, `/package.json`, `/vercel.json` → 404; `/`, `/sw.js`, `/manifest.json`, `/icons/*`, `/vendor/supabase-js-2.116.0.js` → 200; CSP, HSTS, nosniff, `X-Frame-Options DENY`, Referrer-Policy, Permissions-Policy present; vendor immutable, `sw.js` no-cache; vendored bundle sha384 identical to the repo. Browser on production: `window.supabase` from `/vendor/`, zero third-party scripts, `eval` blocked, Supabase reachable, service worker active, landing renders.
+
+17 Sep 2026 16:20 BST (**edge functions**): `supabase functions deploy ai checkout pay stripe-webhook notify-order` → `ai` v21, `checkout` v14, `pay` v17, `stripe-webhook` v14, `notify-order` v16, all ACTIVE, `verify_jwt` unchanged (only `pay` true). Post-deploy: every function booted in 30–56 ms with no error lines; OPTIONS 204 on all five; `ai` `parse_pantry` → `400 retired task` (new code confirmed); `pay` without JWT → 401; webhook without signature → 401; `notify-order` without secret → 401. `newcoming` v6 untouched (no shared imports, no change). **Static deploy blocked** — Vercel CLI logged out on this machine; production static is still the 16 Sep build.
+
+17 Sep 2026 (**database only**, via MCP migrations): `security_hardening_v1_ratelimit_meals`, `security_hardening_v2_orders_trigger`, `security_hardening_v3_orders_server_owned`, `webhook_secret_vault`. Each verified live (rate limiter counts; trigger rejects bad rows and forces paid-looking inserts to `unpaid`; legacy null-total rows still change status; Vault secret authenticates against `newcoming` → 200).
+
+16 Sep 2026: static aliased to https://plentry.vercel.app (`GKXPha1pwT9tVJckC4j32X5665K8`). Ops two-tap capture + money-received, in-app delivery address. Edge: `pay`, `stripe-webhook`, `notify-order`. Founder hold **#33** still `authorized` £4.58 until Ops captures.
 
 9 Sep 2026: static aliased to https://plentry.vercel.app; `ai` + `newcoming` deployed; `meals_tags.sql` applied (columns, backfill, CHECK, Ops UPDATE, pg_cron `plentry-newcoming-fortnight`).

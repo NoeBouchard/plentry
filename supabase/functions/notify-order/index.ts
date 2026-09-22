@@ -19,29 +19,59 @@
 // the gate instead (verify_jwt=false in config.toml).
 
 import { withSupabase } from 'npm:@supabase/server'
+import { clean, searchUrl } from '../_shared/orders.ts'
 
-function fmtOrder(r: any): string {
-  const items = (r.items && r.items.basket) || []
-  const meals = (r.items && r.items.meals) || []
+const TELEGRAM_MAX = 4000 // sendMessage rejects > 4096 chars; a lost ping is worse than a trimmed one
+
+function mustBook(r: any): string {
+  const date = String(r?.slot_date || '')
+  const start = String(r?.slot_start || '').slice(0, 5)
+  const end = String(r?.slot_end || '').slice(0, 5)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !start || !end) return ''
+  const [y, m, d] = date.split('-').map(Number)
+  const day = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+  return `${day} ${start}–${end}`
+}
+
+// S-04: every link in the founder's Telegram is rebuilt from the store whitelist.
+// The row's own `search` field is ignored even though `pay` now writes it server-side.
+export function fmtOrder(r: any): string {
+  const items = Array.isArray(r.items && r.items.basket) ? r.items.basket.slice(0, 60) : []
+  const meals = Array.isArray(r.items && r.items.meals) ? r.items.meals.slice(0, 7).map((m: any) => clean(m, 60)) : []
   const lines = items.flatMap((b: any) => {
-    const title = `• ${b.q}× ${b.product || b.i}${b.pack ? ` (${b.pack})` : b.unit ? ` (${b.unit})` : ''}${
-      b.shelf_price ? ` — £${(b.q * b.shelf_price).toFixed(2)}` : ''
+    const q = Math.max(1, Math.round(Number(b.q) || 1))
+    const label = clean(b.product || b.i, 80)
+    const pack = clean(b.pack || b.unit, 40)
+    const price = Number(b.shelf_price)
+    const title = `• ${q}× ${label}${pack ? ` (${pack})` : ''}${
+      Number.isFinite(price) && price > 0 ? ` — £${(q * price).toFixed(2)}` : ''
     }`
-    return b.search ? [title, `  ${b.search}`] : [title]
+    const link = searchUrl(r.store, label)
+    return link ? [title, `  ${link}`] : [title]
   })
   const paid = r.payment_status === 'authorized'
+  const d = r.address?.delivery
   const ship = r.address?.shipping?.address
-  const addr = ship
+  const addr = d && d.line1
+    ? [d.name, d.line1, d.line2, d.city, d.postcode].filter(Boolean).join(', ')
+    : ship
     ? [ship.line1, ship.line2, ship.city, ship.postal_code].filter(Boolean).join(', ')
     : r.postcode || '—'
-  const phone = r.address?.phone || r.address?.shipping?.phone || ''
+  const phone = d?.phone || r.address?.phone || r.address?.shipping?.phone || ''
+  const window = mustBook(r)
   return [
     paid
       ? `💳 PAID ORDER #${r.id} — hold £${Number(r.amount_held || 0).toFixed(2)}, capture exact total after ordering`
       : `🛒 NEW PLENTRY ORDER #${r.id} (concierge — do not shop until paid)`,
     ``,
+    phone ? `PHONE: ${phone}` : 'PHONE: missing — ask the customer before shopping',
+    window ? `MUST book: ${window}` : '',
     `${r.address?.name || r.name || '—'} · ${r.address?.email || r.email || '—'}`,
-    phone ? `Phone: ${phone}` : '',
     `Deliver to: ${addr}`,
     `Store: ${r.store || '—'} · Est. total: £${Number(r.total || 0).toFixed(2)}`,
     meals.length ? `Meals: ${meals.join(', ')}` : '',
@@ -49,11 +79,23 @@ function fmtOrder(r: any): string {
     ...lines,
     ``,
     paid
-      ? `Shop this list at the store, then capture the exact amount in the Ops tab.`
+      ? `Shop this list at the store only if that window exists, then capture the exact amount in the Ops tab.`
       : `Waiting for card hold — do not place this yet.`,
   ]
     .filter((l, i, a) => l !== '' || a[i - 1] !== '')
     .join('\n')
+    .slice(0, TELEGRAM_MAX)
+}
+
+export function fmtIssue(r: any): string {
+  const body = clean(r?.body, 1000)
+  return [
+    `📨 ISSUE on order #${r?.order_id}`,
+    body || '(empty)',
+    `Reply in Plentry Inbox — do not shop a different slot.`,
+  ]
+    .join('\n')
+    .slice(0, TELEGRAM_MAX)
 }
 
 // Constant-time compare so response timing can't leak the secret byte-by-byte.
@@ -74,11 +116,20 @@ export default {
       return Response.json({ error: 'unauthorized' }, { status: 401 })
 
     const body = await req.json().catch(() => null)
-    // DB trigger payload: { type:'INSERT'|'UPDATE', table:'orders', record:{...} }
-    // INSERT = free-beta order; UPDATE = payment_status flipped to 'authorized'.
+    // DB trigger payload: { type:'INSERT'|'UPDATE', table:'orders'|'order_messages', record:{...} }
+    // orders INSERT = unpaid row; orders UPDATE = payment_status flipped to 'authorized'.
+    // order_messages INSERT = customer issue ping (ops replies stay in-app).
     const rec = body?.record
-    if (!['INSERT', 'UPDATE'].includes(body?.type) || body?.table !== 'orders' || !rec)
+    if (!['INSERT', 'UPDATE'].includes(body?.type) || !rec)
       return Response.json({ error: 'unexpected payload' }, { status: 400 })
+    let text = ''
+    if (body?.table === 'orders') text = fmtOrder(rec)
+    else if (body?.table === 'order_messages') {
+      if (rec.author_role !== 'customer') return Response.json({ ok: true, skipped: true })
+      text = fmtIssue(rec)
+    } else {
+      return Response.json({ error: 'unexpected payload' }, { status: 400 })
+    }
 
     const token = Deno.env.get('TELEGRAM_BOT_TOKEN')
     const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
@@ -87,7 +138,7 @@ export default {
     const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: fmtOrder(rec), disable_web_page_preview: true }),
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
     })
     if (!r.ok) {
       const t = await r.text()
