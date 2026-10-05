@@ -2,6 +2,18 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-05 — public site is getplentry.com
+
+- Customer origin is `https://getplentry.com`. Stripe return URLs (`pay` v21 `APP_URL`) and the exact-origin check (`checkout` v17 `APP_ORIGIN`, I-X02) use that host. `www.getplentry.com` and `plentry.vercel.app` redirect to the apex. Supabase Site URL is the new origin; the old redirect stays on the allow list for a week. Auth mail and the Stripe webhook URL are unchanged. The promised-window test uses a date in 2099 so it still expects “We'll deliver” after 24 Sep 2026.
+
+## 2026-09-24 — phone, slot, Issue + Inbox on production
+
+- Founder deployed static and edge functions (including `notify-order`) after PR #1 merged. Live site confirmed 26 Sep: UK phone, promised window, Issue, Inbox. Vault had still said “not yet deployed”.
+
+## 2026-09-21 — meal / ingredient verification workflow
+
+- New `doc/meal-ingredient verification/`: README (3-stage workflow against chef sources), generated `1-INGREDIENTS.md` / `2-MEALS.md` / `3-INSTRUCTIONS.md`, `CANDIDATES.md`, `STATUS.md`, 77 `meals/*.md` records, `verify.py build|check` (0 problems). Worked examples: Shakshuka (Ottolenghi), Beef ragù spaghetti (RecipeTin Eats). No app or DB change yet — each record proposes its own DB patch.
+
 ## 2026-09-21 — be-in warning on the chosen delivery window
 
 - Confirm: after the customer picks a day + 2-hour slot, an amber note **Be in for this window** — someone at the door, the driver will call the phone on the order.

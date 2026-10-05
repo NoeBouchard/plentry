@@ -678,8 +678,8 @@ describe("orders", () => {
     assert.match(est, /^Expected by \w{3} 23 Sept? — about 4 days from your order/);
     assert.match(est, /Waitrose slot/);
     assert.equal(P.deliveryCopy({ ...base, payment_status: "captured" }).startsWith("Expected by"), true);
-    assert.match(P.deliveryCopy({ ...base, slot_date: "2026-09-24", slot_start: "08:00", slot_end: "10:00" }), /We'll deliver Thu 24 Sept?, 08:00–10:00/);
-    assert.match(P.deliveryCopy({ ...base, status: 2, slot_date: "2026-09-24", slot_start: "08:00", slot_end: "10:00" }), /Waitrose delivers Thu 24 Sept?, 08:00–10:00/);
+    assert.match(P.deliveryCopy({ ...base, slot_date: "2099-06-15", slot_start: "08:00", slot_end: "10:00" }), /We'll deliver Mon 15 Jun, 08:00–10:00/);
+    assert.match(P.deliveryCopy({ ...base, status: 2, slot_date: "2099-06-15", slot_start: "08:00", slot_end: "10:00" }), /Waitrose delivers Mon 15 Jun, 08:00–10:00/);
     assert.equal(P.deliveryCopy({ ...base, status: 2, delivery_slot: "Tue 23 Sep 14:00–16:00" }), "Waitrose delivers Tue 23 Sep 14:00–16:00");
     assert.equal(P.deliveryCopy({ ...base, status: 3 }), "Delivered");
     assert.match(P.deliveryCopy({ ...base, status: 2, slot_date: "2000-01-01", slot_start: "08:00", slot_end: "10:00" }), /Should have arrived/);
@@ -707,7 +707,7 @@ describe("orders", () => {
         payment_status: "captured",
         amount_captured: 31.5,
         delivery_slot: '<img src=x onerror=alert(1)>Tue 23 Sep 14:00–16:00',
-        slot_date: "2026-09-24",
+        slot_date: "2099-06-15",
         slot_start: "08:00",
         slot_end: "10:00",
       }),
@@ -735,7 +735,7 @@ describe("orders", () => {
     const list = document.getElementById("orders-list");
     const html = list.innerHTML;
     assert.equal(list.querySelector("img"), null, "hostile slot never becomes markup");
-    assert.match(html, /Waitrose delivers Thu 24 Sept?, 08:00–10:00/);
+    assert.match(html, /Waitrose delivers Mon 15 Jun, 08:00–10:00/);
     assert.match(html, /🚚 Expected by \w{3} 23 Sept?/);
     const cards = list.querySelectorAll(".meal");
     const waitroseSteps = cards[0].querySelectorAll(".tstep");

@@ -19,7 +19,7 @@ cd plentry
 npm test && vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 ```
 
-Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. Not git-connected. Push to GitHub does not update plentry.vercel.app.
+Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. Not git-connected. Push to GitHub does not update https://getplentry.com.
 
 **Logged out?** Vercel CLI 59 keeps its session in `~/Library/Application Support/com.vercel.cli/auth.json`; when it is missing, `vercel whoami` prints *Logged out* and the scoped deploy fails with *You do not have access to the specified account*. Fix: `vercel login` (device flow — opens vercel.com, approve, back to the terminal), confirm `vercel whoami` → `noebouchard`, re-run the deploy. Never run `vercel teams list` / `vercel login` from an unattended agent: it blocks on the browser step.
 
@@ -28,10 +28,10 @@ Only `index.html`, `sw.js`, `manifest.json`, `icons/`, `vendor/`, `vercel.json` 
 **Post-deploy checks (static):**
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://plentry.vercel.app/doc/SECURITY.md            # 404
-curl -s -o /dev/null -w '%{http_code}\n' https://plentry.vercel.app/supabase/functions/pay/index.ts   # 404
-curl -sI https://plentry.vercel.app/ | grep -i -E 'content-security-policy|x-frame-options'  # both present
-curl -s -o /dev/null -w '%{http_code}\n' https://plentry.vercel.app/vendor/supabase-js-2.116.0.js  # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://getplentry.com/doc/SECURITY.md            # 404
+curl -s -o /dev/null -w '%{http_code}\n' https://getplentry.com/supabase/functions/pay/index.ts   # 404
+curl -sI https://getplentry.com/ | grep -i -E 'content-security-policy|x-frame-options'  # both present
+curl -s -o /dev/null -w '%{http_code}\n' https://getplentry.com/vendor/supabase-js-2.116.0.js  # 200
 ```
 
 Then open the app, DevTools console: no `Refused to …` CSP lines while loading a week and opening a meal.
@@ -53,7 +53,7 @@ CLI needs `supabase-go` on PATH if the shim complains. `_shared/ratelimit.ts` an
 
 ```bash
 B=https://ucciqthwxnlkjalwlhvh.supabase.co/functions/v1
-for f in ai checkout pay stripe-webhook notify-order; do curl -s -o /dev/null -w "$f %{http_code}\n" -X OPTIONS -H 'Origin: https://plentry.vercel.app' -H 'Access-Control-Request-Method: POST' $B/$f; done   # 204 ×5
+for f in ai checkout pay stripe-webhook notify-order; do curl -s -o /dev/null -w "$f %{http_code}\n" -X OPTIONS -H 'Origin: https://getplentry.com' -H 'Access-Control-Request-Method: POST' $B/$f; done   # 204 ×5
 curl -s -X POST -H 'Content-Type: application/json' -H "apikey: $PUBLISHABLE" -d '{"task":"parse_pantry"}' $B/ai      # {"error":"retired task"} 400
 curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' $B/pay              # 401 (platform JWT gate)
 curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' $B/stripe-webhook   # 401 bad signature
@@ -141,8 +141,8 @@ then `supabase secrets set ORDER_WEBHOOK_SECRET=<new value>`. No function redepl
 
 ## Auth dashboard
 
-Site URL: `https://plentry.vercel.app`  
-Redirects: `https://plentry.vercel.app/**`
+Site URL: `https://getplentry.com`  
+Redirects: `https://getplentry.com/**` and `https://plentry.vercel.app/**` (keep the old one for a week so reset mail already sent still opens)
 
 ## Stripe
 

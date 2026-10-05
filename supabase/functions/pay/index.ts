@@ -18,7 +18,7 @@ import { basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket } from '../
 const ADMIN_EMAIL = 'noyouchka.bouchard@gmail.com'
 const COMMISSION = 0.05
 const HOLD_MULTIPLIER = 1.30
-const APP_URL = 'https://plentry.vercel.app'
+const APP_URL = 'https://getplentry.com'
 const MAX_ORDER_GBP = 500
 
 // Store name (as stored on orders) -> ingredient_prices store id + delivery fee.

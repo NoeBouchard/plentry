@@ -14,13 +14,16 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 - ~~Security pass 13 Sep~~ — see [SECURITY.md](SECURITY.md). JWT `email` is GoTrue/`auth.users`, not `user_metadata`. Leftover `orders` fn gone. `pg_net` in `public` accepted. Leaked-password is **Pro-only** (org is Free).
 - ~~Security audit + fixes 17 Sep~~ — 17 findings; DB hardening live; functions/static shipped 17–19 Sep. `npm test` **103**.
 - ~~Small-team loop~~ — GitHub Actions `npm test` on PR/`main`, PR checklist, [ENGINEERING.md](ENGINEERING.md) (21 Sep). Merge still is not Vercel.
+- ~~Phone / slot / dots / Inbox~~ — SQL, static, and functions live (founder deploy 24 Sep). https://plentry.vercel.app asks for a UK phone and a 2-hour window.
+
+- ~~Custom domain~~ — https://getplentry.com (5 Oct). `plentry.vercel.app` redirects there.
 
 ## Now
 
-1. **This scrum (phone / slot / dots / Inbox)** — SQL is live. Deploy static + `notify-order` when you want customers to pick a window and Ops to see PHONE / MUST book / issue pings. Then invite.
-2. **Pilot** — do not rewrite `index.html`. Invite only after you are happy with a live hold + capture on the new build.
-3. **Agent lock:** [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Product changes: branch → PR → CI (see [ENGINEERING.md](ENGINEERING.md)). **You click once:** GitHub → protect `main`, require status check **test**, do not require a second reviewer, do not connect Vercel.
-4. After the advisor (or you) add a dinner: **Meals → New meal** → check ingredients/method/tags → **Verify & publish** (or Remove).
+1. **Pilot** — do not rewrite `index.html`. Invite when you are happy with a live hold + capture on this build.
+2. **Agent lock:** [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Product changes: branch → PR → CI (see [ENGINEERING.md](ENGINEERING.md)). **You click once:** GitHub ruleset on `main` — require a pull request with **0** approvals, require status check **test** only. Do not require Supabase Preview, Vercel, or a second person.
+3. After the advisor (or you) add a dinner: **Meals → New meal** → run its record through [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) → **Verify & publish** (or Remove).
+4. **Recipe source-check** — work the 75 pending records in `meal-ingredient verification/STATUS.md`, 5 per session, most-ordered dishes first; apply each DB patch via the Meals tab. Decide `tomato purée` as a 36th key once 3 records want it.
 
 ## Next product
 

@@ -8,7 +8,7 @@ Single source of truth for product, architecture, what is live, and how agents s
 **Workspace:** `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`  
 The same markdown is copied to `plentry/doc/` for GitHub (`cd plentry && npm run vault`). Edit **this** `doc/`, then copy.
 
-Live: https://plentry.vercel.app · Admin: `noyouchka.bouchard@gmail.com` · Last ship: **19 Sep 2026** (`pay` v19 + static).
+Live: https://getplentry.com · Admin: `noyouchka.bouchard@gmail.com` · Last ship: **5 Oct 2026** (custom domain).
 
 ---
 
