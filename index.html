@@ -1789,7 +1789,12 @@ function adminMealReady(m){
   const rec=storedRecipe(m);
   const tags=mealTags({...m,ing});
   const diet=tags.filter(t=>MEAL_DIET.indexOf(t)>=0);
-  return !!(m&&m.name&&ing.length&&rec&&rec.steps.length&&diet.length===1&&tags.indexOf("dinner")>=0&&m.category&&MEAL_CATEGORIES.indexOf(m.category)>=0);
+  // Exactly one of meat/fish/vegetarian (vegan implies vegetarian, so vegan+vegetarian is valid)
+  const hasMeat=diet.indexOf("meat")>=0;
+  const hasFish=diet.indexOf("fish")>=0;
+  const hasVegetarian=diet.indexOf("vegetarian")>=0;
+  const dietValid=(hasMeat?1:0)+(hasFish?1:0)+(hasVegetarian?1:0)===1;
+  return !!(m&&m.name&&ing.length&&rec&&rec.steps.length&&dietValid&&tags.indexOf("dinner")>=0&&m.category&&MEAL_CATEGORIES.indexOf(m.category)>=0);
 }
 function isAdminDraft(m){return !!(m&&m.id&&!m.reviewed_at);}
 function coerceMealRow(m){
@@ -1853,10 +1858,10 @@ async function loadAdminMeals(){
   window.__adminMealsErr="";
   if(!sb){window.__adminMeals=fallback();return window.__adminMeals;}
   const tries=[
-    "id,name,emoji,time,ing,image_url,recipe,tags,source,created_at,reviewed_at",
-    "id,name,emoji,time,ing,recipe,tags,source,created_at,reviewed_at",
-    "id,name,emoji,time,ing,tags,source,created_at,reviewed_at",
-    "id,name,emoji,time,ing,tags,reviewed_at",
+    "id,name,emoji,time,category,ing,image_url,recipe,tags,source,created_at,reviewed_at",
+    "id,name,emoji,time,category,ing,recipe,tags,source,created_at,reviewed_at",
+    "id,name,emoji,time,category,ing,tags,source,created_at,reviewed_at",
+    "id,name,emoji,time,category,ing,tags,reviewed_at",
   ];
   let rows=null,lastErr="";
   for(const cols of tries){

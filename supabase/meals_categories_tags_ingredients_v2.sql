@@ -11,11 +11,153 @@
 --
 -- Per tag-category-proposal.md Decisions section (6 Oct 2026, Noé approval).
 
+begin;
+
 -- ============================================================================
--- 1. Add category column and backfill all 77 meals
+-- 1. Add category column
 -- ============================================================================
 
 alter table public.meals add column if not exists category text;
+
+-- ============================================================================
+-- 2. Update constraints BEFORE backfill (avoids CHECK failure on vegan+vegetarian)
+-- ============================================================================
+
+-- Category constraint: null only for unverified meals, else one of the 7
+alter table public.meals drop constraint if exists meals_category_check;
+alter table public.meals add constraint meals_category_check check (
+  (category is null and reviewed_at is null)
+  or (category is not null and category in ('pasta', 'rice_bowl', 'tacos_wraps', 'curry_stew', 'oven_bake', 'eggs', 'salad'))
+);
+
+-- Tags constraint: updated list (11 tags total, removed gym/breakfast/lunch/snack)
+-- Exactly one of meat/fish/vegetarian; vegan implies vegetarian
+alter table public.meals drop constraint if exists meals_tags_shape;
+alter table public.meals add constraint meals_tags_shape check (
+  tags is not null
+  and jsonb_typeof(tags) = 'array'
+  and jsonb_array_length(tags) between 1 and 9
+  and tags <@ '[
+    "vegetarian","vegan","meat","fish",
+    "low_calorie","high_protein","low_carb",
+    "dinner","meal_prep","quick","comfort_food"
+  ]'::jsonb
+  and (tags ? 'dinner')
+  and (
+    (tags ? 'meat')::int + (tags ? 'fish')::int + (tags ? 'vegetarian')::int
+  ) = 1
+  and (not (tags ? 'vegan') or (tags ? 'vegetarian'))
+);
+
+comment on constraint meals_tags_shape on public.meals is 
+  'Tags: 11-tag closed set. Exactly one of meat/fish/vegetarian. Vegan dishes also carry vegetarian.';
+
+-- ============================================================================
+-- 3. Update meal_tags_for function: now only derives diet, quick, dinner
+-- ============================================================================
+
+create or replace function public.meal_tags_for(p_name text, p_ing jsonb, p_time int)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  t int := coalesce(p_time, 25);
+  tags text[] := '{}';
+  has_meat boolean;
+  has_fish boolean;
+  has_animal boolean;
+  is_vegan boolean;
+begin
+  -- Diet tags from ingredients
+  has_meat := p_ing ?| array['chicken thighs', 'minced beef'];
+  has_fish := p_ing ? 'salmon fillet';
+  has_animal := p_ing ?| array[
+    'chicken thighs', 'minced beef', 'salmon fillet', 'eggs', 
+    'feta', 'halloumi', 'yoghurt', 'parmesan', 'butter', 'cheddar'
+  ];
+  
+  if has_meat then
+    tags := array_append(tags, 'meat');
+  elsif has_fish then
+    tags := array_append(tags, 'fish');
+  elsif not has_animal then
+    -- Vegan dishes carry BOTH vegan and vegetarian
+    tags := array_append(tags, 'vegan');
+    tags := array_append(tags, 'vegetarian');
+  else
+    tags := array_append(tags, 'vegetarian');
+  end if;
+
+  -- Always add dinner
+  tags := array_append(tags, 'dinner');
+  
+  -- Quick if time < 30 minutes (changed from ≤20)
+  if t < 30 then 
+    tags := array_append(tags, 'quick');
+  end if;
+
+  return to_jsonb(tags);
+end;
+$$;
+
+comment on function public.meal_tags_for(text, jsonb, integer) is
+  'Derives only diet (with vegan+vegetarian for vegan dishes), dinner, and quick (<30min). Other tags are curated.';
+
+-- ============================================================================
+-- 4. Create trigger to maintain derived tags on insert/update
+-- ============================================================================
+
+create or replace function public.meals_tags_derive()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  derived jsonb;
+  derived_tags text[];
+  current_tags text[];
+  final_tags text[];
+  t text;
+begin
+  -- Compute what the DB should derive
+  derived := public.meal_tags_for(new.name, new.ing, new.time);
+  derived_tags := array(select jsonb_array_elements_text(derived));
+  
+  -- Current tags on the row
+  current_tags := array(select jsonb_array_elements_text(new.tags));
+  
+  -- Start with derived tags
+  final_tags := derived_tags;
+  
+  -- Add any curated tags from current that aren't diet/dinner/quick
+  foreach t in array current_tags loop
+    if t not in ('meat', 'fish', 'vegetarian', 'vegan', 'dinner', 'quick') 
+       and not (t = any(final_tags)) then
+      final_tags := array_append(final_tags, t);
+    end if;
+  end loop;
+  
+  new.tags := to_jsonb(final_tags);
+  return new;
+end;
+$$;
+
+drop trigger if exists meals_tags_derive on public.meals;
+create trigger meals_tags_derive
+  before insert or update of ing, time, tags
+  on public.meals
+  for each row
+  execute function public.meals_tags_derive();
+
+comment on trigger meals_tags_derive on public.meals is
+  'Maintains diet, dinner, quick tags; preserves curated tags (meal_prep, comfort_food, high_protein, low_carb, low_calorie).';
+
+-- ============================================================================
+-- 5. Backfill categories on all 77 meals
+-- ============================================================================
 
 -- PASTA (16 meals)
 update public.meals set category = 'pasta' where name = 'Baked feta pasta';
@@ -109,7 +251,7 @@ update public.meals set category = 'salad' where name = 'Halloumi & Chickpea Bud
 update public.meals set category = 'salad' where name = 'Pan-Seared Halloumi with Lemon Broccoli & Chickpea Salad';
 
 -- ============================================================================
--- 2. Remove old tags and set curated tags on all 77 meals
+-- 6. Remove old tags and set curated tags on all 77 meals
 -- ============================================================================
 
 -- First, strip gym, breakfast, lunch, snack from all meals
@@ -148,23 +290,23 @@ update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'quick') where name = 'Minced Beef & Bell Pepper Coconut Rice';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein', 'quick') where name = 'Minced Beef & Chickpea Rice Bowl';
 update public.meals set tags = jsonb_build_array('fish', 'dinner', 'comfort_food') where name = 'Salmon & Lemon Risotto with Parmesan';
-update public.meals set tags = jsonb_build_array('fish', 'dinner', 'high_protein', 'quick') where name = 'Salmon & Spinach Rice with Lemon';
-update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'quick') where name = 'Spiced Halloumi Rice Bowl with Tomato & Spinach';
-update public.meals set tags = jsonb_build_array('meat', 'dinner', 'quick') where name = 'Spiced Minced Beef & Bell Pepper Rice';
+update public.meals set tags = jsonb_build_array('fish', 'dinner') where name = 'Salmon & Spinach Rice with Lemon';
+update public.meals set tags = jsonb_build_array('vegetarian', 'dinner') where name = 'Spiced Halloumi Rice Bowl with Tomato & Spinach';
+update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein', 'quick') where name = 'Spiced Minced Beef & Bell Pepper Rice';
 update public.meals set tags = jsonb_build_array('vegetarian', 'dinner') where name = 'Tomato & parmesan baked rice';
 
 -- OVEN_BAKE
-update public.meals set tags = jsonb_build_array('vegetarian', 'dinner') where name = 'Baked Potatoes with Feta & Spinach Topping';
+update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'low_calorie') where name = 'Baked Potatoes with Feta & Spinach Topping';
 update public.meals set tags = jsonb_build_array('fish', 'dinner') where name = 'Baked Salmon with Roasted Broccoli & Lemon';
-update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep', 'comfort_food', 'high_protein') where name = 'Beef & Parmesan Mash with Sautéed Spinach';
+update public.meals set tags = jsonb_build_array('meat', 'dinner', 'comfort_food', 'high_protein') where name = 'Beef & Parmesan Mash with Sautéed Spinach';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep', 'comfort_food', 'high_protein') where name = 'Beef & Tomato Tortilla Casserole';
-update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep') where name = 'Beef stuffed peppers';
-update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'comfort_food', 'low_calorie') where name = 'Creamy Spinach & Feta Baked Potatoes';
-update public.meals set tags = jsonb_build_array('fish', 'dinner') where name = 'Crispy salmon & smashed potatoes';
-update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep', 'high_protein') where name = 'Curried beef & potato traybake';
-update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep') where name = 'Curried Chicken Thigh & Potato Traybake with Coconut';
+update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep', 'high_protein') where name = 'Beef stuffed peppers';
+update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'low_calorie') where name = 'Creamy Spinach & Feta Baked Potatoes';
+update public.meals set tags = jsonb_build_array('fish', 'dinner', 'high_protein', 'quick') where name = 'Crispy salmon & smashed potatoes';
+update public.meals set tags = jsonb_build_array('meat', 'dinner') where name = 'Curried beef & potato traybake';
+update public.meals set tags = jsonb_build_array('meat', 'dinner') where name = 'Curried Chicken Thigh & Potato Traybake with Coconut';
 update public.meals set tags = jsonb_build_array('fish', 'dinner') where name = 'Curried Salmon with Roasted Potatoes & Broccoli';
-update public.meals set tags = jsonb_build_array('vegetarian', 'dinner') where name = 'Halloumi & chickpea traybake';
+update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'meal_prep') where name = 'Halloumi & chickpea traybake';
 update public.meals set tags = jsonb_build_array('vegetarian', 'dinner') where name = 'Halloumi & Potato Skewers with Tomato Sauce';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'comfort_food', 'high_protein') where name = 'Lemon garlic roast chicken & potatoes';
 update public.meals set tags = jsonb_build_array('fish', 'dinner', 'high_protein') where name = 'Salmon traybake';
@@ -173,7 +315,7 @@ update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein
 -- TACOS_WRAPS
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'quick') where name = 'Beef & bell pepper tacos';
 update public.meals set tags = jsonb_build_array('meat', 'dinner') where name = 'Beef & Potato Curry Tacos';
-update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein', 'quick') where name = 'Beef Meatballs with Yoghurt & Herbs';
+update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein') where name = 'Beef Meatballs with Yoghurt & Herbs';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein', 'quick') where name = 'Chicken Thigh Fajita Tortillas';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein', 'quick') where name = 'Chicken tikka-style wraps';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'high_protein') where name = 'Crispy Chicken Thigh Tortilla Stack with Tomato & Feta';
@@ -189,11 +331,11 @@ update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep', 
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep', 'comfort_food') where name = 'Chicken & chickpea curry';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep', 'high_protein') where name = 'Chicken saag-style curry';
 update public.meals set tags = jsonb_build_array('vegan', 'vegetarian', 'dinner', 'meal_prep', 'comfort_food') where name = 'Chickpea & potato coconut stew';
-update public.meals set tags = jsonb_build_array('vegan', 'vegetarian', 'dinner', 'meal_prep') where name = 'Chickpea & spinach curry';
+update public.meals set tags = jsonb_build_array('vegan', 'vegetarian', 'dinner', 'meal_prep', 'quick') where name = 'Chickpea & spinach curry';
 update public.meals set tags = jsonb_build_array('fish', 'dinner') where name = 'Coconut salmon curry';
 update public.meals set tags = jsonb_build_array('vegan', 'vegetarian', 'dinner', 'meal_prep', 'quick') where name = 'Curried Chickpea & Tomato Coconut Soup';
 update public.meals set tags = jsonb_build_array('meat', 'dinner', 'meal_prep') where name = 'Minced Beef & Potato Coconut Stew';
-update public.meals set tags = jsonb_build_array('vegan', 'vegetarian', 'dinner', 'meal_prep', 'quick') where name = 'Spiced potato & spinach curry';
+update public.meals set tags = jsonb_build_array('vegan', 'vegetarian', 'dinner', 'meal_prep') where name = 'Spiced potato & spinach curry';
 
 -- EGGS
 update public.meals set tags = jsonb_build_array('vegetarian', 'dinner') where name = 'Baked Eggs in Tomato & Chickpea Sauce with Spinach';
@@ -207,143 +349,18 @@ update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'quick'
 -- SALAD
 update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'quick', 'low_carb', 'low_calorie') where name = 'Greek-style chickpea salad bowls';
 update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'quick', 'high_protein') where name = 'Halloumi & Chickpea Buddha Bowl with Yoghurt Dressing';
-update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'low_carb') where name = 'Pan-Seared Halloumi with Lemon Broccoli & Chickpea Salad';
+update public.meals set tags = jsonb_build_array('vegetarian', 'dinner', 'low_carb', 'quick') where name = 'Pan-Seared Halloumi with Lemon Broccoli & Chickpea Salad';
 
 -- ============================================================================
--- 3. Update constraints
+-- 7. Re-derive tags to fix quick inconsistency (10 meals at time=30 were
+--    hard-coded as quick; function uses < 30)
 -- ============================================================================
 
--- Category constraint: null OK for unverified meals, else one of the 7
-alter table public.meals drop constraint if exists meals_category_check;
-alter table public.meals add constraint meals_category_check check (
-  (category is null and reviewed_at is null)
-  or category in ('pasta', 'rice_bowl', 'tacos_wraps', 'curry_stew', 'oven_bake', 'eggs', 'salad')
-);
-
--- Tags constraint: updated list (11 tags total, removed gym/breakfast/lunch/snack)
-alter table public.meals drop constraint if exists meals_tags_shape;
-alter table public.meals add constraint meals_tags_shape check (
-  tags is not null
-  and jsonb_typeof(tags) = 'array'
-  and jsonb_array_length(tags) between 1 and 9
-  and tags <@ '[
-    "vegetarian","vegan","meat","fish",
-    "low_calorie","high_protein","low_carb",
-    "dinner","meal_prep","quick","comfort_food"
-  ]'::jsonb
-  and (tags ? 'dinner')
-  and (
-    (tags ? 'meat')::int + (tags ? 'fish')::int + (tags ? 'vegetarian')::int
-  ) >= 1
-);
-
-comment on constraint meals_tags_shape on public.meals is 
-  'Tags: 11-tag closed set. Exactly one of meat/fish/vegetarian required. Vegan dishes also carry vegetarian.';
+-- Force trigger to re-derive diet/quick/dinner while keeping curated tags
+update public.meals set tags = tags where reviewed_at is not null;
 
 -- ============================================================================
--- 4. Update meal_tags_for function: now only derives diet, quick, dinner
--- ============================================================================
-
-create or replace function public.meal_tags_for(p_name text, p_ing jsonb, p_time int)
-returns jsonb
-language plpgsql
-immutable
-set search_path = public
-as $$
-declare
-  t int := coalesce(p_time, 25);
-  tags text[] := '{}';
-  has_meat boolean;
-  has_fish boolean;
-  has_animal boolean;
-  is_vegan boolean;
-begin
-  -- Diet tags from ingredients
-  has_meat := p_ing ?| array['chicken thighs', 'minced beef'];
-  has_fish := p_ing ? 'salmon fillet';
-  has_animal := p_ing ?| array[
-    'chicken thighs', 'minced beef', 'salmon fillet', 'eggs', 
-    'feta', 'halloumi', 'yoghurt', 'parmesan', 'butter', 'cheddar'
-  ];
-  
-  if has_meat then
-    tags := array_append(tags, 'meat');
-  elsif has_fish then
-    tags := array_append(tags, 'fish');
-  elsif not has_animal then
-    -- Vegan dishes carry BOTH vegan and vegetarian
-    tags := array_append(tags, 'vegan');
-    tags := array_append(tags, 'vegetarian');
-  else
-    tags := array_append(tags, 'vegetarian');
-  end if;
-
-  -- Always add dinner
-  tags := array_append(tags, 'dinner');
-  
-  -- Quick if time < 30 minutes (changed from ≤20)
-  if t < 30 then 
-    tags := array_append(tags, 'quick');
-  end if;
-
-  return to_jsonb(tags);
-end;
-$$;
-
-comment on function public.meal_tags_for(text, jsonb, integer) is
-  'Derives only diet (with vegan+vegetarian for vegan dishes), dinner, and quick (<30min). Other tags are curated.';
-
--- ============================================================================
--- 5. Create trigger to maintain derived tags on insert/update
--- ============================================================================
-
-create or replace function public.meals_tags_derive()
-returns trigger
-language plpgsql
-set search_path = public
-as $$
-declare
-  derived jsonb;
-  derived_tags text[];
-  current_tags text[];
-  final_tags text[];
-  t text;
-begin
-  -- Compute what the DB should derive
-  derived := public.meal_tags_for(new.name, new.ing, new.time);
-  derived_tags := array(select jsonb_array_elements_text(derived));
-  
-  -- Current tags on the row
-  current_tags := array(select jsonb_array_elements_text(new.tags));
-  
-  -- Start with derived tags
-  final_tags := derived_tags;
-  
-  -- Add any curated tags from current that aren't diet/dinner/quick
-  foreach t in array current_tags loop
-    if t not in ('meat', 'fish', 'vegetarian', 'vegan', 'dinner', 'quick') 
-       and not (t = any(final_tags)) then
-      final_tags := array_append(final_tags, t);
-    end if;
-  end loop;
-  
-  new.tags := to_jsonb(final_tags);
-  return new;
-end;
-$$;
-
-drop trigger if exists meals_tags_derive on public.meals;
-create trigger meals_tags_derive
-  before insert or update of ing, time, tags
-  on public.meals
-  for each row
-  execute function public.meals_tags_derive();
-
-comment on trigger meals_tags_derive on public.meals is
-  'Maintains diet, dinner, quick tags; preserves curated tags (meal_prep, comfort_food, high_protein, low_carb, low_calorie).';
-
--- ============================================================================
--- 6. Migrate user preferences: gym → high_protein, drop invalid tags
+-- 8. Migrate user preferences: gym → high_protein, drop invalid tags
 -- ============================================================================
 
 update public.profiles p
@@ -365,10 +382,10 @@ where jsonb_typeof(p.state->'prefs'->'tags') = 'array'
   and p.state->'prefs'->'tags' ?| array['gym', 'breakfast', 'lunch', 'snack'];
 
 -- ============================================================================
--- 7. Add new ingredient keys with prices from the 4 stores
+-- 9. Add new ingredient keys with prices from the 4 stores
 -- ============================================================================
 
--- Link existing butter and cheddar to meal_key
+-- Link existing butter to meal_key
 update public.ingredient_prices set meal_key = 'butter' where slug = 'butter' and meal_key is null;
 
 -- Tomato puree
@@ -390,7 +407,7 @@ on conflict (slug, store) do update set
   is_estimate = excluded.is_estimate,
   captured_on = excluded.captured_on;
 
--- Fresh ginger
+-- Fresh ginger (Waitrose missing - correctly omitted)
 insert into public.ingredient_prices
   (slug, display_name, category, store, meal_key, product_name, pack_size, price_gbp, unit_price, is_estimate, captured_on)
 values
@@ -433,10 +450,10 @@ on conflict (slug, store) do update set
 insert into public.ingredient_prices
   (slug, display_name, category, store, meal_key, product_name, pack_size, price_gbp, unit_price, is_estimate, captured_on)
 values
-  ('limes', 'Limes', 'fruit', 'tesco', 'limes', 'Tesco Limes Minimum 5', '5 pack', 1.15, '£0.23 each', false, '2026-10-06'),
-  ('limes', 'Limes', 'fruit', 'sainsburys', 'limes', 'Sainsbury''s Limes', '5 pack', 1.15, '£0.23 each', false, '2026-10-06'),
-  ('limes', 'Limes', 'fruit', 'asda', 'limes', 'ASDA 5 Limes', '5 pack', 1.18, '£0.24 each', false, '2026-10-06'),
-  ('limes', 'Limes', 'fruit', 'waitrose', 'limes', '5 x Waitrose Loose Limes each', '5 pack', 1.50, '£0.30 each', false, '2026-10-06')
+  ('limes', 'Limes', 'fresh', 'tesco', 'limes', 'Tesco Limes Minimum 5', '5 pack', 1.15, '£0.23 each', false, '2026-10-06'),
+  ('limes', 'Limes', 'fresh', 'sainsburys', 'limes', 'Sainsbury''s Limes', '5 pack', 1.15, '£0.23 each', false, '2026-10-06'),
+  ('limes', 'Limes', 'fresh', 'asda', 'limes', 'ASDA 5 Limes', '5 pack', 1.18, '£0.24 each', false, '2026-10-06'),
+  ('limes', 'Limes', 'fresh', 'waitrose', 'limes', '5 x Waitrose Loose Limes each', '5 pack', 1.50, '£0.30 each', false, '2026-10-06')
 on conflict (slug, store) do update set
   display_name = excluded.display_name,
   category = excluded.category,
@@ -471,10 +488,10 @@ on conflict (slug, store) do update set
 insert into public.ingredient_prices
   (slug, display_name, category, store, meal_key, product_name, pack_size, price_gbp, unit_price, is_estimate, captured_on)
 values
-  ('penne', 'Penne', 'carbs', 'tesco', 'penne', 'Hearty Food Co. Penne Pasta', '500g', 0.41, '£0.08 per 100g', false, '2026-10-06'),
-  ('penne', 'Penne', 'carbs', 'sainsburys', 'penne', 'Stamford Street Co. Penne Pasta', '500g', 0.41, '£0.08 per 100g', false, '2026-10-06'),
-  ('penne', 'Penne', 'carbs', 'asda', 'penne', 'ASDA Penne', '500g', 0.71, '£0.14 per 100g', false, '2026-10-06'),
-  ('penne', 'Penne', 'carbs', 'waitrose', 'penne', 'Essential Penne', null, 1.40, null, true, '2026-10-06')
+  ('penne', 'Penne', 'grocery', 'tesco', 'penne', 'Hearty Food Co. Penne Pasta', '500g', 0.41, '£0.08 per 100g', false, '2026-10-06'),
+  ('penne', 'Penne', 'grocery', 'sainsburys', 'penne', 'Stamford Street Co. Penne Pasta', '500g', 0.41, '£0.08 per 100g', false, '2026-10-06'),
+  ('penne', 'Penne', 'grocery', 'asda', 'penne', 'ASDA Penne', '500g', 0.71, '£0.14 per 100g', false, '2026-10-06'),
+  ('penne', 'Penne', 'grocery', 'waitrose', 'penne', 'Essential Penne', null, 1.40, null, true, '2026-10-06')
 on conflict (slug, store) do update set
   display_name = excluded.display_name,
   category = excluded.category,
@@ -490,10 +507,10 @@ on conflict (slug, store) do update set
 insert into public.ingredient_prices
   (slug, display_name, category, store, meal_key, product_name, pack_size, price_gbp, unit_price, is_estimate, captured_on)
 values
-  ('arborio-rice', 'Arborio rice', 'carbs', 'tesco', 'arborio rice', 'Tesco Arborio Risotto Rice', '1kg', 3.30, '£0.33 per 100g', false, '2026-10-06'),
-  ('arborio-rice', 'Arborio rice', 'carbs', 'sainsburys', 'arborio rice', 'Sainsbury''s Arborio Risotto Rice', '500g', 2.25, '£0.45 per 100g', false, '2026-10-06'),
-  ('arborio-rice', 'Arborio rice', 'carbs', 'asda', 'arborio rice', 'ASDA Risotto Arborio Rice', '500g', 2.60, '£0.52 per 100g', false, '2026-10-06'),
-  ('arborio-rice', 'Arborio rice', 'carbs', 'waitrose', 'arborio rice', 'Waitrose Arborio Risotto Rice', null, 2.65, null, true, '2026-10-06')
+  ('arborio-rice', 'Arborio rice', 'grocery', 'tesco', 'arborio rice', 'Tesco Arborio Risotto Rice', '1kg', 3.30, '£0.33 per 100g', false, '2026-10-06'),
+  ('arborio-rice', 'Arborio rice', 'grocery', 'sainsburys', 'arborio rice', 'Sainsbury''s Arborio Risotto Rice', '500g', 2.25, '£0.45 per 100g', false, '2026-10-06'),
+  ('arborio-rice', 'Arborio rice', 'grocery', 'asda', 'arborio rice', 'ASDA Risotto Arborio Rice', '500g', 2.60, '£0.52 per 100g', false, '2026-10-06'),
+  ('arborio-rice', 'Arborio rice', 'grocery', 'waitrose', 'arborio rice', 'Waitrose Arborio Risotto Rice', null, 2.65, null, true, '2026-10-06')
 on conflict (slug, store) do update set
   display_name = excluded.display_name,
   category = excluded.category,
@@ -581,6 +598,8 @@ on conflict (slug, store) do update set
   is_estimate = excluded.is_estimate,
   captured_on = excluded.captured_on;
 
+commit;
+
 -- ============================================================================
 -- Summary
 -- ============================================================================
@@ -591,12 +610,15 @@ on conflict (slug, store) do update set
 -- Changed: quick threshold from ≤20 to <30 minutes
 -- Changed: vegan dishes now also carry vegetarian tag
 -- Updated: meal_tags_for function to only derive diet/dinner/quick
--- Added: trigger to maintain derived tags while preserving curated ones
+-- Added: SECURITY DEFINER trigger to maintain derived tags while preserving curated ones
+-- Re-derived: all tags to fix quick inconsistency (10 meals at time=30)
 -- Migrated: user prefs (gym → high_protein, dropped invalid tags)
 -- Added: 11 new ingredient keys with 4-store prices (43 new rows)
+-- Tightened: category CHECK (null only when unverified)
+-- Tightened: tags CHECK (vegan implies vegetarian)
 --
 -- Missing prices noted in PR:
---   - Waitrose fresh ginger (no product found)
---   - 'size not listed' for: waitrose tomato-puree, asda/waitrose spring-onions,
---     waitrose penne, waitrose arborio-rice, asda/waitrose fresh-basil,
---     waitrose red-onions, waitrose cheddar
+--   - Waitrose fresh ginger (no product found, correctly omitted)
+--   - 'size not listed' (is_estimate=true) for: waitrose tomato-puree, 
+--     asda/waitrose spring-onions, waitrose penne, waitrose arborio-rice,
+--     asda/waitrose fresh-basil, waitrose red-onions, waitrose cheddar
