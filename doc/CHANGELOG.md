@@ -2,6 +2,16 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-06 18:00 UTC — meal categories, new tag structure, 11 new ingredient keys
+
+- **Categories:** every verified meal has exactly one category from 7 values (`pasta`, `rice_bowl`, `oven_bake`, `tacos_wraps`, `curry_stew`, `eggs`, `salad`). Stored in `meals.category` (CHECK constraint). Category is allowed null when `reviewed_at` is null (draft meals). The Meals admin UI requires a category to Verify & publish. The advisor/AI function whitelists category. All 77 current meals backfilled with categories per the proposal.
+- **Tags (11-tag closed set):** `dinner` (hidden constant), `quick` (< 30 min), `high_protein`, `low_carb`, `low_calorie`, `meal_prep`, `comfort_food`, plus diet tags (`meat`, `fish`, `vegetarian`, `vegan`). Removed: `gym`, `breakfast`, `lunch`, `snack`. Users' saved `gym` pref migrated to `high_protein`; old meal/snack/lunch tags dropped. **Vegan dishes now carry BOTH `vegan` AND `vegetarian` tags** (changed from "vegan is not also vegetarian"). Tags are stored data; the DB only derives diet, `quick`, and `dinner` via `meal_tags_for` + trigger. `meal_prep`, `comfort_food`, and nutrition tags are curated, so catalog patches must not wipe them. `low_carb` and `low_calorie` are hidden from onboarding/prefs chips until each has ≥ 8 live meals, but kept for users who already selected them. Onboarding goals no longer steer to `low_calorie`.
+- **New ingredient keys (46 total, was 35):** `tomato puree`, `fresh ginger`, `garam masala`, `limes`, `spring onions`, `penne`, `arborio rice`, `fresh basil`, `cucumber`, `red onions`, `cheddar`. Added to all three catalog lists (`index.html` `INGREDIENTS`, `ai/index.ts` `CATALOG`, `_shared/orders.ts` `CATALOG`) and `ingredient_prices` rows for the 4 stores. `cheddar` added to `ANIMAL_ING`.
+- **SQL migration:** `meals_categories_tags_ingredients_v2.sql` adds `category` column, backfills all 77 meals with categories and curated tags, updates CHECK constraints, rewrites `meal_tags_for` to derive only diet/quick/dinner, adds `meals_tags_derive` trigger, migrates `profiles.state` (`gym` → `high_protein`), inserts `ingredient_prices` for 11 new keys. **Not applied to production yet — Noé must run manually.**
+- **Tests:** `npm test` **89** passing (updated tag/category/ingredient assertions, added `--experimental-strip-types` flag for Node TypeScript support).
+- **Docs updated:** `TAGS.md`, `INVARIANTS.md` (I-W05, I-W06), `CURRENT-STATE.md`, `CHANGELOG.md`.
+- **Staged, not deployed:** PR on branch `cursor/meal-categories-tags-ingredients-3723`, GitHub Actions **test** pending. Merge is not live.
+
 ## 2026-10-06 — founder login keeps the authenticator code up
 
 - A password login with a verified TOTP factor is `aal1`, so Ops / Meals / Inbox stay hidden until the 6-digit code. The code sheet was a normal modal: tapping the dimmed area closed it and nothing asked again. It now stays open until the code succeeds, and a banner on the page repeats the ask. The client also treats a verified factor as needing `aal2` when the assurance helper only saw an empty `session.user.factors`. Static deployed to https://getplentry.com (`npm test` 106/106). Edge functions unchanged.

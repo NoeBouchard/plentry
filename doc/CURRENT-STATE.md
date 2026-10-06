@@ -1,6 +1,6 @@
 # Current state
 
-Updated: **6 Oct 2026**. If you ship behaviour, change this file in the same change.
+Updated: **6 Oct 2026** (18:00 UTC). If you ship behaviour, change this file in the same change.
 
 **Agents:** start at [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Do not restructure the SPA.
 
@@ -31,14 +31,14 @@ Live: https://getplentry.com (static on Vercel). `www.getplentry.com` and `plent
 - **Meals `ing`:** production catalog (**77** rows) updated 8 Sep 2026 from the founder review: salt/pepper/spices plus three new keys (`chopped tomatoes`, `butter`, `fresh coriander`). Client `completeIng()` still fills stale local copies that omit salt.
 - **Meal / ingredient verification (21 Sep 2026):** [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) — per-meal records (`meals/<slug>.md`) that take every dinner through ingredient gathering → catalog list → method, each against one chef source; `verify.py build|check` regenerates the ingredient/meal/instruction lists from the last applied catalog SQL and validates records (0 problems on 77). Status (5 Oct): 8 source-matched (Batch 1 eggs & shakshuka done), 69 pending; cooking time tracked per record in STATUS.md. New advisor meals go through the same records before **Verify & publish**. Candidate keys so far: `tomato purée`, `harissa`.
 - **Catalog recipes:** each `meals` row has `recipe` JSON (`steps` + `tip`) from the same review. Cooking instructions in the app use that method (quantities for 2) instead of generating a new AI recipe. New advisor dinners still get an AI method until they are reviewed.
-- **Tags (9 Sep 2026):** closed set on `meals.tags` (see [TAGS.md](TAGS.md)). Live split: **33 meat / 11 fish / 28 vegetarian / 5 vegan**. All 77 marked reviewed; newcoming queue is empty until the advisor inserts a new dish. Week cards and meal details show tag chips.
+- **Tags (6 Oct 2026):** closed set (11 tags) on `meals.tags` (see [TAGS.md](TAGS.md)). Live split: **33 meat / 11 fish / 28 vegetarian / 5 vegan**. Tags are stored data; the DB only derives diet, `quick` (time < 30), and `dinner`. Vegan dishes carry BOTH `vegan` AND `vegetarian` tags. All 77 marked reviewed and categorized. Each verified meal has exactly one category from 7 values (`pasta`, `rice_bowl`, `oven_bake`, `tacos_wraps`, `curry_stew`, `eggs`, `salad`); category required to Verify & publish. Week cards and meal details show tag chips (except `dinner`, which is a hidden constant).
 
 ## Intentionally not live / degraded
 
 - **Pepesto** off unless `PEPESTO_API_KEY` is set → shelf/estimate prices, concierge shops manually.
 - **Delivery fees** are typical constants, not live supermarket availability. The customer-chosen 2-hour window is the fulfilment target; Ops confirms it or chats. Legacy rows without `slot_date` still show order + 4 days until Ops types `delivery_slot`.
 - **Stores** are the four UK names, not geolocated from postcode (postcode is format-checked).
-- **35 catalog keys** (27 groceries + 8 cupboard seasonings). Every meal ingredient must be in that set. `chopped tomatoes` = 400g tin; `tomatoes` = fresh; `passata` = sieved sauce.
+- **46 catalog keys** (35 groceries + 11 pantry seasonings). Every meal ingredient must be in that set. Added 6 Oct 2026: `tomato puree`, `fresh ginger`, `garam masala`, `limes`, `spring onions`, `penne`, `arborio rice`, `fresh basil`, `cucumber`, `red onions`, `cheddar`. `chopped tomatoes` = 400g tin; `tomatoes` = fresh; `passata` = sieved sauce.
 - Auth URLs confirmed. Telegram depends on secrets (see RUNBOOK). Do not put Stripe keys in git.
 - README stubs and `doc/archive/` describe older models (pay the supermarket, simulated prices). **Ignore those.** Concierge + Stripe + 5% is current.
 
@@ -53,12 +53,12 @@ Live: https://getplentry.com (static on Vercel). `www.getplentry.com` and `plent
 | Rate limits | `ai` 40/min, `pay` 15/min, `checkout` per function; `ai_drafts` 20/user/day | `check_rate_limit()` (live), `_shared/ratelimit.ts`, `ai/index.ts` |
 | Password minimum | 8 | `index.html` `PASSWORD_MIN`; Supabase Auth setting (founder to raise from 6) |
 | Admin email | `noyouchka.bouchard@gmail.com` **+ `aal2`** | `index.html` (`isAdmin()`), `pay/index.ts` (`REQUIRE_ADMIN_MFA=1`), `admin_mfa.sql` (live RLS; `admin_policies.sql` is the email-only fallback) |
-| Catalog keys | 35 | `index.html` `INGREDIENTS`, `ai/index.ts` `CATALOG`, `_shared/orders.ts` `CATALOG` — test asserts all three equal |
+| Catalog keys | 46 | `index.html` `INGREDIENTS`, `ai/index.ts` `CATALOG`, `_shared/orders.ts` `CATALOG` — test asserts all three equal |
 | supabase-js | 2.116.0 vendored | `/vendor/supabase-js-2.116.0.js`; sha384 pinned in `contracts.test.mjs` |
 
 ## Tests
 
-`npm test` inside `plentry/` — **105** passing across `test/app.test.mjs` (jsdom), `test/contracts.test.mjs` (source contracts), `test/edge.test.mjs` (real unit tests on `_shared/ratelimit.ts` + `_shared/orders.ts`, plus a parse check of every edge function). Covers money, XSS, Modify, cupboard/basket, orders, Meals add/verify, Ops capture + over-hold + unpaid lock, `payApi` errors, delivery address, **UK phone (I-O08–10)**, **promised window (I-O16)**, **Issue + Inbox (I-O18)**, **order recipes (I-O15)**, **and** the 17 Sep security invariants (I-S01, I-O11–14, I-X02–03, I-A04–11). See [TESTING.md](TESTING.md) and [INVARIANTS.md](INVARIANTS.md). Must be green before staging UI/money/order/XSS changes. `window.__plentry` is a test hook only.
+`npm test` inside `plentry/` — **89** passing (6 Oct 2026) across `test/app.test.mjs` (jsdom), `test/contracts.test.mjs` (source contracts), `test/edge.test.mjs` (real unit tests on `_shared/ratelimit.ts` + `_shared/orders.ts`, plus a parse check of every edge function). Covers money, XSS, Modify, cupboard/basket, orders, Meals add/verify, Ops capture + over-hold + unpaid lock, `payApi` errors, delivery address, **UK phone (I-O08–10)**, **promised window (I-O16)**, **Issue + Inbox (I-O18)**, **order recipes (I-O15)**, **and** the 17 Sep security invariants (I-S01, I-O11–14, I-X02–03, I-A04–11), **and** the tag/category/ingredient catalog contracts (I-W05, I-W06). See [TESTING.md](TESTING.md) and [INVARIANTS.md](INVARIANTS.md). Must be green before staging UI/money/order/XSS changes. `window.__plentry` is a test hook only.
 
 ## Last production ship
 
