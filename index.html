@@ -750,6 +750,12 @@ const INGREDIENTS={
   "yoghurt":{unit:"500g",price:1.25},"parmesan":{unit:"80g",price:1.85},
   "chopped tomatoes":{unit:"400g tin",price:0.50},"butter":{unit:"250g",price:1.99},
   "fresh coriander":{unit:"30g bunch",price:0.70},
+  "tomato puree":{unit:"200g",price:0.65},"fresh ginger":{unit:"100g",price:1.25},
+  "garam masala":{unit:"jar",price:1.10},"limes":{unit:"5 pk",price:1.20},
+  "spring onions":{unit:"bunch",price:0.70},"penne":{unit:"500g",price:0.60},
+  "arborio rice":{unit:"500g",price:2.50},"fresh basil":{unit:"30g",price:0.55},
+  "cucumber":{unit:"each",price:0.85},"red onions":{unit:"3 pk",price:0.95},
+  "cheddar":{unit:"400g",price:2.75},
   "salt":{unit:"750g",price:0.65},"black pepper":{unit:"jar",price:1.10},
   "paprika":{unit:"jar",price:1.10},"cumin":{unit:"jar",price:1.10},
   "chilli flakes":{unit:"jar",price:1.00},"mixed herbs":{unit:"jar",price:1.10},
@@ -786,34 +792,34 @@ function storedRecipe(m){
   return null;
 }
 // Closed meal tags (same set as ai/index.ts). A dinner can have several.
-const MEAL_TAGS=["vegetarian","vegan","meat","fish","low_calorie","high_protein","low_carb","breakfast","lunch","dinner","snack","gym","meal_prep","quick","comfort_food"];
+const MEAL_TAGS=["vegetarian","vegan","meat","fish","low_calorie","high_protein","low_carb","dinner","meal_prep","quick","comfort_food"];
+const MEAL_CATEGORIES=["pasta","rice_bowl","tacos_wraps","curry_stew","oven_bake","eggs","salad"];
+const MEAL_CATEGORY_LABELS={
+  pasta:"Pasta",
+  rice_bowl:"Rice & bowls",
+  tacos_wraps:"Tacos & wraps",
+  curry_stew:"Curries & stews",
+  oven_bake:"Traybakes & bakes",
+  eggs:"Eggs & shakshuka",
+  salad:"Salads"
+};
 const MEAT_ING=["chicken thighs","minced beef"];
 const FISH_ING=["salmon fillet"];
-const ANIMAL_ING=["chicken thighs","minced beef","salmon fillet","eggs","feta","halloumi","yoghurt","parmesan","butter"];
+const ANIMAL_ING=["chicken thighs","minced beef","salmon fillet","eggs","feta","halloumi","yoghurt","parmesan","butter","cheddar"];
 const PROTEIN_ING=["chicken thighs","minced beef","salmon fillet","eggs","halloumi","yoghurt","chickpeas","feta"];
 const CARB_ING=["rice","spaghetti","tortillas","potatoes"];
 function tagsFor(m){
   const ing=Array.isArray(m&&m.ing)?m.ing:[];
-  const name=String(m&&m.name||"").toLowerCase();
   const time=+m.time||25;
   const has=k=>ing.indexOf(k)>=0;
   const anyOf=keys=>keys.some(k=>has(k));
   const tags=[];
   if(anyOf(MEAT_ING))tags.push("meat");
   else if(anyOf(FISH_ING))tags.push("fish");
-  else if(!anyOf(ANIMAL_ING))tags.push("vegan");
+  else if(!anyOf(ANIMAL_ING)){tags.push("vegan");tags.push("vegetarian");}
   else tags.push("vegetarian");
-  if(anyOf(PROTEIN_ING))tags.push("high_protein");
-  if(!anyOf(CARB_ING))tags.push("low_carb");
-  const diet=tags[0];
-  if((diet==="vegan"||diet==="vegetarian")&&!has("coconut milk")&&!has("spaghetti")&&!has("halloumi")&&!has("feta")&&!has("parmesan")&&time<=25&&!/pasta|bake|fried rice|mash|curry|stew|meatball/.test(name))tags.push("low_calorie");
   tags.push("dinner");
-  if(/omelette|shakshuka|frittata|baked eggs|spanish tortilla/.test(name))tags.push("breakfast");
-  if(/bowl|wrap|taco|salad|soup|omelette|fajita|frittata/.test(name))tags.push("lunch");
-  if(time<=20)tags.push("quick");
-  if(/curry|stew|rag[uù]|bolognese|traybake|casserole|keema|baked rice|soup/.test(name))tags.push("meal_prep");
-  if(tags.indexOf("high_protein")>=0&&(diet==="meat"||diet==="fish"||has("eggs")||has("halloumi")))tags.push("gym");
-  if(/pasta|spaghetti|curry|meatball|mash|bake|fried rice|shakshuka|parm|rag[uù]|stew|bolognese/.test(name))tags.push("comfort_food");
+  if(time<30)tags.push("quick");
   return tags.filter((t,i,a)=>a.indexOf(t)===i);
 }
 function mealTags(m){
@@ -822,17 +828,21 @@ function mealTags(m){
   return keep.length?keep:tagsFor(m);
 }
 function mealTagHtml(m){
-  return mealTags(m).slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+  return mealTags(m).filter(t=>t!=="dinner").slice(0,3).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
 }
 const USER_MEAL_TAGS=[
-  {id:"quick",ico:"⚡",t:"Quick",d:"On the table in about 20 minutes"},
+  {id:"quick",ico:"⚡",t:"Quick",d:"On the table in under 30 minutes"},
   {id:"meal_prep",ico:"🍱",t:"Meal prep",d:"Cook once, eat again"},
-  {id:"gym",ico:"💪",t:"Gym",d:"Training weeks, higher protein"},
   {id:"high_protein",ico:"🥩",t:"High protein",d:"Chicken, fish, eggs, halloumi"},
   {id:"low_calorie",ico:"🥬",t:"Lighter",d:"Lower calorie dinners"},
   {id:"low_carb",ico:"🥦",t:"Low carb",d:"Fewer pasta and rice nights"},
   {id:"comfort_food",ico:"🍝",t:"Comfort",d:"Curries, pastas, traybakes"},
 ];
+function normalizePrefTags(tags){
+  const arr=Array.isArray(tags)?tags:[];
+  const allowed=USER_MEAL_TAGS.map(t=>t.id);
+  return arr.map(t=>t==="gym"?"high_protein":t).filter(t=>allowed.indexOf(t)>=0).filter((x,i,a)=>a.indexOf(x)===i);
+}
 function clampMeals(n){
   const x=Math.round(+n);
   return x>=1&&x<=7?x:5;
@@ -849,7 +859,6 @@ function wantedTags(){
   if(g.indexOf("decide")>=0)t.push("quick");
   if(g.indexOf("shop")>=0)t.push("meal_prep","quick");
   if(g.indexOf("waste")>=0)t.push("meal_prep");
-  if(g.indexOf("budget")>=0)t.push("low_calorie");
   return t.filter((x,i,a)=>a.indexOf(x)===i);
 }
 function dietPref(){
@@ -1041,6 +1050,7 @@ async function loadCloudState(user){
   if(S.prefs.preferredStore)chosenStore=STORES.find(s=>s.id===S.prefs.preferredStore)||chosenStore;
   if(!S.prefs.diet)S.prefs.diet="omnivore";
   if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
+  S.prefs.tags=normalizePrefTags(S.prefs.tags);
   S.prefs.budget=normBudget(S.prefs.budget,60); // cloud blob is user-writable JSON, never trust its shape (S-12)
   S.prefs.meals=clampMeals(S.prefs.meals);
   S.prefs.delivery=deliveryFrom(S.prefs.delivery);
@@ -1420,7 +1430,14 @@ function pickDiet(id){
 function renderUserTags(elId){
   const el=document.getElementById(elId);if(!el)return;
   const cur=Array.isArray(S.prefs.tags)?S.prefs.tags:[];
-  el.innerHTML=USER_MEAL_TAGS.map(t=>
+  const pool=publishedPool();
+  const lowCarbCount=pool.filter(m=>(m.tags||[]).indexOf("low_carb")>=0).length;
+  const lowCalCount=pool.filter(m=>(m.tags||[]).indexOf("low_calorie")>=0).length;
+  el.innerHTML=USER_MEAL_TAGS.filter(t=>{
+    if(t.id==="low_carb"&&lowCarbCount<8&&cur.indexOf("low_carb")<0)return false;
+    if(t.id==="low_calorie"&&lowCalCount<8&&cur.indexOf("low_calorie")<0)return false;
+    return true;
+  }).map(t=>
     `<button type="button" class="choice ${cur.indexOf(t.id)>=0?"sel":""}" onclick="toggleUserTag('${t.id}')">
       <div class="c-ico">${t.ico}</div><div><b>${esc(t.t)}</b><p>${esc(t.d)}</p></div>
     </button>`).join("");
@@ -1772,7 +1789,12 @@ function adminMealReady(m){
   const rec=storedRecipe(m);
   const tags=mealTags({...m,ing});
   const diet=tags.filter(t=>MEAL_DIET.indexOf(t)>=0);
-  return !!(m&&m.name&&ing.length&&rec&&rec.steps.length&&diet.length===1&&tags.indexOf("dinner")>=0);
+  // Exactly one of meat/fish/vegetarian (vegan implies vegetarian, so vegan+vegetarian is valid)
+  const hasMeat=diet.indexOf("meat")>=0;
+  const hasFish=diet.indexOf("fish")>=0;
+  const hasVegetarian=diet.indexOf("vegetarian")>=0;
+  const dietValid=(hasMeat?1:0)+(hasFish?1:0)+(hasVegetarian?1:0)===1;
+  return !!(m&&m.name&&ing.length&&rec&&rec.steps.length&&dietValid&&tags.indexOf("dinner")>=0&&m.category&&MEAL_CATEGORIES.indexOf(m.category)>=0);
 }
 function isAdminDraft(m){return !!(m&&m.id&&!m.reviewed_at);}
 function coerceMealRow(m){
@@ -1836,10 +1858,10 @@ async function loadAdminMeals(){
   window.__adminMealsErr="";
   if(!sb){window.__adminMeals=fallback();return window.__adminMeals;}
   const tries=[
-    "id,name,emoji,time,ing,image_url,recipe,tags,source,created_at,reviewed_at",
-    "id,name,emoji,time,ing,recipe,tags,source,created_at,reviewed_at",
-    "id,name,emoji,time,ing,tags,source,created_at,reviewed_at",
-    "id,name,emoji,time,ing,tags,reviewed_at",
+    "id,name,emoji,time,category,ing,image_url,recipe,tags,source,created_at,reviewed_at",
+    "id,name,emoji,time,category,ing,recipe,tags,source,created_at,reviewed_at",
+    "id,name,emoji,time,category,ing,tags,source,created_at,reviewed_at",
+    "id,name,emoji,time,category,ing,tags,reviewed_at",
   ];
   let rows=null,lastErr="";
   for(const cols of tries){
@@ -1919,13 +1941,15 @@ function mealEditorHtml(m){
   const diet=tags.find(t=>MEAL_DIET.indexOf(t)>=0)||"meat";
   const extras=MEAL_TAGS.filter(t=>MEAL_DIET.indexOf(t)<0&&t!=="dinner");
   const ingSet=window.__mealIng||new Set();
+  const cat=m.category&&MEAL_CATEGORIES.indexOf(m.category)>=0?m.category:"";
   return `<h2 style="margin-bottom:6px">${id?"Edit meal":"Add meal"}</h2>
-    <p class="sub">${id?"Edit, tag, then Verify & publish — live from Postgres, no extra deploy.":"Ingredients → method → tags → Verify & publish. Save keeps it in New meal until you are sure."}</p>
+    <p class="sub">${id?"Edit, category, tag, then Verify & publish — live from Postgres, no extra deploy.":"Ingredients → method → category → tags → Verify & publish. Category is required to publish. Save keeps it in New meal until you are sure."}</p>
     <div class="field"><label>Name</label><input id="me-name" value="${esc(m.name||"")}" placeholder="Chicken traybake"></div>
     <div class="grid2">
       <div class="field"><label>Emoji</label><input id="me-emoji" value="${esc(m.emoji||"🍽️")}" maxlength="8"></div>
       <div class="field"><label>Minutes</label><input id="me-time" type="number" min="5" max="120" value="${+m.time||30}"></div>
     </div>
+    <div class="field"><label>Category (required to publish)</label><select id="me-category"><option value="">— choose —</option>${MEAL_CATEGORIES.map(c=>`<option value="${c}" ${cat===c?"selected":""}>${esc(MEAL_CATEGORY_LABELS[c]||c)}</option>`).join("")}</select></div>
     <h3>Ingredients</h3>
     <p class="sub" style="margin-bottom:4px">Only catalog keys — these are what the shop can price.</p>
     <div class="me-ing">${keys.map((name,i)=>`<button type="button" id="me-ing-${i}" class="${ingSet.has(name)?"sel":""}" onclick="adminToggleIng(${i})">${esc(name)}</button>`).join("")}</div>
@@ -1980,6 +2004,8 @@ function readMealEditor(){
   const name=clean(document.getElementById("me-name")&&document.getElementById("me-name").value);
   const emoji=clean(document.getElementById("me-emoji")&&document.getElementById("me-emoji").value).slice(0,8)||"🍽️";
   const time=Math.max(5,Math.min(120,+(document.getElementById("me-time")&&document.getElementById("me-time").value)||30));
+  const categoryEl=document.getElementById("me-category");
+  const category=categoryEl&&MEAL_CATEGORIES.indexOf(categoryEl.value)>=0?categoryEl.value:null;
   const ing=completeIng({name,ing:[...(window.__mealIng||[])]}).slice(0,20);
   const steps=String(document.getElementById("me-steps")&&document.getElementById("me-steps").value||"").split(/\n+/).map(s=>s.trim()).filter(Boolean).slice(0,20);
   const tip=String(document.getElementById("me-tip")&&document.getElementById("me-tip").value||"").slice(0,240);
@@ -1990,7 +2016,7 @@ function readMealEditor(){
   if(!name)return {error:"Name the dinner."};
   if(ing.length<3)return {error:"Pick at least a few ingredients from the catalog."};
   if(!validMeal({name,ing}))return {error:"Ingredients must all be catalog keys."};
-  return {row:{name,emoji,time,ing,recipe:{steps:steps.length?steps:["Cook according to the ingredients."],tip},tags,source:"ops"}};
+  return {row:{name,emoji,time,category,ing,recipe:{steps:steps.length?steps:["Cook according to the ingredients."],tip},tags,source:"ops"}};
 }
 async function saveMealEditor(mode){
   if(!sb||!isAdmin())return;

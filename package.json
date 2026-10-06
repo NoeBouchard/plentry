@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "node --test test/app.test.mjs test/contracts.test.mjs test/edge.test.mjs",
+    "test": "node --experimental-strip-types --test test/app.test.mjs test/contracts.test.mjs test/edge.test.mjs",
     "vault": "mkdir -p ./doc/archive && cp ../doc/*.md ./doc/ && cp ../doc/archive/*.md ./doc/archive/"
   },
   "repository": {

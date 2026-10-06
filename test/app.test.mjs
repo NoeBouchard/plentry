@@ -281,9 +281,6 @@ describe("week and modify", () => {
     });
     assert.ok(meat.includes("meat"));
     assert.ok(meat.includes("dinner"));
-    assert.ok(meat.includes("high_protein"));
-    assert.ok(meat.includes("meal_prep"));
-    assert.ok(meat.includes("gym"));
     assert.ok(!meat.includes("vegan"));
     assert.ok(!meat.includes("vegetarian"));
     const vegan = window.__plentry.tagsFor({
@@ -292,7 +289,7 @@ describe("week and modify", () => {
       ing: ["chickpeas", "curry paste", "coconut milk", "spinach", "onions", "rice", "chopped tomatoes"],
     });
     assert.ok(vegan.includes("vegan"));
-    assert.ok(vegan.includes("comfort_food"));
+    assert.ok(vegan.includes("vegetarian"));
     assert.ok(!vegan.includes("meat"));
     const quick = window.__plentry.tagsFor({
       name: "Halloumi fajitas",
@@ -301,15 +298,15 @@ describe("week and modify", () => {
     });
     assert.ok(quick.includes("vegetarian"));
     assert.ok(quick.includes("quick"));
-    assert.ok(quick.includes("lunch"));
+    assert.ok(!quick.includes("meat"));
     assert.ok(window.__plentry.MEAL_TAGS.includes("comfort_food"));
     const stored = window.__plentry.mealTags({
       name: "Anything",
       time: 40,
       ing: ["chicken thighs", "rice"],
-      tags: ["dinner", "meat", "gym", "not_a_real_tag"],
+      tags: ["dinner", "meat", "high_protein", "not_a_real_tag"],
     });
-    assert.deepEqual(stored, ["dinner", "meat", "gym"]);
+    assert.deepEqual(stored, ["dinner", "meat", "high_protein"]);
   });
 
   it("meal count bar covers 1–7 dinners on onboarding and Profile", async () => {
@@ -333,13 +330,13 @@ describe("week and modify", () => {
     S.prefs.goals = ["decide"];
     S.prefs.tags = [];
     assert.equal(window.__plentry.wantedTags().join(","), "quick");
-    window.toggleUserTag("gym");
-    assert.equal(window.__plentry.wantedTags().join(","), "gym");
+    window.toggleUserTag("high_protein");
+    assert.equal(window.__plentry.wantedTags().join(","), "high_protein");
     window.showObStep(2);
-    assert.ok(document.getElementById("ob-tags").textContent.includes("Gym"));
+    assert.ok(document.getElementById("ob-tags").textContent.includes("High protein"));
     assert.ok(document.getElementById("ob-diet").textContent.includes("Everything"));
     window.nav("profile");
-    assert.ok(document.getElementById("pr-tags").textContent.includes("Gym"));
+    assert.ok(document.getElementById("pr-tags").textContent.includes("High protein"));
   });
 });
 
@@ -1295,6 +1292,7 @@ describe("ops", () => {
       ing: ["minced beef", "rice", "onions", "garlic", "curry paste", "salt", "black pepper"],
       recipe: { steps: ["Brown the beef.", "Simmer with curry paste and rice."], tip: "Toast the paste." },
       tags: ["dinner", "meat", "comfort_food"],
+      category: "curry_stew",
       source: "advisor",
       created_at: "2026-09-14T10:00:00.000Z",
       reviewed_at: null,
@@ -1307,6 +1305,7 @@ describe("ops", () => {
       ing: ["salmon fillet", "potatoes", "broccoli", "lemons", "olive oil", "garlic", "salt", "black pepper"],
       recipe: { steps: ["Roast potatoes.", "Add salmon."], tip: "Hot oven." },
       tags: ["dinner", "fish"],
+      category: "oven_bake",
       source: "seed",
       created_at: "2026-09-01T10:00:00.000Z",
       reviewed_at: "2026-09-08T12:00:00.000Z",

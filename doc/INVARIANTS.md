@@ -50,7 +50,8 @@ Coverage: **covered** = `npm test` already guards it. **ops** = founder/manual (
 | I-W02 | New week / Modify pick **verified** meals only when a live pool exists. Not `ai("meal_options")`. | covered |
 | I-W03 | Default diet **omnivore**: meat/fish first, at most one vegetarian/vegan dinner. | covered |
 | I-W04 | `validMeal`: every `ing` key is in `INGREDIENTS`. Unknown keys drop the meal. | covered |
-| I-W05 | Closed tag set; AI new rows `reviewed_at` null until Meals **Verify**. | covered |
+| I-W05 | Closed tag set (11 tags: diet, dinner, quick, meal_prep, comfort_food, high_protein, low_calorie, low_carb); AI new rows `reviewed_at` null until Meals **Verify**. Tags are stored data; the DB only derives diet/quick/dinner via `meal_tags_for` + trigger. Vegan dishes carry BOTH `vegan` AND `vegetarian`. `MEAL_TAGS` identical in `index.html`, `ai/index.ts`, and `meals_tags_shape` CHECK. | covered — contracts |
+| I-W06 | Every verified meal has exactly one category from 7 values (`pasta`, `rice_bowl`, `oven_bake`, `tacos_wraps`, `curry_stew`, `eggs`, `salad`); CHECK constraint. Category allowed null when `reviewed_at` is null. Meals admin UI requires category to Verify & publish. `MEAL_CATEGORIES` identical in `index.html`, `ai/index.ts`, and `meals_category_check` CHECK. | covered — contracts + admin verify test |
 | I-C01 | Ticked cupboard staples are skipped on the shop. Groceries stay. Spice skip warning on basket / confirm. | covered |
 | I-C02 | Empty/stale `basketEdit` does not leave a £0 week; **Order this week** rebuilds from meals. | covered |
 | I-C03 | Cooking method uses stored `meals.recipe`, not a live `ai("recipe")` for reviewed dinners. | covered |

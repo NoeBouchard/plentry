@@ -126,7 +126,7 @@ describe("S-04 server-built basket", () => {
     const htmlKeys = [...ingBlock.matchAll(/"([^"]+)":\{unit/g)].map((m) => m[1]);
     assert.deepEqual([...CATALOG].sort(), [...aiKeys].sort());
     assert.deepEqual([...CATALOG].sort(), [...htmlKeys].sort());
-    assert.equal(CATALOG.length, 35);
+    assert.equal(CATALOG.length, 46);
   });
 });
 

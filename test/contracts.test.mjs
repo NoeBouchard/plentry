@@ -445,4 +445,65 @@ describe("source contracts", () => {
     assert.doesNotMatch(html, /ai\("parse_pantry"/);
     assert.match(ai, /parse_pantry/);
   });
+
+  it("MEAL_TAGS: 11-tag closed set is identical in index.html, ai/index.ts, and meals_tags_shape CHECK", () => {
+    const htmlMatch = html.match(/const MEAL_TAGS=\[([^\]]+)\]/);
+    assert.ok(htmlMatch, "MEAL_TAGS found in index.html");
+    const htmlTags = JSON.parse("[" + htmlMatch[1] + "]").sort();
+    
+    const aiMatch = ai.match(/const MEAL_TAGS = \[([\s\S]*?)\] as const/);
+    assert.ok(aiMatch, "MEAL_TAGS found in ai/index.ts");
+    const aiTags = aiMatch[1].split(",").map((s) => s.trim().replace(/^['"]/g, "").replace(/['"]$/g, "")).filter(Boolean).sort();
+    
+    const migration = readFileSync(path.join(ROOT, "supabase/meals_categories_tags_ingredients_v2.sql"), "utf8");
+    const checkMatch = migration.match(/tags <@ '\[([^\]]+)\]'/s);
+    assert.ok(checkMatch, "tags CHECK constraint found in migration");
+    const checkTags = JSON.parse("[" + checkMatch[1] + "]").sort();
+    
+    const expected = ["comfort_food", "dinner", "fish", "high_protein", "low_calorie", "low_carb", "meal_prep", "meat", "quick", "vegan", "vegetarian"];
+    assert.deepEqual(htmlTags, expected, "index.html MEAL_TAGS matches expected");
+    assert.deepEqual(aiTags, expected, "ai/index.ts MEAL_TAGS matches expected");
+    assert.deepEqual(checkTags, expected, "CHECK constraint tags match expected");
+  });
+
+  it("MEAL_CATEGORIES: 7 categories are identical in index.html, ai/index.ts, and meals_category_check CHECK", () => {
+    const htmlMatch = html.match(/const MEAL_CATEGORIES=\[([^\]]+)\]/);
+    assert.ok(htmlMatch, "MEAL_CATEGORIES found in index.html");
+    const htmlCats = JSON.parse("[" + htmlMatch[1] + "]").sort();
+    
+    const aiMatch = ai.match(/const MEAL_CATEGORIES = \[([\s\S]*?)\] as const/);
+    assert.ok(aiMatch, "MEAL_CATEGORIES found in ai/index.ts");
+    const aiCats = aiMatch[1].split(",").map((s) => s.trim().replace(/^['"]/g, "").replace(/['"]$/g, "")).filter(Boolean).sort();
+    
+    const migration = readFileSync(path.join(ROOT, "supabase/meals_categories_tags_ingredients_v2.sql"), "utf8");
+    const checkMatch = migration.match(/category in \(([^)]+)\)/);
+    assert.ok(checkMatch, "category CHECK constraint found in migration");
+    const checkCats = checkMatch[1].split(",").map((s) => s.trim().replace(/^['"]/g, "").replace(/['"]$/g, "")).filter(Boolean).sort();
+    
+    const expected = ["curry_stew", "eggs", "oven_bake", "pasta", "rice_bowl", "salad", "tacos_wraps"];
+    assert.deepEqual(htmlCats, expected, "index.html MEAL_CATEGORIES matches expected");
+    assert.deepEqual(aiCats, expected, "ai/index.ts MEAL_CATEGORIES matches expected");
+    assert.deepEqual(checkCats, expected, "CHECK constraint categories match expected");
+  });
+
+  it("CATALOG: 46 ingredient keys are identical in index.html INGREDIENTS, ai/index.ts, and _shared/orders.ts", () => {
+    const htmlMatch = html.match(/const INGREDIENTS=\{([\s\S]*?)\};/);
+    assert.ok(htmlMatch, "INGREDIENTS found in index.html");
+    const htmlKeys = [...htmlMatch[1].matchAll(/"([^"]+)":/g)].map((m) => m[1]).sort();
+    
+    const aiMatch = ai.match(/const CATALOG = \[([\s\S]*?)\]/);
+    assert.ok(aiMatch, "CATALOG found in ai/index.ts");
+    const aiKeys = aiMatch[1].split(",").map((s) => s.trim().replace(/^['"]/g, "").replace(/['"]$/g, "")).filter(Boolean).sort();
+    
+    const orders = readFileSync(path.join(ROOT, "supabase/functions/_shared/orders.ts"), "utf8");
+    const ordersMatch = orders.match(/export const CATALOG = \[([\s\S]*?)\]/);
+    assert.ok(ordersMatch, "CATALOG found in _shared/orders.ts");
+    const ordersKeys = ordersMatch[1].split(",").map((s) => s.trim().replace(/^['"]/g, "").replace(/['"]$/g, "")).filter(Boolean).sort();
+    
+    assert.equal(htmlKeys.length, 46, "index.html has 46 ingredient keys");
+    assert.equal(aiKeys.length, 46, "ai/index.ts has 46 catalog keys");
+    assert.equal(ordersKeys.length, 46, "_shared/orders.ts has 46 catalog keys");
+    assert.deepEqual(htmlKeys, aiKeys, "index.html INGREDIENTS keys match ai CATALOG");
+    assert.deepEqual(aiKeys, ordersKeys, "ai CATALOG matches _shared/orders CATALOG");
+  });
 });
