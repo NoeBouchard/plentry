@@ -780,6 +780,13 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(document.getElementById("nav-meals").style.display, "none");
     assert.equal(document.getElementById("nav-inbox").style.display, "none");
     assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+    assert.ok(document.getElementById("mfa-banner").classList.contains("show"));
+
+    document.getElementById("modal-bg").click();
+    window.closeModal();
+    assert.ok(document.getElementById("modal-bg").classList.contains("open"), "tapping outside must not dismiss the code");
+    assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+    assert.equal(document.getElementById("nav-admin").style.display, "none");
 
     document.getElementById("mfa-code").value = "000000";
     await window.submitMfaChallenge();
@@ -793,7 +800,24 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(window.isAdmin(), true);
     assert.equal(document.getElementById("nav-admin").style.display, "");
     assert.equal(document.getElementById("nav-inbox").style.display, "");
+    assert.ok(!document.getElementById("mfa-banner").classList.contains("show"));
     assert.deepEqual(mfa.state.calls.at(-1), ["challengeAndVerify", { factorId: "11111111-2222-4333-8444-555555555555", code: "123456" }]);
+  });
+
+  it("still demands a code when the assurance helper reports aal1 but a verified totp is listed", async () => {
+    const factor = { id: "11111111-2222-4333-8444-555555555555", status: "verified", factor_type: "totp" };
+    const mfa = {
+      getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: "aal1", nextLevel: "aal1" }, error: null }),
+      listFactors: async () => ({ data: { all: [factor] }, error: null }),
+      challengeAndVerify: async () => ({ data: null, error: { message: "Invalid TOTP code" } }),
+    };
+    const { window, document } = await loadApp({ localState: weekState(), session: admin, tables: tables(), mfa });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(window.mfaPending(), true);
+    assert.equal(window.isAdmin(), false);
+    assert.equal(document.getElementById("nav-admin").style.display, "none");
+    assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+    assert.ok(document.getElementById("mfa-banner").classList.contains("show"));
   });
 
   it("without a factor nothing changes; the founder can enrol from Profile with a QR data URL", async () => {

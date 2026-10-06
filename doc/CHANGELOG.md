@@ -2,6 +2,10 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-06 — founder login keeps the authenticator code up
+
+- A password login with a verified TOTP factor is `aal1`, so Ops / Meals / Inbox stay hidden until the 6-digit code. The code sheet was a normal modal: tapping the dimmed area closed it and nothing asked again. It now stays open until the code succeeds, and a banner on the page repeats the ask. The client also treats a verified factor as needing `aal2` when the assurance helper only saw an empty `session.user.factors`. Static deployed to https://getplentry.com (`npm test` 106/106). Edge functions unchanged.
+
 ## 2026-10-05 — public site is getplentry.com
 
 - Customer origin is `https://getplentry.com`. Stripe return URLs (`pay` v21 `APP_URL`) and the exact-origin check (`checkout` v17 `APP_ORIGIN`, I-X02) use that host. `www.getplentry.com` and `plentry.vercel.app` redirect to the apex. Supabase Site URL is the new origin; the old redirect stays on the allow list for a week. Auth mail and the Stripe webhook URL are unchanged. The promised-window test uses a date in 2099 so it still expects “We'll deliver” after 24 Sep 2026.
@@ -9,6 +13,11 @@ Vault history of **functional** product changes. Newest first. Agents append her
 ## 2026-09-24 — phone, slot, Issue + Inbox on production
 
 - Founder deployed static and edge functions (including `notify-order`) after PR #1 merged. Live site confirmed 26 Sep: UK phone, promised window, Issue, Inbox. Vault had still said “not yet deployed”.
+
+## 2026-10-05 — verification batch 1 + cooking-time check
+
+- `verify.py sql` (batch catalog patch for the Supabase SQL editor, replaces per-dish Meals-tab edits) and `verify.py catalog-add` (new key → 3 code lists + `ingredient_prices` estimate SQL). `prices.py status|sql`: catalog × 4-store price grid (`PRICES.md`), checklist with links, observed.csv → upsert SQL. First run: 0 of 140 cells observed in the last 90 days; the 8 seasonings have **no** `ingredient_prices` rows at any store (basket uses the `INGREDIENTS` fallback).
+- `meal-ingredient verification/`: Batch 1 (eggs & shakshuka, 6 records) source-matched against Ottolenghi / delicious. / RecipeTin Eats; one Remove proposed (Baked Eggs with Chickpea Tomato Sauce, duplicate). `verify.py check` now tracks `time` per record (catalog → record, >45 min flagged, bucket summary in STATUS.md). Flags Curried Chicken Thigh & Potato Traybake at 50 min for Batch 4. PLAN.md + LOG.md added. No DB change yet.
 
 ## 2026-09-21 — meal / ingredient verification workflow
 
