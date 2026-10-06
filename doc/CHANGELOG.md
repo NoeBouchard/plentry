@@ -12,6 +12,10 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Docs updated:** `TAGS.md`, `INVARIANTS.md` (I-W05, I-W06), `CURRENT-STATE.md`, `CHANGELOG.md`.
 - **Staged, not deployed:** PR on branch `cursor/meal-categories-tags-ingredients-3723`, GitHub Actions **test** pending. Merge is not live.
 
+## 2026-10-06 — method section headings (display only)
+
+- Cooking instructions now parse and display section headings for labeled steps. When a step starts with a known label + colon (Sauce:, Meatballs:, Pasta:, To serve:, Base:, Topping:, Filling:, Assembly:, Garnish:), the label renders as a visual heading and is stripped from the step text. Step numbering continues across sections. Display-time parsing only — no database or schema changes. Helper function `parseStepWithHeading()` detects the allowlist. CSS for `.recipe-heading`. Tests cover parsing, rendering, and continuous numbering. Storage unchanged — orders still snapshot plain strings. Closed allowlist prevents false-positives on steps like "Tip:" mixed into body text.
+
 ## 2026-10-06 — founder login keeps the authenticator code up
 
 - A password login with a verified TOTP factor is `aal1`, so Ops / Meals / Inbox stay hidden until the 6-digit code. The code sheet was a normal modal: tapping the dimmed area closed it and nothing asked again. It now stays open until the code succeeds, and a banner on the page repeats the ask. The client also treats a verified factor as needing `aal2` when the assurance helper only saw an empty `session.user.factors`. Static deployed to https://getplentry.com (`npm test` 106/106). Edge functions unchanged.

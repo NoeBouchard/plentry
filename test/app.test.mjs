@@ -508,6 +508,56 @@ describe("pantry have-list", () => {
     assert.ok(modal.includes("Keep the yolks soft."));
     assert.ok(modal.includes("quantities for 2"));
   });
+
+  it("parseStepWithHeading extracts known section labels from step text", async () => {
+    const { window } = await loadApp();
+    const labels = ["Sauce", "Meatballs", "Pasta", "To serve", "Base", "Topping", "Filling", "Assembly", "Garnish"];
+    for (const label of labels) {
+      const parsed = window.parseStepWithHeading(`${label}: Put a large pan on medium heat.`);
+      assert.equal(parsed.heading, label, `detects ${label}: prefix`);
+      assert.equal(parsed.text, "Put a large pan on medium heat.", `strips ${label}: from body`);
+    }
+    const noLabel = window.parseStepWithHeading("Just a regular step without a prefix.");
+    assert.equal(noLabel.heading, undefined, "no heading for regular step");
+    assert.equal(noLabel.text, "Just a regular step without a prefix.", "text unchanged when no prefix");
+  });
+
+  it("showRecipe renders section headings for labeled steps and numbers continuously", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.menuOptions = [
+      {
+        name: "Spaghetti & meatballs",
+        emoji: "🍝",
+        time: 40,
+        ing: ["minced beef", "spaghetti", "passata", "onions", "garlic"],
+        recipe: {
+          steps: [
+            "Sauce: Heat oil in a pan and cook diced onions for 5 minutes.",
+            "Sauce: Add passata and simmer for 15 minutes.",
+            "Meatballs: Roll beef into balls and fry until browned.",
+            "Pasta: Cook spaghetti in salted water for 10 minutes.",
+            "To serve: Toss pasta with sauce and top with meatballs.",
+          ],
+          tip: "Brown the meatballs properly.",
+        },
+      },
+    ];
+    S.selected = ["Spaghetti & meatballs"];
+    window.fetch = async () => ({ ok: false, status: 503, json: async () => ({}) });
+    await window.showRecipe("Spaghetti & meatballs");
+    const html = document.getElementById("modal").innerHTML;
+    assert.ok(html.includes('class="recipe-heading">Sauce</div>'), "Sauce heading rendered");
+    assert.ok(html.includes('class="recipe-heading">Meatballs</div>'), "Meatballs heading rendered");
+    assert.ok(html.includes('class="recipe-heading">Pasta</div>'), "Pasta heading rendered");
+    assert.ok(html.includes('class="recipe-heading">To serve</div>'), "To serve heading rendered");
+    assert.ok(html.includes("Heat oil in a pan"), "step text shown without the label prefix");
+    assert.ok(!html.includes("Sauce: Heat oil"), "step text does not include the stripped label");
+    const stepNumbers = html.match(/<span class="n">(\d+)<\/span>/g) || [];
+    assert.equal(stepNumbers.length, 5, "five numbered steps total (continuous across sections)");
+    assert.ok(html.includes('<span class="n">1</span>'), "step 1 present");
+    assert.ok(html.includes('<span class="n">5</span>'), "step 5 present (numbering is continuous)");
+  });
 });
 
 describe("orders", () => {
