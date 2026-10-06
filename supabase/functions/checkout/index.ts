@@ -27,7 +27,7 @@ import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 
 const PEPESTO = 'https://s.pepesto.com/api'
-const APP_ORIGIN = 'https://plentry.vercel.app'
+const APP_ORIGIN = 'https://getplentry.com'
 
 // S-10: exact-origin check for the post-basket bounce. Returns the URL or null.
 export function appRedirect(u: unknown): string | null {

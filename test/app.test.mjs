@@ -678,8 +678,8 @@ describe("orders", () => {
     assert.match(est, /^Expected by \w{3} 23 Sept? — about 4 days from your order/);
     assert.match(est, /Waitrose slot/);
     assert.equal(P.deliveryCopy({ ...base, payment_status: "captured" }).startsWith("Expected by"), true);
-    assert.match(P.deliveryCopy({ ...base, slot_date: "2026-09-24", slot_start: "08:00", slot_end: "10:00" }), /We'll deliver Thu 24 Sept?, 08:00–10:00/);
-    assert.match(P.deliveryCopy({ ...base, status: 2, slot_date: "2026-09-24", slot_start: "08:00", slot_end: "10:00" }), /Waitrose delivers Thu 24 Sept?, 08:00–10:00/);
+    assert.match(P.deliveryCopy({ ...base, slot_date: "2099-06-15", slot_start: "08:00", slot_end: "10:00" }), /We'll deliver Mon 15 Jun, 08:00–10:00/);
+    assert.match(P.deliveryCopy({ ...base, status: 2, slot_date: "2099-06-15", slot_start: "08:00", slot_end: "10:00" }), /Waitrose delivers Mon 15 Jun, 08:00–10:00/);
     assert.equal(P.deliveryCopy({ ...base, status: 2, delivery_slot: "Tue 23 Sep 14:00–16:00" }), "Waitrose delivers Tue 23 Sep 14:00–16:00");
     assert.equal(P.deliveryCopy({ ...base, status: 3 }), "Delivered");
     assert.match(P.deliveryCopy({ ...base, status: 2, slot_date: "2000-01-01", slot_start: "08:00", slot_end: "10:00" }), /Should have arrived/);
@@ -707,7 +707,7 @@ describe("orders", () => {
         payment_status: "captured",
         amount_captured: 31.5,
         delivery_slot: '<img src=x onerror=alert(1)>Tue 23 Sep 14:00–16:00',
-        slot_date: "2026-09-24",
+        slot_date: "2099-06-15",
         slot_start: "08:00",
         slot_end: "10:00",
       }),
@@ -735,7 +735,7 @@ describe("orders", () => {
     const list = document.getElementById("orders-list");
     const html = list.innerHTML;
     assert.equal(list.querySelector("img"), null, "hostile slot never becomes markup");
-    assert.match(html, /Waitrose delivers Thu 24 Sept?, 08:00–10:00/);
+    assert.match(html, /Waitrose delivers Mon 15 Jun, 08:00–10:00/);
     assert.match(html, /🚚 Expected by \w{3} 23 Sept?/);
     const cards = list.querySelectorAll(".meal");
     const waitroseSteps = cards[0].querySelectorAll(".tstep");
@@ -780,6 +780,13 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(document.getElementById("nav-meals").style.display, "none");
     assert.equal(document.getElementById("nav-inbox").style.display, "none");
     assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+    assert.ok(document.getElementById("mfa-banner").classList.contains("show"));
+
+    document.getElementById("modal-bg").click();
+    window.closeModal();
+    assert.ok(document.getElementById("modal-bg").classList.contains("open"), "tapping outside must not dismiss the code");
+    assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+    assert.equal(document.getElementById("nav-admin").style.display, "none");
 
     document.getElementById("mfa-code").value = "000000";
     await window.submitMfaChallenge();
@@ -793,7 +800,24 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(window.isAdmin(), true);
     assert.equal(document.getElementById("nav-admin").style.display, "");
     assert.equal(document.getElementById("nav-inbox").style.display, "");
+    assert.ok(!document.getElementById("mfa-banner").classList.contains("show"));
     assert.deepEqual(mfa.state.calls.at(-1), ["challengeAndVerify", { factorId: "11111111-2222-4333-8444-555555555555", code: "123456" }]);
+  });
+
+  it("still demands a code when the assurance helper reports aal1 but a verified totp is listed", async () => {
+    const factor = { id: "11111111-2222-4333-8444-555555555555", status: "verified", factor_type: "totp" };
+    const mfa = {
+      getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: "aal1", nextLevel: "aal1" }, error: null }),
+      listFactors: async () => ({ data: { all: [factor] }, error: null }),
+      challengeAndVerify: async () => ({ data: null, error: { message: "Invalid TOTP code" } }),
+    };
+    const { window, document } = await loadApp({ localState: weekState(), session: admin, tables: tables(), mfa });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(window.mfaPending(), true);
+    assert.equal(window.isAdmin(), false);
+    assert.equal(document.getElementById("nav-admin").style.display, "none");
+    assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+    assert.ok(document.getElementById("mfa-banner").classList.contains("show"));
   });
 
   it("without a factor nothing changes; the founder can enrol from Profile with a QR data URL", async () => {

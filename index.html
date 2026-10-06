@@ -26,6 +26,9 @@
   .app{max-width:480px;margin:0 auto;padding:0 18px 140px}
   .sticky-cta{position:fixed;left:50%;transform:translateX(-50%);width:min(480px,100%);bottom:58px;padding:12px 18px 16px;background:linear-gradient(transparent,var(--bg) 28%);z-index:45;display:none;box-sizing:border-box}
   header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 8px}
+  #mfa-banner{display:none;background:#fff8e6;border:1px solid var(--amber);border-radius:14px;padding:12px 14px;margin:8px 0 12px}
+  #mfa-banner.show{display:block}
+  #mfa-banner p{font-size:.92rem;margin:0 0 10px}
   .logo{font-family:var(--serif);font-size:1.45rem;font-weight:700;letter-spacing:-.4px;color:var(--green-d)}
   .logo span{color:var(--green)}
   .pill{background:transparent;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:.78rem;color:var(--green-d);cursor:pointer;text-decoration:none}
@@ -241,6 +244,10 @@
     <div class="logo">plentry<span>.</span></div>
     <a class="pill" href="#" id="hdr-pill" onclick="openAuth();return false">Log in</a>
   </header>
+  <div id="mfa-banner">
+    <p>2-step verification is on. Enter the code from your authenticator app — Ops stays locked until you do.</p>
+    <button type="button" class="btn" onclick="openMfaChallenge()">Enter code</button>
+  </div>
 
   <!-- LANDING / SIGNUP -->
   <div class="screen" id="scr-landing">
@@ -1048,19 +1055,42 @@ async function loadCloudState(user){
 // supabase/admin_mfa.sql (RLS needs aal2) and REQUIRE_ADMIN_MFA=1 on `pay`
 // (capture needs aal2) — apply both only AFTER enrolling, or you lock yourself out.
 let mfa={level:"aal1",next:"aal1",factorId:null};
+let mfaLock=false; // code sheet stays up until the code succeeds (backdrop must not dismiss it)
 const mfaApi=()=>sb&&sb.auth&&sb.auth.mfa?sb.auth.mfa:null;
+function verifiedTotp(data){
+  const rows=[];
+  if(data&&Array.isArray(data.totp))rows.push(...data.totp);
+  if(data&&Array.isArray(data.all))rows.push(...data.all);
+  return rows.find(x=>x&&x.status==="verified"&&(x.factor_type==null||x.factor_type===""||x.factor_type==="totp"))||null;
+}
 async function refreshMfa(){
-  mfa={level:"aal1",next:"aal1",factorId:null};
   const api=mfaApi();
-  if(!api||!S.user||!S.user.id)return mfa;
+  if(!api||!S.user||!S.user.id){mfa={level:"aal1",next:"aal1",factorId:null};mfaLock=false;return mfa;}
+  let level="aal1",next="aal1",factorId=null,listed=false;
   try{
-    const {data}=await api.getAuthenticatorAssuranceLevel();
-    if(data){mfa.level=data.currentLevel||"aal1";mfa.next=data.nextLevel||"aal1";}
-    const f=await api.listFactors();
-    const totp=(f&&f.data&&Array.isArray(f.data.totp)?f.data.totp:[]).find(x=>x&&x.status==="verified");
-    mfa.factorId=totp?String(totp.id):null;
+    let token;
+    try{const s=await sb.auth.getSession();token=s&&s.data&&s.data.session&&s.data.session.access_token;}catch(e){}
+    // Pass the access token so nextLevel is read from getUser().factors. With no
+    // argument the client only looks at session.user.factors, which is often empty
+    // on a password login, so it reports aal1 even when a verified TOTP exists.
+    const {data}=await api.getAuthenticatorAssuranceLevel(token||undefined);
+    if(data){level=data.currentLevel||"aal1";next=data.nextLevel||level;}
   }catch(e){}
+  try{
+    const f=await api.listFactors();
+    if(f&&f.error)throw f.error;
+    listed=true;
+    const totp=verifiedTotp(f&&f.data);
+    factorId=totp?String(totp.id):null;
+  }catch(e){}
+  if(!listed&&mfa.factorId)factorId=mfa.factorId;
+  if(factorId&&level!=="aal2")next="aal2";
+  mfa={level,next,factorId};
   return mfa;
+}
+function syncMfaBanner(){
+  const el=document.getElementById("mfa-banner");
+  if(el)el.classList.toggle("show",mfaPending());
 }
 function mfaPending(){
   if(S.user&&S.user.email===ADMIN_EMAIL&&mfa.factorId&&mfa.level!=="aal2")return true;
@@ -1069,12 +1099,19 @@ function mfaPending(){
 const mfaCode=()=>{const el=document.getElementById("mfa-code");return String(el?el.value:"").replace(/\D/g,"");};
 const mfaFactorIdOk=id=>/^[0-9a-f-]{36}$/i.test(String(id||""));
 function openMfaChallenge(){
+  if(!mfaPending()){mfaLock=false;syncMfaBanner();return;}
+  mfaLock=true;
+  syncMfaBanner();
+  const bg=document.getElementById("modal-bg");
+  if(bg&&bg.classList.contains("open")&&document.getElementById("mfa-code"))return;
   openModal(`<h2>Enter your 6-digit code</h2>
-    <p class="sub">2-step verification is on for this account. Open your authenticator app.</p>
+    <p class="sub">2-step verification is on for this account. Open your authenticator app. This stays up until the code is right.</p>
     <div class="field"><label>Code</label><input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></div>
     <div class="err" id="mfa-err"></div>
     <button class="btn" style="width:100%" id="mfa-btn" onclick="submitMfaChallenge()">Verify →</button>
     <p class="sub" style="margin:12px 0 0;text-align:center"><a href="#" style="color:var(--green)" onclick="signOut();return false">Sign out</a></p>`);
+  const input=document.getElementById("mfa-code");
+  if(input){try{input.focus();}catch(e){}}
 }
 async function submitMfaChallenge(){
   const code=mfaCode();
@@ -1087,6 +1124,8 @@ async function submitMfaChallenge(){
   }catch(e){err.textContent=e.message||"That code didn't work.";return;}
   try{if(sb&&sb.auth&&sb.auth.refreshSession)await sb.auth.refreshSession();}catch(e){}
   await refreshMfa();
+  if(mfaPending()){openMfaChallenge();return;}
+  mfaLock=false;
   closeModal();
   const pending=window.__pendingCapture;
   window.__pendingCapture=null;
@@ -1254,9 +1293,16 @@ async function submitAuth(){
   }else{
     S.user={name:name||email.split("@")[0],email};save();
   }
-  closeModal();
   syncHeader();
   lastAuthMsg="";
+  // Swap the login sheet for the code sheet in place. Closing first lets a
+  // second tap on the dimmed area dismiss the code before it can be read.
+  if(mfaPending()){
+    if(S.onboarded)enterApp();
+    else openMfaChallenge();
+    return;
+  }
+  closeModal();
   if(pendingCheckout){pendingCheckout=false;confirmOrder();return;}
   if(pendingMeals){pendingMeals=false;if(S.onboarded)enterApp();return;}
   const staying=document.getElementById("scr-onboard").classList.contains("active")
@@ -1594,10 +1640,17 @@ function enterApp(){
   const mealsNav=document.getElementById("nav-meals");
   if(mealsNav)mealsNav.style.display=isAdmin()?"":"none";
   syncHeader();
+  syncMfaBanner();
   // S-06: a verified authenticator exists but this session has not entered the
   // code yet — ask before anything admin-shaped can render.
   if(mfaPending())openMfaChallenge();
-  return Promise.resolve(ensureWeek()).catch(()=>{}).then(()=>{nav("menu");renderBasketFab();refreshInboxBadge();return hydrateOrdersFromDb();});
+  return Promise.resolve(ensureWeek()).catch(()=>{}).then(()=>{
+    nav("menu");
+    renderBasketFab();
+    refreshInboxBadge();
+    if(mfaPending())openMfaChallenge();
+    return hydrateOrdersFromDb();
+  });
 }
 
 // ---------- ADMIN OPS (concierge fulfilment; founder account only) ----------
@@ -3380,7 +3433,7 @@ function syncHeader(){
 }
 function nav(s){
   try{
-    if(s==="shop"){openBasket();return;}
+    if(s==="shop"){openBasket();if(mfaPending())openMfaChallenge();return;}
     activateScreen("scr-"+s);
     document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.s===s));
     syncHeader();
@@ -3392,13 +3445,20 @@ function nav(s){
     if(s==="admin"){renderAdmin();refreshInboxBadge();renderBasketFab();}
     if(s==="inbox"){renderInbox();refreshInboxBadge();renderBasketFab();}
     if(s==="meals"){showMealsScreen();renderBasketFab();}
+    if(mfaPending())openMfaChallenge();
   }catch(e){
     console.error(e);
     activateScreen("scr-"+(s||"onboard"));
   }
 }
 function openModal(html){document.getElementById("modal").innerHTML=html;document.getElementById("modal-bg").classList.add("open");}
-function closeModal(){window.__deliveryReplace=false;stopIssuePoll();document.getElementById("modal-bg").classList.remove("open");}
+function closeModal(){
+  if(mfaLock&&mfaPending()){openMfaChallenge();return;}
+  mfaLock=false;
+  window.__deliveryReplace=false;stopIssuePoll();
+  const bg=document.getElementById("modal-bg");
+  if(bg)bg.classList.remove("open");
+}
 
 // Stripe Checkout return handling (?paid=1&order=N or ?paycancel=1&order=N)
 async function handlePaymentReturn(){
@@ -3459,6 +3519,7 @@ async function retryPay(orderId){
       startOnboarding();
     }
     await handlePaymentReturn();
+    if(mfaPending())openMfaChallenge();
   }catch(e){
     console.error(e);
     startOnboarding();

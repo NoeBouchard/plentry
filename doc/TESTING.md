@@ -20,7 +20,7 @@ Invariant IDs: [INVARIANTS.md](INVARIANTS.md). Automated rules are covered; `I-A
 
 - Reads `index.html`.
 - Strips the vendored `<script src="/vendor/supabase-js-…">` tag and injects `createClient() → window.__mockSb`.
-- `JSDOM` with `runScripts: 'dangerously'`, url `https://plentry.vercel.app/`.
+- `JSDOM` with `runScripts: 'dangerously'`, url `https://getplentry.com/`.
 - Chainable mock `from()` / `auth.getSession`. Optional `opts.mfa` (use `mockMfa({ enrolled, goodCode, qr })`) adds a fake `sb.auth.mfa` surface (`getAuthenticatorAssuranceLevel`, `listFactors`, `enroll`, `challengeAndVerify`, `unenroll`); omitted = no 2-step configured.
 - `fetch` stubbed (no network in unit tests).
 

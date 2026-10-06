@@ -29,8 +29,10 @@ feature branch → PR → CI npm test → Bugbot/security if money/XSS → merge
 
 ## GitHub (founder, once)
 
-Settings → Branches → protect `main`:
+Repo → **Settings → Rules → Rulesets → New branch ruleset** (not the old “Branches” page):
 
-- Require status check **test**
-- Do **not** require a second reviewer
-- Do **not** enable Vercel git integration
+- Name: `require-test`. Enforcement: **Active**. Bypass list: empty.
+- Target: include default branch (`main`).
+- **Require a pull request before merging**, required approvals **0**.
+- **Require status checks to pass**, add only **`test`**. Leave Supabase Preview and Vercel off that list.
+- Do not turn on Vercel or Supabase “deploy to production”. Merge is still not live.

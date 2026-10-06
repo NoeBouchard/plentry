@@ -20,7 +20,7 @@ Confirm shows **Deliver to this address?** (name, address, **phone**) when Profi
 
 ## 3. Ops — shop and capture
 
-1. Founder email only (`noyouchka.bouchard@gmail.com`). Once 2-step verification is on (Profile → **Security**), each login asks for the 6-digit code **before** Ops / Meals appear. Nav **Ops**.
+1. Founder email only (`noyouchka.bouchard@gmail.com`). Once 2-step verification is on (Profile → **Security**), each login asks for the 6-digit code **before** Ops / Meals appear. The code sheet stays up until the code succeeds (tapping the dimmed area does not close it). Nav **Ops**.
 2. Unpaid: faded, status locked, **do not shop**.
 3. Authorized: **Phone** (the number the driver will call) then **Deliver to** the door address. Copy list / Open {store}. Shop with the **Wise (or other) float** — Stripe balance is not a Tesco card. Start a **new** supermarket checkout for this row; paste **this order’s** name, address, and **customer phone**. Do not rewrite the account-default home address.
 4. Type till £ → preview customer charge (till + 5%) → **Charge £X** → **Confirm £X**.

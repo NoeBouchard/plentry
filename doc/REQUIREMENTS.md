@@ -2,7 +2,7 @@
 
 This is the product contract. Agents implement **inside** it. They do not replace it with a new stack, a new fee model, or a new fulfilment path unless the founder changes this file.
 
-**Locked:** 17 Sep 2026. Live: https://plentry.vercel.app  
+**Locked:** 17 Sep 2026. Live: https://getplentry.com  
 **Code shape:** `plentry/index.html` (vanilla) + `plentry/supabase/functions/`. No React, Next, or bundler.
 
 If a chat, `README.md`, or anything in [archive/](archive/README.md) disagrees, **this file + [INVARIANTS.md](INVARIANTS.md) + [CURRENT-STATE.md](CURRENT-STATE.md) win**.

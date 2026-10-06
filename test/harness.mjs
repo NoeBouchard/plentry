@@ -160,7 +160,7 @@ export async function loadApp(opts = {}) {
   virtualConsole.sendTo(console, { omitJSDOMErrors: true });
 
   const dom = new JSDOM(html, {
-    url: opts.url || "https://plentry.vercel.app/",
+    url: opts.url || "https://getplentry.com/",
     runScripts: "dangerously",
     pretendToBeVisual: true,
     virtualConsole,

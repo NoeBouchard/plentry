@@ -366,7 +366,7 @@ describe("source contracts", () => {
   });
 
   it("I-X02 redirects are exact-origin: checkout bounce == app origin, client only follows checkout.stripe.com (S-10)", () => {
-    assert.match(checkout, /const APP_ORIGIN = 'https:\/\/plentry\.vercel\.app'/);
+    assert.match(checkout, /const APP_ORIGIN = 'https:\/\/getplentry\.com'/);
     assert.match(checkout, /return x\.origin === APP_ORIGIN \? x\.href\.slice\(0, 300\) : null/);
     assert.doesNotMatch(checkout, /startsWith\('https:\/\/plentry\.vercel\.app'\)/);
     assert.match(html, /function stripeCheckoutUrl\(u\)/);

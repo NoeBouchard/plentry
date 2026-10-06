@@ -32,7 +32,7 @@ function fmtQueue(rows: any[]): string {
   return [
     `🍽️ ${rows.length} newcoming meal${rows.length === 1 ? '' : 's'} waiting for review`,
     ``,
-    `Open Ops on plentry.vercel.app and mark each one reviewed (or delete odd recipes in the Table Editor).`,
+    `Open Ops on getplentry.com and mark each one reviewed (or delete odd recipes in the Table Editor).`,
     ``,
     ...lines,
     extra,

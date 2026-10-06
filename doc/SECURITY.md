@@ -105,7 +105,7 @@ See the status table above. Live (DB 17 Sep, functions 17 Sep, static 18 Sep): S
 
 ## Redirects
 
-`checkout` bag `redirect_url` must have **exactly** the origin `https://plentry.vercel.app` (`appRedirect()`). The client only follows `pay.url` when its host is `checkout.stripe.com` over https (`stripeCheckoutUrl()`).
+`checkout` bag `redirect_url` must have **exactly** the origin `https://getplentry.com` (`appRedirect()`). The client only follows `pay.url` when its host is `checkout.stripe.com` over https (`stripeCheckoutUrl()`).
 
 ## Audit output wanted
 
