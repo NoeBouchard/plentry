@@ -24,6 +24,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 2. **Agent lock:** [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Product changes: branch → PR → CI (see [ENGINEERING.md](ENGINEERING.md)). **You click once:** GitHub ruleset on `main` — require a pull request with **0** approvals, require status check **test** only. Do not require Supabase Preview, Vercel, or a second person.
 3. After the advisor (or you) add a dinner: **Meals → New meal** → run its record through [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) → **Verify & publish** (or Remove).
 4. **Recipe source-check** — work the 75 pending records in `meal-ingredient verification/STATUS.md`, 5 per session, most-ordered dishes first; apply each DB patch via the Meals tab. Decide `tomato purée` as a 36th key once 3 records want it.
+5. **Servings ship** — after the servings PR merges: run `plentry/supabase/servings.sql`, then deploy `pay` and the static site together. Until that, production checkout is still the previous basket.
 
 ## Next product
 

@@ -55,6 +55,11 @@ Coverage: **covered** = `npm test` already guards it. **ops** = founder/manual (
 | I-C01 | Ticked cupboard staples are skipped on the shop. Groceries stay. Spice skip warning on basket / confirm. | covered |
 | I-C02 | Empty/stale `basketEdit` does not leave a £0 week; **Order this week** rebuilds from meals. | covered |
 | I-C03 | Cooking method uses stored `meals.recipe`, not a live `ai("recipe")` for reviewed dinners. | covered |
+| I-P01 | `prefs.servings` is 2, 4, or 6. Default from household: 1–2 → 2, 3–4 and legacy `"4+"` → 4, 5–6 → 6. Profile offers only those three. | covered — jsdom + `portions.ts` |
+| I-P02 | Basket packs are `ceil(need / pack)`: whole packs, never a price multiplier. A meal with portions adds scaled amounts. A meal without portions contributes 1 pack per grocery, and a second such meal does not add another (`max`). | covered — `portions.ts` + jsdom (Beef ragù for 4) |
+| I-P03 | Seasonings (salt, pepper, paprika, cumin, chilli flakes, mixed herbs, soy sauce, stock cubes) are never scaled: 1 pack unless the cupboard tick removes the line. | covered — `portions.ts` |
+| I-P04 | The `basketFor` block in `index.html` and `_shared/portions.ts` is byte-identical. `pay` prices the hold from that function using database portions, not the client’s quantities, when the order names meals. | covered — `edge.test.mjs` + `pay` source |
+| I-P05 | The week locks `weekServings` when it is built. An order snapshots `items.servings`. Changing Profile “Cooking for” does not reprice this week or that order. | covered — jsdom |
 
 ## XSS and shape
 

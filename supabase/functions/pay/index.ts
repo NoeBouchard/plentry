@@ -14,6 +14,7 @@
 import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 import { basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket } from '../_shared/orders.ts'
+import { PACKS, SEASONINGS, basketFor, normServings } from '../_shared/portions.ts'
 
 const ADMIN_EMAIL = 'noyouchka.bouchard@gmail.com'
 const COMMISSION = 0.05
@@ -45,19 +46,41 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
     .select('meal_key,display_name,product_name,pack_size,price_gbp')
     .eq('store', s.db)
   if (error) return { error: 'prices unavailable' }
-  const rebuilt = rebuildBasket(items?.basket, data || [], store)
-  if ('error' in rebuilt) return rebuilt
-  const t = Math.round((basketTotal(rebuilt.basket) + s.fee) * 100) / 100
-  if (!(t > 0 && t <= MAX_ORDER_GBP)) return { error: 'total out of range' }
   // Snapshot cooking methods from the catalog (then any client copy) so the
   // customer can read them from the order after the week moves on (I-O15).
   const names = cleanMeals(items?.meals)
   let catalogRows: unknown[] = []
   if (names.length) {
-    const { data } = await admin.from('meals').select('name,emoji,time,ing,recipe').in('name', names)
-    if (Array.isArray(data)) catalogRows = data
+    const withPortions = await admin.from('meals').select('name,emoji,time,ing,recipe,portions').in('name', names)
+    if (!withPortions.error && Array.isArray(withPortions.data)) catalogRows = withPortions.data
+    else {
+      const plain = await admin.from('meals').select('name,emoji,time,ing,recipe').in('name', names)
+      if (Array.isArray(plain.data)) catalogRows = plain.data
+    }
   }
   const clientRecipes = Array.isArray(items?.recipes) ? items.recipes : []
+  const servings = normServings(items?.servings)
+  const ticks = (Array.isArray(items?.cupboard) ? items.cupboard : [])
+    .map((k: unknown) => String(k ?? '').trim().toLowerCase())
+    .filter((k: string) => !!PACKS[k] || SEASONINGS.indexOf(k) >= 0)
+    .slice(0, 40)
+  // Hold is pack arithmetic from the catalog, not the client's quantities (I-P04).
+  // An order with no meal names still prices the basket it already stored.
+  let rawBasket: unknown = items?.basket
+  if (names.length) {
+    const byName: Record<string, any> = {}
+    for (const row of catalogRows) {
+      const nm = (row as any)?.name
+      if (nm) byName[String(nm)] = row
+    }
+    const weekMeals = names.map((n) => byName[n] || { name: n, ing: [] })
+    const packs = basketFor(weekMeals, servings, ticks, PACKS, false)
+    rawBasket = Object.keys(packs).map((i) => ({ i, q: packs[i] }))
+  }
+  const rebuilt = rebuildBasket(rawBasket, data || [], store)
+  if ('error' in rebuilt) return rebuilt
+  const t = Math.round((basketTotal(rebuilt.basket) + s.fee) * 100) / 100
+  if (!(t > 0 && t <= MAX_ORDER_GBP)) return { error: 'total out of range' }
   return {
     total: t,
     items: {
@@ -66,6 +89,8 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
       recipes: cleanRecipes([...catalogRows, ...clientRecipes], names),
       eta: clean(items?.eta, 40) || null,
       mode: 'manual',
+      servings,
+      cupboard: ticks,
     },
   }
 }

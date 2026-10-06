@@ -140,7 +140,25 @@ export type OrderRecipe = {
   emoji: string
   time: number
   ing: string[]
+  portions?: Record<string, [number, string]>
   recipe: { steps: string[]; tip: string } | null
+}
+
+const PORTION_UNITS = new Set(['g', 'ml', 'pc', 'clove', 'tbsp', 'tsp'])
+
+function cleanPortions(raw: unknown): Record<string, [number, string]> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const out: Record<string, [number, string]> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const key = String(k).trim().toLowerCase()
+    if (!CATALOG_SET.has(key) || !Array.isArray(v) || v.length < 2) continue
+    const amount = Number(v[0])
+    const unit = String(v[1])
+    if (!Number.isFinite(amount) || amount < 0 || amount > 5000 || !PORTION_UNITS.has(unit)) continue
+    out[key] = [Math.round(amount * 100) / 100, unit]
+    if (Object.keys(out).length >= 24) break
+  }
+  return Object.keys(out).length ? out : null
 }
 
 // Cooking method snapshotted onto the order so the customer can still read it
@@ -172,6 +190,7 @@ export function cleanRecipes(raw: unknown, mealNames?: unknown): OrderRecipe[] {
     const stepsRaw = Array.isArray((rec as any)?.steps) ? (rec as any).steps : []
     const steps = stepsRaw.map((s: unknown) => clean(s, MAX_RECIPE_STEP)).filter(Boolean).slice(0, MAX_RECIPE_STEPS)
     const tip = clean((rec as any)?.tip, MAX_RECIPE_TIP)
-    return { name, emoji, time, ing, recipe: steps.length ? { steps, tip } : null }
+    const portions = cleanPortions((row as any)?.portions)
+    return { name, emoji, time, ing, ...(portions ? { portions } : {}), recipe: steps.length ? { steps, tip } : null }
   })
 }

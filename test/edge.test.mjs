@@ -19,6 +19,13 @@ import {
   searchUrl,
   ukPostcode,
 } from "../supabase/functions/_shared/orders.ts";
+import {
+  PACKS,
+  basketFor,
+  normServings,
+  scalePortion,
+  servingsFromHousehold,
+} from "../supabase/functions/_shared/portions.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const req = (headers) => new Request("https://x.test/fn", { headers });
@@ -127,6 +134,74 @@ describe("S-04 server-built basket", () => {
     assert.deepEqual([...CATALOG].sort(), [...aiKeys].sort());
     assert.deepEqual([...CATALOG].sort(), [...htmlKeys].sort());
     assert.equal(CATALOG.length, 46);
+    const packRe = /"([^"]+)":\{unit:"[^"]*",pack:(null|\d+),pu:"([^"]*)"/g;
+    const htmlPacks = {};
+    for (const m of ingBlock.matchAll(packRe)) htmlPacks[m[1]] = { pack: m[2] === "null" ? null : Number(m[2]), pu: m[3] };
+    assert.deepEqual(htmlPacks, PACKS);
+  });
+
+  it("I-P02 / I-P03 / I-P04 Beef ragù for 4 is whole packs, not a price multiplier", () => {
+    const ragu = {
+      name: "Beef ragù spaghetti",
+      ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+      portions: {
+        "black pepper": [0.25, "tsp"],
+        garlic: [2, "clove"],
+        "minced beef": [400, "g"],
+        "mixed herbs": [1, "tsp"],
+        "olive oil": [1, "tbsp"],
+        onions: [1, "pc"],
+        parmesan: [30, "g"],
+        passata: [400, "g"],
+        salt: [0.5, "tsp"],
+        "soy sauce": [1, "tsp"],
+        spaghetti: [180, "g"],
+        "stock cubes": [1, "pc"],
+      },
+    };
+    assert.equal(scalePortion(2, "clove", "garlic", 6), 5, "garlic at 6 is 0.75 × the factor, rounded up");
+    assert.equal(scalePortion(1, "pc", "onions", 4), 2);
+    const packs = basketFor([ragu], 4, [], PACKS, true);
+    assert.equal(packs["minced beef"], 2);
+    assert.equal(packs.passata, 2);
+    assert.equal(packs.spaghetti, 1);
+    assert.equal(packs.parmesan, 1);
+    assert.equal(packs.onions, 1);
+    assert.equal(packs.garlic, 1);
+    assert.equal(packs["olive oil"], 1);
+    assert.equal(packs["stock cubes"], 1);
+    assert.equal(packs.salt, 1);
+    assert.ok(Object.values(packs).every((q) => Number.isInteger(q) && q >= 1));
+    const ticked = basketFor([ragu], 4, ["salt", "stock cubes", "olive oil"], PACKS, true);
+    assert.equal(ticked.salt, undefined);
+    assert.equal(ticked["stock cubes"], undefined);
+    assert.equal(ticked["olive oil"], undefined);
+    assert.equal(ticked["minced beef"], 2, "cupboard ticks do not scale groceries");
+    const doubled = basketFor([ragu, ragu], 4, [], PACKS, true);
+    assert.equal(doubled["minced beef"], 4, "portioned meals add, they are not a flat ×2 of the pack price");
+    const legacy = { name: "Old dinner", ing: ["eggs", "onions", "salt"] };
+    assert.deepEqual(
+      basketFor([legacy, { name: "Another", ing: ["eggs", "onions"] }], 6, [], PACKS, true),
+      { eggs: 1, onions: 1, salt: 1 },
+      "a meal without portions contributes 1 pack, shared keys stay at 1",
+    );
+    assert.throws(() => basketFor([{ ing: [], portions: { "minced beef": [400, "pc"] } }], 2, [], PACKS, true), /unit mismatch/);
+    const soft = basketFor([{ ing: [], portions: { "minced beef": [400, "pc"] } }], 2, [], PACKS, false);
+    assert.equal(soft["minced beef"], 1, "a bad unit falls back to 1 pack");
+    assert.equal(normServings(3), 4);
+    assert.equal(normServings(5), 6);
+    assert.equal(servingsFromHousehold("1"), 2);
+    assert.equal(servingsFromHousehold("3"), 4);
+    assert.equal(servingsFromHousehold("4+"), 4);
+    assert.equal(servingsFromHousehold("6"), 6);
+    const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
+    const ts = readFileSync(path.join(ROOT, "supabase/functions/_shared/portions.ts"), "utf8");
+    const grab = (s) => {
+      const a = s.indexOf("/* portions:start */");
+      const b = s.indexOf("/* portions:end */");
+      return s.slice(a, b + "/* portions:end */".length);
+    };
+    assert.equal(grab(html), grab(ts), "client and server basketFor are the same source");
   });
 });
 
