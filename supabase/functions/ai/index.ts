@@ -30,8 +30,27 @@ const CATALOG = [
   'salt', 'black pepper', 'paprika', 'cumin', 'chilli flakes', 'mixed herbs', 'soy sauce', 'stock cubes',
 ]
 
+const PORTION_UNITS = ['g', 'ml', 'pc', 'clove', 'tbsp', 'tsp']
+const portionOk = (p: any) => {
+  if (p == null) return true
+  if (typeof p !== 'object' || Array.isArray(p)) return false
+  const keys = Object.keys(p)
+  if (keys.length > 24) return false
+  return keys.every((k) => {
+    const v = p[k]
+    return CATALOG.includes(k) && Array.isArray(v) && v.length >= 2
+      && Number.isFinite(Number(v[0])) && Number(v[0]) >= 0 && Number(v[0]) <= 5000
+      && PORTION_UNITS.includes(String(v[1]))
+  })
+}
+const cleanPortions = (p: any) => {
+  if (!portionOk(p) || p == null) return null
+  const out: Record<string, [number, string]> = {}
+  for (const k of Object.keys(p)) out[k] = [Math.round(Number(p[k][0]) * 100) / 100, String(p[k][1])]
+  return Object.keys(out).length ? out : null
+}
 const VALID = (m: any) =>
-  m && m.name && Array.isArray(m.ing) && m.ing.length && m.ing.every((i: string) => CATALOG.includes(i))
+  m && m.name && Array.isArray(m.ing) && m.ing.length && m.ing.every((i: string) => CATALOG.includes(i)) && portionOk(m.portions)
 
 const MEAL_TAGS = [
   'vegetarian', 'vegan', 'meat', 'fish',
@@ -164,6 +183,7 @@ async function writeMeals(admin: any, meals: any[], source: string, userId: stri
   for (const m of meals) {
     const name = clean(m.name, 60)
     const image_url = await photoForMeal(m)
+    const portions = cleanPortions(m.portions)
     rows.push({
       name,
       emoji: clean(m.emoji || '🍽️', 8) || '🍽️',
@@ -173,6 +193,7 @@ async function writeMeals(admin: any, meals: any[], source: string, userId: stri
       source,
       created_by: userId,
       image_url,
+      ...(portions ? { portions } : {}),
     })
   }
   await admin.from('meals').upsert(rows, { onConflict: 'name', ignoreDuplicates: true })
@@ -200,9 +221,10 @@ Rules:
 - After 2 questions max (or sooner if you have enough), propose 4-6 dinner options.
 - Every ingredient must come strictly from this catalog: ${cat}.
 - Each dinner's ing array is the FULL shopping list for that recipe, including salt, black pepper, and any spices, oils, or sauces used. 6-16 ingredients. Use chopped tomatoes for a tin, tomatoes for fresh. Do not assume extra pantry items.
+- portions: the amount of each grocery for 2 servings, same catalog keys as ing. Shape {"minced beef":[400,"g"],"onions":[1,"pc"]}. Units only: g, ml, pc, clove, tbsp, tsp. Seasonings may be omitted. Omit portions entirely if you are unsure — never invent a unit.
 - Tags: use ONLY this closed set (several per meal): ${TAG_LIST}. Exactly one of vegetarian|vegan|meat|fish. Always include dinner. Match nutrition / meal-context / use-case tags to the ingredients and name.
 - Prefer existing catalog dinners that match the user's request and tags. Only invent a new dish if nothing listed fits.
-- ALWAYS respond with ONLY valid JSON: {"message":"<your short chat reply>","meals":[{"name":"...","emoji":"🍛","time":<minutes>,"ing":["catalog item",...],"tags":["dinner","meat"]}]}
+- ALWAYS respond with ONLY valid JSON: {"message":"<your short chat reply>","meals":[{"name":"...","emoji":"🍛","time":<minutes>,"ing":["catalog item",...],"tags":["dinner","meat"],"portions":{"catalog item":[400,"g"]}}]}
 - While still asking questions, use "meals": [].
 - When proposing, "message" should briefly introduce the options.
 User onboarding goals: ${goals.length ? goals.join(', ') : 'none given'}.
@@ -280,7 +302,14 @@ export default {
       // Service-role write (clients can no longer INSERT meals directly).
       // New rows keep reviewed_at NULL (newcoming) until Ops marks them.
       if (Array.isArray(out.meals)) {
-        out.meals = out.meals.map((m: any) => (VALID(m) ? { ...m, tags: sanitizeTags(m) } : m))
+        out.meals = out.meals.map((m: any) => {
+          if (m && m.portions != null && !portionOk(m.portions)) {
+            const copy = { ...m }
+            delete copy.portions
+            m = copy
+          }
+          return VALID(m) ? { ...m, tags: sanitizeTags(m) } : m
+        })
       }
       if (task === 'advisor' && signedIn && Array.isArray(out.meals)) {
         const uid = ctx.userClaims?.sub || null

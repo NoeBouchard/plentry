@@ -410,6 +410,80 @@ describe("basket and cupboard", () => {
   });
 });
 
+describe("servings (I-P01 / I-P02 / I-P05)", () => {
+  it("I-P01 cooking for is only 2, 4 or 6, and this week keeps its snapshot", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    assert.equal(window.servingsFromHousehold("1"), 2);
+    assert.equal(window.servingsFromHousehold("3"), 4);
+    assert.equal(window.servingsFromHousehold("6"), 6);
+    assert.equal(window.normServings(5), 6);
+    assert.equal(window.weekServings(), 2);
+    window.nav("profile");
+    const buttons = [...document.getElementById("pr-servings").querySelectorAll("button")].map((b) => b.textContent);
+    assert.deepEqual(buttons, ["2", "4", "6"]);
+    window.setServings(4);
+    assert.equal(window.__plentry.state().prefs.servings, 4);
+    assert.equal(window.weekServings(), 2);
+    window.__plentry.state().weekServings = 4;
+    window.renderMenu();
+    const week = document.getElementById("menu-week").textContent;
+    assert.ok(week.includes("serves 4"));
+    assert.ok(!week.includes("serves 3") && !week.includes("serves 5"));
+  });
+
+  it("I-P02 / I-P05 a portioned dinner buys whole packs, and the order keeps that servings number", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.weekServings = 4;
+    S.prefs.servings = 2;
+    S.menuOptions = [{
+      name: "Beef ragù spaghetti",
+      emoji: "🍝",
+      time: 35,
+      ing: ["minced beef", "passata", "spaghetti", "parmesan", "onions", "garlic", "olive oil", "salt", "stock cubes"],
+      portions: {
+        "minced beef": [400, "g"],
+        passata: [400, "g"],
+        spaghetti: [180, "g"],
+        parmesan: [30, "g"],
+        onions: [1, "pc"],
+        garlic: [2, "clove"],
+        "olive oil": [1, "tbsp"],
+      },
+      recipe: { steps: ["Brown the mince."], tip: "Don't rush it." },
+    }];
+    S.selected = ["Beef ragù spaghetti"];
+    S.basketEdit = null;
+    window.syncBasketFromMeals();
+    const beef = window.__plentry.getBasket().find((b) => b.i === "minced beef");
+    assert.equal(beef.q, 2);
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "spaghetti").q, 1);
+    window.openBasket();
+    assert.ok(document.getElementById("basket-panel").textContent.includes("2 × 500g"));
+    await window.showRecipe("Beef ragù spaghetti");
+    const modal = document.getElementById("modal").textContent;
+    assert.ok(modal.includes("800g minced beef"));
+    assert.ok(modal.includes("2 onions"));
+    assert.ok(modal.includes("Written for 2"));
+    assert.ok(modal.includes("cooking for 4"));
+    assert.ok(modal.includes("Brown the mince."));
+    assert.ok(!modal.includes("{{"));
+    const order = window.orderFromRow({
+      id: 9,
+      store: "Tesco",
+      total: 12,
+      items: { servings: 4, basket: [{ i: "minced beef", q: 2 }], meals: ["Beef ragù spaghetti"] },
+      status: "new",
+      created_at: "2026-10-06T12:00:00.000Z",
+      payment_status: "authorized",
+    });
+    S.prefs.servings = 6;
+    S.weekServings = 2;
+    assert.equal(order.servings, 4);
+    assert.equal(window.weekServings(), 2);
+  });
+});
+
 describe("pantry have-list", () => {
   it("lists cupboard staples only and search filters them", async () => {
     const { window, document } = await loadApp({ localState: weekState() });

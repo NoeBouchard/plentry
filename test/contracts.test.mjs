@@ -67,10 +67,13 @@ describe("source contracts", () => {
 
   it("I-O12 pay rebuilds items.basket server-side and Telegram links come from the store whitelist", () => {
     assert.match(pay, /import \{ basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket \} from '\.\.\/_shared\/orders\.ts'/);
-    assert.match(pay, /const rebuilt = rebuildBasket\(items\?\.basket, data \|\| \[\], store\)/);
+    assert.match(pay, /import \{ PACKS, SEASONINGS, basketFor, normServings \} from '\.\.\/_shared\/portions\.ts'/);
+    assert.match(pay, /const packs = basketFor\(weekMeals, servings, ticks, PACKS, false\)/);
+    assert.match(pay, /const rebuilt = rebuildBasket\(rawBasket, data \|\| \[\], store\)/);
     assert.match(pay, /update\(\{ total: est, items: priced\.items \}\)/);
     assert.match(pay, /meals: names/);
     assert.match(pay, /recipes: cleanRecipes\(\[\.\.\.catalogRows, \.\.\.clientRecipes\], names\)/);
+    assert.match(pay, /\.from\('meals'\)\.select\('name,emoji,time,ing,recipe,portions'\)\.in\('name', names\)/);
     assert.match(pay, /\.from\('meals'\)\.select\('name,emoji,time,ing,recipe'\)\.in\('name', names\)/);
     assert.doesNotMatch(pay, /FALLBACK_ITEM_GBP = 2\.50/);
     assert.match(pay, /payment_method_types\[0\]', 'card'/);
@@ -150,7 +153,7 @@ describe("source contracts", () => {
     assert.match(html, /meals\.map\(\(n,j\)=>`<button class="btn ghost sm" onclick="showRecipeFromOrder\(\$\{oid\},\$\{j\}\)"/);
     assert.match(html, /function orderRecipesPayload\(\)/);
     assert.match(html, /recipes:orderRecipesPayload\(\)/);
-    assert.match(html, /showRecipe\(name, recipeFromOrder\(o, name\)\)/);
+    assert.match(html, /showRecipe\(name, recipeFromOrder\(o, name\), normServings\(o\.servings\|\|2\)\)/);
     assert.match(html, /sb\.from\("meals"\)\.select\([^)]*\)\.eq\("name",key\)\.limit\(1\)/);
     assert.match(notify, /PHONE:/);
     assert.match(notify, /MUST book/);
