@@ -25,6 +25,8 @@ const CATALOG = [
   'onions', 'garlic', 'bell peppers', 'broccoli', 'spinach', 'tomatoes',
   'lemons', 'potatoes', 'olive oil', 'feta', 'yoghurt', 'parmesan',
   'chopped tomatoes', 'butter', 'fresh coriander',
+  'tomato puree', 'fresh ginger', 'garam masala', 'limes', 'spring onions',
+  'penne', 'arborio rice', 'fresh basil', 'cucumber', 'red onions', 'cheddar',
   'salt', 'black pepper', 'paprika', 'cumin', 'chilli flakes', 'mixed herbs', 'soy sauce', 'stock cubes',
 ]
 
@@ -34,44 +36,32 @@ const VALID = (m: any) =>
 const MEAL_TAGS = [
   'vegetarian', 'vegan', 'meat', 'fish',
   'low_calorie', 'high_protein', 'low_carb',
-  'breakfast', 'lunch', 'dinner', 'snack',
-  'gym', 'meal_prep', 'quick', 'comfort_food',
+  'dinner', 'meal_prep', 'quick', 'comfort_food',
+] as const
+const MEAL_CATEGORIES = [
+  'pasta', 'rice_bowl', 'tacos_wraps', 'curry_stew', 'oven_bake', 'eggs', 'salad',
 ] as const
 const MEAT_ING = ['chicken thighs', 'minced beef']
 const FISH_ING = ['salmon fillet']
-const ANIMAL_ING = ['chicken thighs', 'minced beef', 'salmon fillet', 'eggs', 'feta', 'halloumi', 'yoghurt', 'parmesan', 'butter']
+const ANIMAL_ING = ['chicken thighs', 'minced beef', 'salmon fillet', 'eggs', 'feta', 'halloumi', 'yoghurt', 'parmesan', 'butter', 'cheddar']
 const PROTEIN_ING = ['chicken thighs', 'minced beef', 'salmon fillet', 'eggs', 'halloumi', 'yoghurt', 'chickpeas', 'feta']
 const CARB_ING = ['rice', 'spaghetti', 'tortillas', 'potatoes']
 const DIET_TAGS = ['vegetarian', 'vegan', 'meat', 'fish']
 const GOAL_IDS = ['decide', 'shop', 'waste', 'budget', 'variety']
 const TAG_LIST = MEAL_TAGS.join(', ')
+const CATEGORY_LIST = MEAL_CATEGORIES.join(', ')
 
 function tagsFor(m: any): string[] {
   const ing: string[] = Array.isArray(m?.ing) ? m.ing : []
-  const name = String(m?.name || '').toLowerCase()
   const time = Number(m?.time) || 25
-  const has = (k: string) => ing.includes(k)
   const anyOf = (keys: string[]) => keys.some((k) => ing.includes(k))
   const tags: string[] = []
   if (anyOf(MEAT_ING)) tags.push('meat')
   else if (anyOf(FISH_ING)) tags.push('fish')
-  else if (!anyOf(ANIMAL_ING)) tags.push('vegan')
+  else if (!anyOf(ANIMAL_ING)) {tags.push('vegan'); tags.push('vegetarian')}
   else tags.push('vegetarian')
-  if (anyOf(PROTEIN_ING)) tags.push('high_protein')
-  if (!anyOf(CARB_ING)) tags.push('low_carb')
-  const diet = tags[0]
-  if (
-    (diet === 'vegan' || diet === 'vegetarian') &&
-    !has('coconut milk') && !has('spaghetti') && !has('halloumi') && !has('feta') && !has('parmesan') &&
-    time <= 25 && !/pasta|bake|fried rice|mash|curry|stew|meatball/.test(name)
-  ) tags.push('low_calorie')
   tags.push('dinner')
-  if (/omelette|shakshuka|frittata|baked eggs|spanish tortilla/.test(name)) tags.push('breakfast')
-  if (/bowl|wrap|taco|salad|soup|omelette|fajita|frittata/.test(name)) tags.push('lunch')
-  if (time <= 20) tags.push('quick')
-  if (/curry|stew|rag[uù]|bolognese|traybake|casserole|keema|baked rice|soup/.test(name)) tags.push('meal_prep')
-  if (tags.includes('high_protein') && (diet === 'meat' || diet === 'fish' || has('eggs') || has('halloumi'))) tags.push('gym')
-  if (/pasta|spaghetti|curry|meatball|mash|bake|fried rice|shakshuka|parm|rag[uù]|stew|bolognese/.test(name)) tags.push('comfort_food')
+  if (time < 30) tags.push('quick')
   return [...new Set(tags)]
 }
 

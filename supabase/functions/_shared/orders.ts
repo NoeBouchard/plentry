@@ -17,6 +17,8 @@ export const CATALOG = [
   'onions', 'garlic', 'bell peppers', 'broccoli', 'spinach', 'tomatoes',
   'lemons', 'potatoes', 'olive oil', 'feta', 'yoghurt', 'parmesan',
   'chopped tomatoes', 'butter', 'fresh coriander',
+  'tomato puree', 'fresh ginger', 'garam masala', 'limes', 'spring onions',
+  'penne', 'arborio rice', 'fresh basil', 'cucumber', 'red onions', 'cheddar',
   'salt', 'black pepper', 'paprika', 'cumin', 'chilli flakes', 'mixed herbs', 'soy sauce', 'stock cubes',
 ]
 const CATALOG_SET = new Set(CATALOG)
