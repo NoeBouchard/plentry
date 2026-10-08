@@ -62,55 +62,69 @@ select id, email from auth.users
 where email = 'noyouchka.bouchard@gmail.com'
 on conflict (user_id) do nothing;
 
+-- to authenticated: anon never evaluates is_admin_aal2().
 drop policy if exists "admins read admins" on public.admins;
 create policy "admins read admins" on public.admins
-  for select using (auth.uid() = user_id or public.is_admin_aal2());
+  for select to authenticated
+  using (auth.uid() = user_id or public.is_admin_aal2());
 
 drop policy if exists "admins insert admins" on public.admins;
 create policy "admins insert admins" on public.admins
-  for insert with check (public.is_admin_aal2());
+  for insert to authenticated
+  with check (public.is_admin_aal2());
 
 -- Orders / meals writes: same five policies as admin_mfa.sql, now the role list.
 drop policy if exists "admin select all orders" on public.orders;
 create policy "admin select all orders" on public.orders
-  for select using (public.is_admin_aal2());
+  for select to authenticated
+  using (public.is_admin_aal2());
 
 drop policy if exists "admin update all orders" on public.orders;
 create policy "admin update all orders" on public.orders
-  for update using (public.is_admin_aal2());
+  for update to authenticated
+  using (public.is_admin_aal2());
 
 drop policy if exists "admin update meals review" on public.meals;
 create policy "admin update meals review" on public.meals
-  for update using (public.is_admin_aal2())
+  for update to authenticated
+  using (public.is_admin_aal2())
   with check (public.is_admin_aal2());
 
 drop policy if exists "insert meals" on public.meals;
 drop policy if exists "admin insert meals" on public.meals;
 create policy "admin insert meals" on public.meals
-  for insert with check (public.is_admin_aal2());
+  for insert to authenticated
+  with check (public.is_admin_aal2());
 
 drop policy if exists "admin delete meals" on public.meals;
 create policy "admin delete meals" on public.meals
-  for delete using (public.is_admin_aal2());
+  for delete to authenticated
+  using (public.is_admin_aal2());
 
--- Unpublished dinners are admin-only. Customers still read the live catalog.
-drop policy if exists "read meals" on public.meals;
-create policy "read meals" on public.meals
-  for select using (reviewed_at is not null or public.is_admin_aal2());
+-- Leave the existing "read meals" policy in place: authenticated users can
+-- already read published meals and drafts. Add admin read of unpublished
+-- meals. Do not grant this to anon.
+drop policy if exists "admin read meals" on public.meals;
+create policy "admin read meals" on public.meals
+  for select to authenticated
+  using (public.is_admin_aal2());
 
 -- Prices stay world-readable (landing + basket). Writes are admin + aal2.
 drop policy if exists "admin insert ingredient_prices" on public.ingredient_prices;
 create policy "admin insert ingredient_prices" on public.ingredient_prices
-  for insert with check (public.is_admin_aal2());
+  for insert to authenticated
+  with check (public.is_admin_aal2());
 
 drop policy if exists "admin update ingredient_prices" on public.ingredient_prices;
 create policy "admin update ingredient_prices" on public.ingredient_prices
-  for update using (public.is_admin_aal2())
+  for update to authenticated
+  using (public.is_admin_aal2())
   with check (public.is_admin_aal2());
 
 drop policy if exists "admin delete ingredient_prices" on public.ingredient_prices;
 create policy "admin delete ingredient_prices" on public.ingredient_prices
-  for delete using (public.is_admin_aal2());
+  for delete to authenticated
+  using (public.is_admin_aal2());
 
 -- Per-shop pack, so the next basketFor can read this instead of one catalog pack.
 -- servings.sql adds the same columns; both files are safe to re-run.
@@ -122,9 +136,9 @@ do $$
 begin
   if to_regclass('public.order_messages') is not null then
     execute 'drop policy if exists "admin select order messages" on public.order_messages';
-    execute 'create policy "admin select order messages" on public.order_messages for select using (public.is_admin_aal2())';
+    execute 'create policy "admin select order messages" on public.order_messages for select to authenticated using (public.is_admin_aal2())';
     execute 'drop policy if exists "admin insert order messages" on public.order_messages';
-    execute 'create policy "admin insert order messages" on public.order_messages for insert with check (public.is_admin_aal2() and author_role = ''ops'')';
+    execute 'create policy "admin insert order messages" on public.order_messages for insert to authenticated with check (public.is_admin_aal2() and author_role = ''ops'')';
   end if;
 end $$;
 
@@ -155,6 +169,11 @@ declare
   expect text;
   steps jsonb;
 begin
+  -- Service role (advisor) and postgres (SQL editor) have no auth.uid().
+  -- Their writes stay exactly as they are today, including seasoning keys.
+  if auth.uid() is null then
+    return new;
+  end if;
   if new.name is null or length(btrim(new.name)) < 1 then
     raise exception 'meal needs a name';
   end if;
@@ -164,8 +183,9 @@ begin
     end if;
     for k, spec in select * from jsonb_each(portions) loop
       expect := packs->>k;
+      -- Seasoning keys stay on the row. Basket logic never scales them.
       if expect is not null and expect = '' then
-        raise exception 'seasonings stay 1 pack: %', k;
+        continue;
       end if;
       if jsonb_typeof(spec) <> 'array' or jsonb_array_length(spec) < 2 then
         raise exception 'bad portion for %', k;
@@ -211,13 +231,19 @@ declare
   rowj jsonb := to_jsonb(new);
   qty jsonb := rowj->'pack_qty';
   unit text := rowj->>'pack_unit';
-  seasonings text[] := array['salt','black pepper','paprika','cumin','chilli flakes','mixed herbs','soy sauce','stock cubes'];
 begin
+  -- Catalog price SQL and other postgres/service-role writes are unchanged.
+  if auth.uid() is null then
+    return new;
+  end if;
   if new.store is null or new.store not in ('tesco','sainsburys','asda','waitrose') then
     raise exception 'shop must be tesco, sainsburys, asda, or waitrose';
   end if;
-  if new.category is null or new.category not in ('protein','dairy','veg','fruit','carbs','pantry') then
-    raise exception 'category is required';
+  -- New admin rows need a known category. Updates keep grocery/fresh and any other existing value.
+  if tg_op = 'INSERT' then
+    if new.category is null or new.category not in ('protein','dairy','veg','fruit','carbs','pantry') then
+      raise exception 'category is required';
+    end if;
   end if;
   if new.price_gbp is null or new.price_gbp <= 0 then
     raise exception 'price is required';
@@ -225,11 +251,7 @@ begin
   if new.slug is null or btrim(new.slug) = '' then
     new.slug := trim(both '-' from regexp_replace(lower(coalesce(nullif(btrim(new.meal_key), ''), new.display_name)), '[^a-z0-9]+', '-', 'g'));
   end if;
-  if new.meal_key = any(seasonings) then
-    if (qty is not null and qty <> 'null'::jsonb) or (unit is not null and unit <> '') then
-      raise exception 'seasonings stay 1 pack';
-    end if;
-  elsif unit is not null and unit <> '' then
+  if unit is not null and unit <> '' then
     if unit not in ('g','ml','pc','clove','tbsp','tsp') then
       raise exception 'pack unit must be g, ml, pc, clove, tbsp, or tsp';
     end if;

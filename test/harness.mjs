@@ -23,8 +23,10 @@ function makeQuery(tables, table) {
     limit() {
       return q;
     },
-    upsert() {
-      return Promise.resolve({ data: null, error: null });
+    upsert(v, opts) {
+      q._upsert = Array.isArray(v) ? v : [v];
+      q._onConflict = (opts && opts.onConflict) || "id";
+      return q;
     },
     insert(v) {
       q._insert = Array.isArray(v) ? v : [v];
@@ -54,6 +56,20 @@ function makeQuery(tables, table) {
     if (q._insert) {
       const rows = q._insert.map((row, i) => {
         const next = Object.assign({ id: tables[table].length + 1 + i }, row);
+        tables[table].push(next);
+        return next;
+      });
+      return { data: rows, error: null };
+    }
+    if (q._upsert) {
+      const keys = String(q._onConflict || "id").split(",").map((s) => s.trim()).filter(Boolean);
+      const rows = q._upsert.map((row) => {
+        const idx = tables[table].findIndex((r) => keys.every((k) => r[k] === row[k]));
+        if (idx >= 0) {
+          Object.assign(tables[table][idx], row);
+          return tables[table][idx];
+        }
+        const next = Object.assign({ id: tables[table].length + 1 }, row);
         tables[table].push(next);
         return next;
       });

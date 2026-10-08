@@ -35,9 +35,9 @@ Customer **Issue** on a paid order opens the thread. Founder nav **Inbox** (open
 
 ## 5. Meals — publish a dinner
 
-**Meals** tab (an admin: a row in `public.admins`, at aal2). **New meal** = `reviewed_at` null. Add is blocked until the dinner has a name, catalog ingredients, and at least one instruction step. **Verify & publish** also needs a category and sets `reviewed_at`. Customers can pick it on New week / Modify with no deploy. Unpublish returns it to New meal. Remove deletes the row; orders already store the method. The live list is grouped by the 7 categories.
+**Meals** tab (an admin: a row in `public.admins`, at aal2). **New meal** = `reviewed_at` null. Add is blocked until the dinner has a name, catalog ingredients, and at least one instruction step. **Verify & publish** also needs a category and sets `reviewed_at`. Customers can pick it on New week / Modify with no deploy. Unpublish returns it to New meal. Remove deletes the row; orders already store the method. The live list is grouped by the 7 categories. An expanded card shows the 2, 4, and 6 serving lists the customer sees. Seasoning keys already on the meal stay on save.
 
-**Ingredients** tab (same admin gate). Prices and per-shop pack quantity/unit for Tesco, Sainsbury's, Asda, and Waitrose. Add is blocked until shop, category, and price are set. A key that is not in the code catalog is saved and marked not yet usable in baskets.
+**Ingredients** tab (same admin gate). Prices and per-shop pack quantity/unit for Tesco, Sainsbury's, Asda, and Waitrose, saved together. Add is blocked until shop, category, price, and a meal key are set. Editing an existing row does not require a meal key and does not replace the shelf product name unless that shop's name was edited. A key that is not in the code catalog is saved and marked not yet usable in baskets.
 
 ## 6. Advisor
 

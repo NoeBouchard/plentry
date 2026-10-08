@@ -524,19 +524,28 @@ describe("source contracts", () => {
     for (const pol of ["admin select all orders", "admin update all orders", "admin update meals review", "admin insert meals", "admin delete meals"]) {
       assert.match(sql, new RegExp(`create policy "${pol}"[\\s\\S]*?is_admin_aal2\\(\\)`), pol);
     }
-    assert.match(sql, /create policy "read meals" on public\.meals[\s\S]*reviewed_at is not null or public\.is_admin_aal2\(\)/);
+    assert.doesNotMatch(sql, /drop policy if exists "read meals"/);
+    assert.match(sql, /create policy "admin read meals" on public\.meals[\s\S]*for select to authenticated[\s\S]*is_admin_aal2\(\)/);
+    assert.match(sql, /for select to authenticated\s+using \(public\.is_admin_aal2\(\)\)/);
     assert.match(sql, /create policy "admin insert ingredient_prices"/);
     assert.match(sql, /create policy "admin update ingredient_prices"/);
     assert.match(sql, /create policy "admin delete ingredient_prices"/);
-    assert.match(sql, /for insert with check \(public\.is_admin_aal2\(\)\)/);
+    assert.match(sql, /for insert to authenticated\s+with check \(public\.is_admin_aal2\(\)\)/);
     // Required fields and invariant checks live in the database, not only the client.
     assert.match(sql, /create or replace function public\.validate_meal_write\(\)/);
-    assert.match(sql, /seasonings stay 1 pack/);
+    const mealFn = sql.slice(sql.indexOf("function public.validate_meal_write"), sql.indexOf("function public.validate_ingredient_price"));
+    const priceFn = sql.slice(sql.indexOf("function public.validate_ingredient_price"));
+    // Service role and postgres (auth.uid() is null) skip both triggers. Regex only — not run against a database.
+    assert.match(mealFn, /if auth\.uid\(\) is null then\s+return new;/);
+    assert.match(priceFn, /if auth\.uid\(\) is null then\s+return new;/);
+    assert.match(mealFn, /expect = '' then\s+continue;/);
+    assert.doesNotMatch(mealFn, /seasonings stay 1 pack/);
+    assert.doesNotMatch(priceFn, /seasonings stay 1 pack/);
     assert.match(sql, /portion unit for % must be %/);
     assert.match(sql, /a published meal needs at least one instruction step/);
     assert.match(sql, /create or replace function public\.validate_ingredient_price\(\)/);
     assert.match(sql, /shop must be tesco, sainsburys, asda, or waitrose/);
-    assert.match(sql, /category is required/);
+    assert.match(priceFn, /tg_op = 'INSERT'[\s\S]*category is required/);
     assert.match(sql, /price is required/);
     assert.match(sql, /add column if not exists pack_qty numeric/);
     assert.match(sql, /add column if not exists pack_unit text/);
@@ -549,6 +558,8 @@ describe("source contracts", () => {
     assert.match(html, /Portion unit for "/);
     assert.match(html, /not yet usable in baskets/);
     assert.match(html, /id="nav-ingredients"/);
+    assert.match(html, /upsert\(rows,\{onConflict:"slug,store"\}\)/);
+    assert.doesNotMatch(html, /product_name:g\.name/);
   });
 
   it("I-A12 new ingredient keys stay out of the code catalog until pay and basketFor read the database", () => {

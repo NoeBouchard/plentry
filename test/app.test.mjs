@@ -1767,22 +1767,23 @@ describe("I-A12 admin meals and ingredients", () => {
     assert.equal(window.__sbTables.meals.length, before);
 
     window.__mealPortions = { "minced beef": [200, "g"], salt: [1, "g"] };
-    await window.saveMealEditor(false);
-    assert.match(document.getElementById("me-err").textContent, /Seasonings stay 1 pack/);
-    assert.equal(window.__sbTables.meals.length, before);
-
-    window.__mealPortions = { "minced beef": [200, "g"] };
     await window.saveMealEditor(true);
     assert.match(document.getElementById("me-err").textContent, /category/);
     assert.equal(window.__sbTables.meals.length, before);
 
     document.getElementById("me-category").value = "curry_stew";
+    window.__mealPortions = { "minced beef": [200, "g"], salt: [1, "g"] };
     await window.saveMealEditor(false);
     const added = window.__sbTables.meals.find((m) => m.name === "Ops test chilli");
     assert.ok(added);
     assert.equal(added.reviewed_at, null);
-    // The portion array is created inside the page, so copy it before deep-equal.
+    // Portion arrays are created inside the page, so copy them before deep-equal.
     assert.deepEqual([...(added.portions["minced beef"] || [])], [200, "g"]);
+    assert.deepEqual([...(added.portions.salt || [])], [1, "g"]);
+    const card = document.getElementById("meals-new").textContent;
+    assert.match(card, /serves 4/);
+    assert.match(card, /serves 6/);
+    assert.match(card, /Written for 2/);
   });
 
   it("adding an ingredient is blocked until shop, category, and price are set", async () => {
@@ -1796,7 +1797,10 @@ describe("I-A12 admin meals and ingredients", () => {
     assert.equal(window.ingredientAddError({}), "Pick a shop.");
     assert.equal(window.ingredientAddError({ shop: "tesco" }), "Pick a category.");
     assert.equal(window.ingredientAddError({ shop: "tesco", category: "fruit" }), "Enter a price.");
-    assert.equal(window.ingredientAddError({ shop: "tesco", category: "pantry", price: 1, name: "Salt", meal_key: "salt", pack_qty: 2, pack_unit: "g" }), "Seasonings stay 1 pack — leave pack quantity and unit empty.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "pantry", price: 1, name: "Salt", meal_key: "salt", pack_qty: 2, pack_unit: "g" }), "");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "grocery", price: 1, name: "Penne", meal_key: "penne" }), "Pick a category.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "grocery", price: 1, name: "Penne", updating: true }), "");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "pantry", price: 1, name: "Harissa" }), "Give it a meal key.");
     assert.equal(window.ingredientAddError({ shop: "tesco", category: "fruit", price: 1.2, name: "Limes", meal_key: "limes", pack_qty: 5, pack_unit: "pc" }), "");
 
     window.nav("ingredients");
@@ -1824,5 +1828,36 @@ describe("I-A12 admin meals and ingredients", () => {
     const list = document.getElementById("ingredients-list").textContent;
     assert.ok(list.includes("Harissa"));
     assert.ok(list.includes("not yet usable in baskets"));
+  });
+
+  it("saves shelf prices by row without rewriting the product name, and removes rows that have no meal key", async () => {
+    const prices = [
+      { id: 9, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", meal_key: null, product_name: "Tesco Penne 500g", pack_size: "500g", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+      { id: 10, slug: "penne", display_name: "Penne", category: "grocery", store: "sainsburys", meal_key: null, product_name: "Sainsbury's Penne", pack_size: "500g", price_gbp: 0.7, pack_qty: 500, pack_unit: "g" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    assert.match(document.getElementById("ingredients-list").textContent, /Grocery/);
+    document.getElementById("ing-price-0-tesco").value = "0.85";
+    document.getElementById("ing-product-0-sainsburys").value = "Sainsbury's Penne Rigate";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.length, 2);
+    const tesco = rows.find((r) => r.id === 9);
+    const sains = rows.find((r) => r.id === 10);
+    assert.equal(tesco.price_gbp, 0.85);
+    assert.equal(tesco.product_name, "Tesco Penne 500g");
+    assert.equal(tesco.category, "grocery");
+    assert.equal(sains.product_name, "Sainsbury's Penne Rigate");
+    assert.equal(sains.price_gbp, 0.7);
+    window.confirm = () => true;
+    await window.deleteIngredient(0);
+    assert.equal(window.__sbTables.ingredient_prices.length, 0);
   });
 });
