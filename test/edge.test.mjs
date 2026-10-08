@@ -129,7 +129,7 @@ describe("S-04 server-built basket", () => {
     const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
     const aiBlock = ai.match(/const CATALOG = \[([\s\S]*?)\n\]/)[1];
     const aiKeys = [...aiBlock.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    const ingBlock = html.match(/const INGREDIENTS=\{([\s\S]*?)\n\};/)[1];
+    const ingBlock = html.match(/const INGREDIENTS_FALLBACK=\{([\s\S]*?)\n\};/)[1];
     const htmlKeys = [...ingBlock.matchAll(/"([^"]+)":\{unit/g)].map((m) => m[1]);
     assert.deepEqual([...CATALOG].sort(), [...aiKeys].sort());
     assert.deepEqual([...CATALOG].sort(), [...htmlKeys].sort());

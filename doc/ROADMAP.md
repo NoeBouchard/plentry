@@ -28,6 +28,10 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 
 ## Next product
 
+- **Per-shop packs + database catalog.** `ingredient_prices.pack_qty` / `pack_unit` are editable per shop. `basketFor` should use the row for the order's store instead of the single `PACKS` entry, and `pay` `rebuildBasket` should accept a `meal_key` that has a price row. Until then, admin-added keys are flagged not usable in baskets. Do not edit `basketFor` in the same change as PR #7.
+
+## Next product (older)
+
 - ~~Diet / tag onboarding~~ — step 2 + Profile (16 Sep static).
 - ~~Ops capture + door address~~ — two-tap charge, money-received state, in-app delivery (16 Sep).
 - Photo pantry scan — `parse_pantry` was **retired** from `ai` on 17 Sep (S-11); re-add it behind a signed-in check when the UI needs it.

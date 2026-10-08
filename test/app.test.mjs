@@ -899,6 +899,7 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(window.isAdmin(), false, "email alone is not admin while a code is pending");
     assert.equal(document.getElementById("nav-admin").style.display, "none");
     assert.equal(document.getElementById("nav-meals").style.display, "none");
+    assert.equal(document.getElementById("nav-ingredients").style.display, "none");
     assert.equal(document.getElementById("nav-inbox").style.display, "none");
     assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
     assert.ok(document.getElementById("mfa-banner").classList.contains("show"));
@@ -920,6 +921,7 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(window.mfaPending(), false);
     assert.equal(window.isAdmin(), true);
     assert.equal(document.getElementById("nav-admin").style.display, "");
+    assert.equal(document.getElementById("nav-ingredients").style.display, "");
     assert.equal(document.getElementById("nav-inbox").style.display, "");
     assert.ok(!document.getElementById("mfa-banner").classList.contains("show"));
     assert.deepEqual(mfa.state.calls.at(-1), ["challengeAndVerify", { factorId: "11111111-2222-4333-8444-555555555555", code: "123456" }]);
@@ -1699,5 +1701,128 @@ describe("ops", () => {
     assert.ok(inbox.includes("Guillaume"));
     assert.equal(document.getElementById("inbox-badge").textContent, "1");
     assert.equal(document.getElementById("inbox-badge").style.display, "flex");
+  });
+});
+
+describe("I-A12 admin meals and ingredients", () => {
+  const founder = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+
+  it("a non-member is not admin once public.admins has someone else; aal1 stays blocked", async () => {
+    const mfa = mockMfa({ enrolled: true });
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: {
+        meals: [],
+        orders: [],
+        profiles: [],
+        ingredient_prices: [],
+        admins: [{ id: 1, user_id: "other", email: "ops@example.com" }],
+      },
+      mfa,
+    });
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), false, "founder email is not enough once the admins table has rows");
+    assert.equal(document.getElementById("nav-meals").style.display, "none");
+    await window.showIngredientsScreen();
+    assert.equal(document.getElementById("ingredients-list").textContent, "Admin only.");
+
+    window.__plentry.state().user = { id: "other", email: "ops@example.com" };
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), false, "listed admin at aal1 is blocked");
+    mfa.state.level = "aal2";
+    mfa.state.factors = [];
+    await window.refreshMfa();
+    assert.equal(window.isAdmin(), true, "listed admin at aal2");
+  });
+
+  it("adding a meal is blocked until name, catalog ingredients, and a step are filled; portion units must match", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), true);
+    const before = window.__sbTables.meals.length;
+    window.openMealEditor(null);
+    document.getElementById("me-name").value = "";
+    document.getElementById("me-steps").value = "Fry onions.";
+    window.__mealIng = new Set(["minced beef", "onions", "garlic", "salt", "black pepper"]);
+    await window.saveMealEditor(false);
+    assert.match(document.getElementById("me-err").textContent, /Name/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    document.getElementById("me-name").value = "Ops test chilli";
+    document.getElementById("me-steps").value = "";
+    await window.saveMealEditor(false);
+    assert.match(document.getElementById("me-err").textContent, /instruction step/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    document.getElementById("me-steps").value = "Fry onions.";
+    window.__mealPortions = { "minced beef": [100, "ml"] };
+    await window.saveMealEditor(false);
+    assert.match(document.getElementById("me-err").textContent, /Portion unit for minced beef must be g/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    window.__mealPortions = { "minced beef": [200, "g"], salt: [1, "g"] };
+    await window.saveMealEditor(false);
+    assert.match(document.getElementById("me-err").textContent, /Seasonings stay 1 pack/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    window.__mealPortions = { "minced beef": [200, "g"] };
+    await window.saveMealEditor(true);
+    assert.match(document.getElementById("me-err").textContent, /category/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    document.getElementById("me-category").value = "curry_stew";
+    await window.saveMealEditor(false);
+    const added = window.__sbTables.meals.find((m) => m.name === "Ops test chilli");
+    assert.ok(added);
+    assert.equal(added.reviewed_at, null);
+    // The portion array is created inside the page, so copy it before deep-equal.
+    assert.deepEqual([...(added.portions["minced beef"] || [])], [200, "g"]);
+  });
+
+  it("adding an ingredient is blocked until shop, category, and price are set", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    assert.equal(window.ingredientAddError({}), "Pick a shop.");
+    assert.equal(window.ingredientAddError({ shop: "tesco" }), "Pick a category.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "fruit" }), "Enter a price.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "pantry", price: 1, name: "Salt", meal_key: "salt", pack_qty: 2, pack_unit: "g" }), "Seasonings stay 1 pack — leave pack quantity and unit empty.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "fruit", price: 1.2, name: "Limes", meal_key: "limes", pack_qty: 5, pack_unit: "pc" }), "");
+
+    window.nav("ingredients");
+    document.getElementById("ing-add-name").value = "Harissa";
+    document.getElementById("ing-add-key").value = "harissa";
+    document.getElementById("ing-add-cat").value = "pantry";
+    document.getElementById("ing-add-shop").value = "tesco";
+    await window.saveNewIngredient();
+    assert.equal(document.getElementById("ing-add-err").textContent, "Enter a price.");
+    assert.equal(window.__sbTables.ingredient_prices.length, 0);
+
+    document.getElementById("ing-add-price").value = "1.40";
+    document.getElementById("ing-add-qty").value = "180";
+    document.getElementById("ing-add-unit").value = "g";
+    await window.saveNewIngredient();
+    const row = window.__sbTables.ingredient_prices[0];
+    assert.ok(row);
+    assert.equal(row.store, "tesco");
+    assert.equal(row.meal_key, "harissa");
+    assert.equal(row.category, "pantry");
+    assert.equal(row.price_gbp, 1.4);
+    assert.equal(row.slug, "harissa");
+    assert.equal(row.pack_qty, 180);
+    assert.equal(row.pack_unit, "g");
+    const list = document.getElementById("ingredients-list").textContent;
+    assert.ok(list.includes("Harissa"));
+    assert.ok(list.includes("not yet usable in baskets"));
   });
 });

@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-08 — Admin meals and ingredients
+
+- **Admins list.** `supabase/admin_roles.sql` adds `public.admins` and `is_admin()` / `is_admin_aal2()`. The five Ops/Meals policies, ingredient price writes, inbox, and unpublished meals use that instead of the founder email. The founder row is inserted by the script. Until the table has any row, the founder email still counts, so the account is not locked out between this file and the static ship. **Not applied.** Run it in the SQL editor before deploying `index.html`.
+- **Meals tab** groups the live catalog by the 7 categories. Each card shows the photo, time, category, tags, ingredients, 2-serving portions, and method (section headings included). Add is blocked until name, at least three catalog ingredients, and one instruction step. Publish also needs a category. Portion units must match the catalog pack unit; seasonings cannot have a portion. Remove is a hard delete after a confirm that says past orders keep their snapshotted method — Unpublish is the reversible path.
+- **Ingredients tab** groups `ingredient_prices` by category and expands to price, pack label, `pack_qty`, and `pack_unit` per shop (`tesco`, `sainsburys`, `asda`, `waitrose`). Add is blocked until shop, category, and a price are set. A key that is not in the code catalog is saved and flagged **not yet usable in baskets**.
+- **Catalog decision.** The hardcoded lists stay. Copying new keys into `INGREDIENTS` would not make `pay` accept them (`rebuildBasket` still uses `CATALOG`), and reading `pack_size` text as the basket pack would change quantities. Shelf prices for keys that already exist still flow through `loadShelfPrices`. Follow-up: `basketFor` takes per-shop `pack_qty` / `pack_unit` from `ingredient_prices` for the order's store, and `pay` accepts any `meal_key` that has a price row.
+- **Not deployed.**
+
 ## 2026-10-06 18:00 UTC — meal categories, new tag structure, 11 new ingredient keys
 
 - **Categories:** every verified meal has exactly one category from 7 values (`pasta`, `rice_bowl`, `oven_bake`, `tacos_wraps`, `curry_stew`, `eggs`, `salad`). Stored in `meals.category` (CHECK constraint). Category is allowed null when `reviewed_at` is null (draft meals). The Meals admin UI requires a category to Verify & publish. The advisor/AI function whitelists category. All 77 current meals backfilled with categories per the proposal.

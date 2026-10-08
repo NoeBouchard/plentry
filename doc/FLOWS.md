@@ -35,7 +35,9 @@ Customer **Issue** on a paid order opens the thread. Founder nav **Inbox** (open
 
 ## 5. Meals — publish a dinner
 
-**Meals** tab (founder). **New meal** = `reviewed_at` null. Add ingredients + method + tags (exactly one diet tag, plus `dinner`). **Verify & publish** sets `reviewed_at`. Customers can pick it on New week / Modify with no deploy. Unpublish returns it to New meal.
+**Meals** tab (an admin: a row in `public.admins`, at aal2). **New meal** = `reviewed_at` null. Add is blocked until the dinner has a name, catalog ingredients, and at least one instruction step. **Verify & publish** also needs a category and sets `reviewed_at`. Customers can pick it on New week / Modify with no deploy. Unpublish returns it to New meal. Remove deletes the row; orders already store the method. The live list is grouped by the 7 categories.
+
+**Ingredients** tab (same admin gate). Prices and per-shop pack quantity/unit for Tesco, Sainsbury's, Asda, and Waitrose. Add is blocked until shop, category, and price are set. A key that is not in the code catalog is saved and marked not yet usable in baskets.
 
 ## 6. Advisor
 

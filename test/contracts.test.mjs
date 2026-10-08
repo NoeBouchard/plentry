@@ -258,7 +258,9 @@ describe("source contracts", () => {
     assert.match(mfaSql, /APPLIED 18 Sep 2026/);
     assert.match(mfaSql, /lock yourself out of Ops/);
     assert.match(mfaSql, /supabase secrets unset REQUIRE_ADMIN_MFA/, "roll-back path documented");
-    assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&S\.user\.email===ADMIN_EMAIL\)&&!mfaPending\(\);\}/);
+    assert.match(html, /const ADMIN_EMAIL="noyouchka.bouchard@gmail.com"/);
+    assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&adminStatus\)&&!mfaPending\(\);\}/);
+    assert.match(html, /S\.user\.email===ADMIN_EMAIL/);
     assert.match(html, /if\(mfaPending\(\)\)openMfaChallenge\(\);/);
     assert.match(html, /r&&r\.error==="mfa_required"/);
     assert.match(html, /window\.__pendingCapture=\{id,storeAmt\}/);
@@ -489,9 +491,9 @@ describe("source contracts", () => {
     assert.deepEqual(checkCats, expected, "CHECK constraint categories match expected");
   });
 
-  it("CATALOG: 46 ingredient keys are identical in index.html INGREDIENTS, ai/index.ts, and _shared/orders.ts", () => {
-    const htmlMatch = html.match(/const INGREDIENTS=\{([\s\S]*?)\};/);
-    assert.ok(htmlMatch, "INGREDIENTS found in index.html");
+  it("CATALOG: 46 ingredient keys in INGREDIENTS_FALLBACK match ai/index.ts and _shared/orders.ts", () => {
+    const htmlMatch = html.match(/const INGREDIENTS_FALLBACK=\{([\s\S]*?)\};/);
+    assert.ok(htmlMatch, "INGREDIENTS_FALLBACK found in index.html");
     const htmlKeys = [...htmlMatch[1].matchAll(/"([^"]+)":/g)].map((m) => m[1]).sort();
     
     const aiMatch = ai.match(/const CATALOG = \[([\s\S]*?)\]/);
@@ -503,10 +505,57 @@ describe("source contracts", () => {
     assert.ok(ordersMatch, "CATALOG found in _shared/orders.ts");
     const ordersKeys = ordersMatch[1].split(",").map((s) => s.trim().replace(/^['"]/g, "").replace(/['"]$/g, "")).filter(Boolean).sort();
     
-    assert.equal(htmlKeys.length, 46, "index.html has 46 ingredient keys");
+    assert.equal(htmlKeys.length, 46, "index.html has 46 ingredient keys in fallback");
     assert.equal(aiKeys.length, 46, "ai/index.ts has 46 catalog keys");
     assert.equal(ordersKeys.length, 46, "_shared/orders.ts has 46 catalog keys");
-    assert.deepEqual(htmlKeys, aiKeys, "index.html INGREDIENTS keys match ai CATALOG");
+    assert.deepEqual(htmlKeys, aiKeys, "index.html INGREDIENTS_FALLBACK keys match ai CATALOG");
     assert.deepEqual(aiKeys, ordersKeys, "ai CATALOG matches _shared/orders CATALOG");
+  });
+
+  it("I-A12 admins table + aal2 gates orders, meals, and ingredient prices; non-admin and aal1 cannot write", () => {
+    const sql = readFileSync(path.join(ROOT, "supabase/admin_roles.sql"), "utf8");
+    assert.match(sql, /create table if not exists public\.admins/);
+    assert.match(sql, /create or replace function public\.is_admin\(\) returns boolean/);
+    assert.match(sql, /security definer set search_path = public/);
+    assert.match(sql, /create or replace function public\.is_admin_aal2\(\) returns boolean/);
+    assert.match(sql, /select public\.is_admin\(\)\s+and \(auth\.jwt\(\)->>'aal'\) = 'aal2'/);
+    assert.match(sql, /grant execute on function public\.is_admin_aal2\(\) to authenticated/);
+    assert.match(sql, /revoke all on function public\.is_admin_aal2\(\) from public, anon, authenticated/);
+    for (const pol of ["admin select all orders", "admin update all orders", "admin update meals review", "admin insert meals", "admin delete meals"]) {
+      assert.match(sql, new RegExp(`create policy "${pol}"[\\s\\S]*?is_admin_aal2\\(\\)`), pol);
+    }
+    assert.match(sql, /create policy "read meals" on public\.meals[\s\S]*reviewed_at is not null or public\.is_admin_aal2\(\)/);
+    assert.match(sql, /create policy "admin insert ingredient_prices"/);
+    assert.match(sql, /create policy "admin update ingredient_prices"/);
+    assert.match(sql, /create policy "admin delete ingredient_prices"/);
+    assert.match(sql, /for insert with check \(public\.is_admin_aal2\(\)\)/);
+    // Required fields and invariant checks live in the database, not only the client.
+    assert.match(sql, /create or replace function public\.validate_meal_write\(\)/);
+    assert.match(sql, /seasonings stay 1 pack/);
+    assert.match(sql, /portion unit for % must be %/);
+    assert.match(sql, /a published meal needs at least one instruction step/);
+    assert.match(sql, /create or replace function public\.validate_ingredient_price\(\)/);
+    assert.match(sql, /shop must be tesco, sainsburys, asda, or waitrose/);
+    assert.match(sql, /category is required/);
+    assert.match(sql, /price is required/);
+    assert.match(sql, /add column if not exists pack_qty numeric/);
+    assert.match(sql, /add column if not exists pack_unit text/);
+    assert.match(html, /sb\.rpc\("is_admin"\)/);
+    assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&adminStatus\)&&!mfaPending\(\);\}/);
+    assert.match(html, /function ingredientAddError/);
+    assert.match(html, /return "Pick a shop\."/);
+    assert.match(html, /return "Pick a category\."/);
+    assert.match(html, /return "Enter a price\."/);
+    assert.match(html, /Portion unit for "/);
+    assert.match(html, /not yet usable in baskets/);
+    assert.match(html, /id="nav-ingredients"/);
+  });
+
+  it("I-A12 new ingredient keys stay out of the code catalog until pay and basketFor read the database", () => {
+    assert.match(html, /const INGREDIENTS_FALLBACK=/);
+    assert.match(html, /let INGREDIENTS=\{\.\.\.INGREDIENTS_FALLBACK\}/);
+    assert.match(html, /function catalogKeyUsable\(key\)/);
+    assert.doesNotMatch(html, /INGREDIENTS\[key\]=\{unit:row\.pack_size/);
+    assert.doesNotMatch(html, /async function loadIngredientPrices\(\)/);
   });
 });
