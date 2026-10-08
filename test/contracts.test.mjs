@@ -67,8 +67,8 @@ describe("source contracts", () => {
 
   it("I-O12 pay rebuilds items.basket server-side and Telegram links come from the store whitelist", () => {
     assert.match(pay, /import \{ basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket \} from '\.\.\/_shared\/orders\.ts'/);
-    assert.match(pay, /import \{ PACKS, SEASONINGS, basketFor, normServings \} from '\.\.\/_shared\/portions\.ts'/);
-    assert.match(pay, /const packs = basketFor\(weekMeals, servings, ticks, PACKS, false\)/);
+    assert.match(pay, /import \{ PACKS, SEASONINGS, basketFor, normServings, storePacksFromPrices \} from '\.\.\/_shared\/portions\.ts'/);
+    assert.match(pay, /const packs = basketFor\(weekMeals, servings, ticks, PACKS, false, storePacksFromPrices\(data \|\| \[\]\)\)/);
     assert.match(pay, /const rebuilt = rebuildBasket\(rawBasket, data \|\| \[\], store\)/);
     assert.match(pay, /update\(\{ total: est, items: priced\.items \}\)/);
     assert.match(pay, /meals: names/);
@@ -258,7 +258,9 @@ describe("source contracts", () => {
     assert.match(mfaSql, /APPLIED 18 Sep 2026/);
     assert.match(mfaSql, /lock yourself out of Ops/);
     assert.match(mfaSql, /supabase secrets unset REQUIRE_ADMIN_MFA/, "roll-back path documented");
-    assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&S\.user\.email===ADMIN_EMAIL\)&&!mfaPending\(\);\}/);
+    assert.match(html, /const ADMIN_EMAIL="noyouchka.bouchard@gmail.com"/);
+    assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&adminStatus\)&&!mfaPending\(\);\}/);
+    assert.match(html, /S\.user\.email===ADMIN_EMAIL/);
     assert.match(html, /if\(mfaPending\(\)\)openMfaChallenge\(\);/);
     assert.match(html, /r&&r\.error==="mfa_required"/);
     assert.match(html, /window\.__pendingCapture=\{id,storeAmt\}/);
@@ -489,9 +491,9 @@ describe("source contracts", () => {
     assert.deepEqual(checkCats, expected, "CHECK constraint categories match expected");
   });
 
-  it("CATALOG: 46 ingredient keys are identical in index.html INGREDIENTS, ai/index.ts, and _shared/orders.ts", () => {
-    const htmlMatch = html.match(/const INGREDIENTS=\{([\s\S]*?)\};/);
-    assert.ok(htmlMatch, "INGREDIENTS found in index.html");
+  it("CATALOG: 46 ingredient keys in INGREDIENTS_FALLBACK match ai/index.ts and _shared/orders.ts", () => {
+    const htmlMatch = html.match(/const INGREDIENTS_FALLBACK=\{([\s\S]*?)\};/);
+    assert.ok(htmlMatch, "INGREDIENTS_FALLBACK found in index.html");
     const htmlKeys = [...htmlMatch[1].matchAll(/"([^"]+)":/g)].map((m) => m[1]).sort();
     
     const aiMatch = ai.match(/const CATALOG = \[([\s\S]*?)\]/);
@@ -503,10 +505,87 @@ describe("source contracts", () => {
     assert.ok(ordersMatch, "CATALOG found in _shared/orders.ts");
     const ordersKeys = ordersMatch[1].split(",").map((s) => s.trim().replace(/^['"]/g, "").replace(/['"]$/g, "")).filter(Boolean).sort();
     
-    assert.equal(htmlKeys.length, 46, "index.html has 46 ingredient keys");
+    assert.equal(htmlKeys.length, 46, "index.html has 46 ingredient keys in fallback");
     assert.equal(aiKeys.length, 46, "ai/index.ts has 46 catalog keys");
     assert.equal(ordersKeys.length, 46, "_shared/orders.ts has 46 catalog keys");
-    assert.deepEqual(htmlKeys, aiKeys, "index.html INGREDIENTS keys match ai CATALOG");
+    assert.deepEqual(htmlKeys, aiKeys, "index.html INGREDIENTS_FALLBACK keys match ai CATALOG");
     assert.deepEqual(aiKeys, ordersKeys, "ai CATALOG matches _shared/orders CATALOG");
+  });
+
+  it("I-A12 admins table + aal2 gates orders, meals, and ingredient prices; non-admin and aal1 cannot write", () => {
+    const sql = readFileSync(path.join(ROOT, "supabase/admin_roles.sql"), "utf8");
+    assert.match(sql, /create table if not exists public\.admins/);
+    assert.match(sql, /create or replace function public\.is_admin\(\) returns boolean/);
+    assert.match(sql, /security definer set search_path = public/);
+    assert.match(sql, /create or replace function public\.is_admin_aal2\(\) returns boolean/);
+    assert.match(sql, /select public\.is_admin\(\)\s+and \(auth\.jwt\(\)->>'aal'\) = 'aal2'/);
+    assert.match(sql, /grant execute on function public\.is_admin_aal2\(\) to authenticated/);
+    assert.match(sql, /revoke all on function public\.is_admin_aal2\(\) from public, anon, authenticated/);
+    for (const pol of ["admin select all orders", "admin update all orders", "admin update meals review", "admin insert meals"]) {
+      assert.match(sql, new RegExp(`create policy "${pol}"[\\s\\S]*?is_admin_aal2\\(\\)`), pol);
+    }
+    assert.match(sql, /drop policy if exists "admins insert admins" on public\.admins/);
+    assert.doesNotMatch(sql, /create policy "admins insert admins"/);
+    assert.doesNotMatch(sql, /create policy "admins update admins"/);
+    assert.doesNotMatch(sql, /create policy "admins delete admins"/);
+    const adminsRls = sql.slice(sql.indexOf("alter table public.admins enable row level security"), sql.indexOf("-- Orders / meals writes"));
+    assert.doesNotMatch(adminsRls, /for insert|for update|for delete/);
+    assert.match(sql, /drop policy if exists "admin delete meals" on public\.meals/);
+    assert.doesNotMatch(sql, /create policy "admin delete meals"/);
+    const mealsPol = sql.slice(sql.indexOf("-- Orders / meals writes"), sql.indexOf("-- Prices stay world-readable"));
+    assert.doesNotMatch(mealsPol, /for delete/);
+    assert.doesNotMatch(html, /function adminDeleteMeal/);
+    assert.doesNotMatch(html, /adminDeleteMeal\(/);
+    assert.doesNotMatch(html, /from\("meals"\)\.delete\(/);
+    assert.doesNotMatch(html, /from\("admins"\)\.insert\(/);
+    assert.doesNotMatch(html, /Add admin/);
+    assert.match(html, /saveMealEditor\('unpublish'\)/);
+    assert.doesNotMatch(sql, /drop policy if exists "read meals"/);
+    assert.match(sql, /create policy "admin read meals" on public\.meals[\s\S]*for select to authenticated[\s\S]*is_admin_aal2\(\)/);
+    assert.match(sql, /for select to authenticated\s+using \(public\.is_admin_aal2\(\)\)/);
+    assert.match(sql, /create policy "admin insert ingredient_prices"/);
+    assert.match(sql, /create policy "admin update ingredient_prices"/);
+    assert.match(sql, /create policy "admin delete ingredient_prices"/);
+    assert.match(sql, /for insert to authenticated\s+with check \(public\.is_admin_aal2\(\)\)/);
+    // Required fields and invariant checks live in the database, not only the client.
+    assert.match(sql, /create or replace function public\.validate_meal_write\(\)/);
+    const mealFn = sql.slice(sql.indexOf("function public.validate_meal_write"), sql.indexOf("function public.validate_ingredient_price"));
+    const priceFn = sql.slice(sql.indexOf("function public.validate_ingredient_price"));
+    // Service role and postgres (auth.uid() is null) skip both triggers. Regex only — not run against a database.
+    assert.match(mealFn, /if auth\.uid\(\) is null then\s+return new;/);
+    assert.match(priceFn, /if auth\.uid\(\) is null then\s+return new;/);
+    assert.match(mealFn, /expect = '' then\s+continue;/);
+    assert.doesNotMatch(mealFn, /seasonings stay 1 pack/);
+    assert.doesNotMatch(priceFn, /seasonings stay 1 pack/);
+    assert.match(sql, /portion unit for % must be %/);
+    assert.match(sql, /a published meal needs at least one instruction step/);
+    assert.match(sql, /create or replace function public\.validate_ingredient_price\(\)/);
+    assert.match(sql, /shop must be tesco, sainsburys, asda, or waitrose/);
+    assert.match(priceFn, /tg_op = 'INSERT'[\s\S]*category is required/);
+    assert.match(priceFn, /p\.slug = new\.slug and p\.category = new\.category/);
+    assert.match(sql, /price is required/);
+    assert.match(sql, /add column if not exists pack_qty numeric/);
+    assert.match(sql, /add column if not exists pack_unit text/);
+    assert.match(html, /sb\.rpc\("is_admin"\)/);
+    assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&adminStatus\)&&!mfaPending\(\);\}/);
+    assert.match(html, /function ingredientAddError/);
+    assert.match(html, /return "Pick a shop\."/);
+    assert.match(html, /return "Pick a category\."/);
+    assert.match(html, /return "Enter a price\."/);
+    assert.match(html, /Portion unit for "/);
+    assert.match(html, /not yet usable in baskets/);
+    assert.match(html, /id="nav-ingredients"/);
+    assert.match(html, /update\(patch\)\.eq\("id",fields\.existing\.id\)/);
+    assert.match(html, /slug:groupSlug/);
+    assert.doesNotMatch(html, /onConflict:"slug,store"/);
+    assert.doesNotMatch(html, /product_name:g\.name/);
+  });
+
+  it("I-A12 new ingredient keys stay out of the code catalog until pay and basketFor read the database", () => {
+    assert.match(html, /const INGREDIENTS_FALLBACK=/);
+    assert.match(html, /let INGREDIENTS=\{\.\.\.INGREDIENTS_FALLBACK\}/);
+    assert.match(html, /function catalogKeyUsable\(key\)/);
+    assert.doesNotMatch(html, /INGREDIENTS\[key\]=\{unit:row\.pack_size/);
+    assert.doesNotMatch(html, /async function loadIngredientPrices\(\)/);
   });
 });

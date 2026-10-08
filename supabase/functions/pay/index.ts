@@ -14,7 +14,7 @@
 import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 import { basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket } from '../_shared/orders.ts'
-import { PACKS, SEASONINGS, basketFor, normServings } from '../_shared/portions.ts'
+import { PACKS, SEASONINGS, basketFor, normServings, storePacksFromPrices } from '../_shared/portions.ts'
 
 const ADMIN_EMAIL = 'noyouchka.bouchard@gmail.com'
 const COMMISSION = 0.05
@@ -41,10 +41,17 @@ const STORE_DB: Record<string, { db: string; fee: number }> = {
 async function serverTotal(admin: any, store: string, items: any): Promise<{ total: number; items: any } | { error: string }> {
   const s = STORE_DB[store]
   if (!s) return { error: 'unknown store' }
-  const { data, error } = await admin
+  let priceQuery = await admin
     .from('ingredient_prices')
-    .select('meal_key,display_name,product_name,pack_size,price_gbp')
+    .select('id,meal_key,display_name,product_name,pack_size,price_gbp,pack_qty,pack_unit')
     .eq('store', s.db)
+  if (priceQuery.error) {
+    priceQuery = await admin
+      .from('ingredient_prices')
+      .select('meal_key,display_name,product_name,pack_size,price_gbp')
+      .eq('store', s.db)
+  }
+  const { data, error } = priceQuery
   if (error) return { error: 'prices unavailable' }
   // Snapshot cooking methods from the catalog (then any client copy) so the
   // customer can read them from the order after the week moves on (I-O15).
@@ -74,7 +81,7 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
       if (nm) byName[String(nm)] = row
     }
     const weekMeals = names.map((n) => byName[n] || { name: n, ing: [] })
-    const packs = basketFor(weekMeals, servings, ticks, PACKS, false)
+    const packs = basketFor(weekMeals, servings, ticks, PACKS, false, storePacksFromPrices(data || []))
     rawBasket = Object.keys(packs).map((i) => ({ i, q: packs[i] }))
   }
   const rebuilt = rebuildBasket(rawBasket, data || [], store)
@@ -164,7 +171,7 @@ export default {
       p.set('line_items[0][price_data][unit_amount]', String(amount))
       p.set('line_items[0][price_data][product_data][name]', `Plentry groceries — ${o.store}`)
       p.set('line_items[0][price_data][product_data][description]',
-        'Hold covers the estimate + 5% Plentry fee, with ~15% buffer. You are charged the exact store total plus 5%.')
+        'Hold covers the estimate + 5% Plentry fee, with ~30% buffer. You are charged the exact store total plus 5%.')
       if (ctx.userClaims?.email) p.set('customer_email', ctx.userClaims.email)
       const del = o.address && o.address.delivery
       if (del && del.line1 && del.city && del.postcode) {

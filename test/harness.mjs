@@ -6,7 +6,19 @@ import { JSDOM, VirtualConsole } from "jsdom";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX = path.join(ROOT, "index.html");
 
-function makeQuery(tables, table) {
+// ingredient_prices NOT NULL columns. Postgres checks these on INSERT, including
+// the insert half of an upsert, before ON CONFLICT can match an existing row.
+const PRICE_NOT_NULL = ["slug", "display_name", "category", "store", "product_name", "price_gbp"];
+
+export function ingredientPriceWriteError(row) {
+  if (!row || typeof row !== "object") return { message: "null value in column \"slug\" of relation \"ingredient_prices\" violates not-null constraint" };
+  for (const col of PRICE_NOT_NULL) {
+    if (row[col] == null) return { message: `null value in column "${col}" of relation "ingredient_prices" violates not-null constraint` };
+  }
+  return null;
+}
+
+export function makeQuery(tables, table) {
   const q = {
     _eq: {},
     _update: null,
@@ -23,8 +35,10 @@ function makeQuery(tables, table) {
     limit() {
       return q;
     },
-    upsert() {
-      return Promise.resolve({ data: null, error: null });
+    upsert(v, opts) {
+      q._upsert = Array.isArray(v) ? v : [v];
+      q._onConflict = (opts && opts.onConflict) || "id";
+      return q;
     },
     insert(v) {
       q._insert = Array.isArray(v) ? v : [v];
@@ -49,11 +63,37 @@ function makeQuery(tables, table) {
       return run().then(onFulfilled, onRejected);
     },
   };
+  function rejectPartial(rows) {
+    if (table !== "ingredient_prices") return null;
+    for (const row of rows) {
+      const error = ingredientPriceWriteError(row);
+      if (error) return error;
+    }
+    return null;
+  }
   async function run() {
     if (!tables[table]) tables[table] = [];
     if (q._insert) {
+      const error = rejectPartial(q._insert);
+      if (error) return { data: null, error };
       const rows = q._insert.map((row, i) => {
         const next = Object.assign({ id: tables[table].length + 1 + i }, row);
+        tables[table].push(next);
+        return next;
+      });
+      return { data: rows, error: null };
+    }
+    if (q._upsert) {
+      const error = rejectPartial(q._upsert);
+      if (error) return { data: null, error };
+      const keys = String(q._onConflict || "id").split(",").map((s) => s.trim()).filter(Boolean);
+      const rows = q._upsert.map((row) => {
+        const idx = tables[table].findIndex((r) => keys.every((k) => r[k] === row[k]));
+        if (idx >= 0) {
+          Object.assign(tables[table][idx], row);
+          return tables[table][idx];
+        }
+        const next = Object.assign({ id: tables[table].length + 1 }, row);
         tables[table].push(next);
         return next;
       });

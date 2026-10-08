@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extraMeals, loadApp, mockMfa } from "./harness.mjs";
+import { extraMeals, ingredientPriceWriteError, loadApp, makeQuery, mockMfa } from "./harness.mjs";
 
 function weekState() {
   const menuOptions = extraMeals();
@@ -45,6 +45,23 @@ describe("money", () => {
     const clientHold = window.holdAmount(shop);
     const serverPence = Math.round(charged * (1 + window.__plentry.HOLD_BUFFER) * 100);
     assert.equal(serverPence, Math.round(clientHold * 100));
+  });
+
+  it("client hold matches pay hold exactly, no 1p difference (Bug 2 fix)", async () => {
+    const { window } = await loadApp();
+    const testCases = [
+      { shop: 62.68, desc: "Tesco 4 servings from bug report" },
+      { shop: 20, desc: "round number" },
+      { shop: 47.83, desc: "typical fractional" },
+      { shop: 100.01, desc: "edge case" },
+    ];
+    testCases.forEach(({ shop, desc }) => {
+      const clientHold = window.holdAmount(shop);
+      const charged = shop * 1.05;
+      const payHoldPence = Math.round(charged * 1.30 * 100);
+      const payHold = payHoldPence / 100;
+      assert.equal(clientHold, payHold, `${desc}: client ${clientHold} should equal pay ${payHold}`);
+    });
   });
 });
 
@@ -899,6 +916,7 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(window.isAdmin(), false, "email alone is not admin while a code is pending");
     assert.equal(document.getElementById("nav-admin").style.display, "none");
     assert.equal(document.getElementById("nav-meals").style.display, "none");
+    assert.equal(document.getElementById("nav-ingredients").style.display, "none");
     assert.equal(document.getElementById("nav-inbox").style.display, "none");
     assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
     assert.ok(document.getElementById("mfa-banner").classList.contains("show"));
@@ -920,6 +938,7 @@ describe("founder 2-step verification (S-06)", () => {
     assert.equal(window.mfaPending(), false);
     assert.equal(window.isAdmin(), true);
     assert.equal(document.getElementById("nav-admin").style.display, "");
+    assert.equal(document.getElementById("nav-ingredients").style.display, "");
     assert.equal(document.getElementById("nav-inbox").style.display, "");
     assert.ok(!document.getElementById("mfa-banner").classList.contains("show"));
     assert.deepEqual(mfa.state.calls.at(-1), ["challengeAndVerify", { factorId: "11111111-2222-4333-8444-555555555555", code: "123456" }]);
@@ -1699,5 +1718,499 @@ describe("ops", () => {
     assert.ok(inbox.includes("Guillaume"));
     assert.equal(document.getElementById("inbox-badge").textContent, "1");
     assert.equal(document.getElementById("inbox-badge").style.display, "flex");
+  });
+});
+
+describe("I-A12 admin meals and ingredients", () => {
+  const founder = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+
+  it("a non-member is not admin once public.admins has someone else; aal1 stays blocked", async () => {
+    const mfa = mockMfa({ enrolled: true });
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: {
+        meals: [],
+        orders: [],
+        profiles: [],
+        ingredient_prices: [],
+        admins: [{ id: 1, user_id: "other", email: "ops@example.com" }],
+      },
+      mfa,
+    });
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), false, "founder email is not enough once the admins table has rows");
+    assert.equal(document.getElementById("nav-meals").style.display, "none");
+    await window.showIngredientsScreen();
+    assert.equal(document.getElementById("ingredients-list").textContent, "Admin only.");
+
+    window.__plentry.state().user = { id: "other", email: "ops@example.com" };
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), false, "listed admin at aal1 is blocked");
+    mfa.state.level = "aal2";
+    mfa.state.factors = [];
+    await window.refreshMfa();
+    assert.equal(window.isAdmin(), true, "listed admin at aal2");
+  });
+
+  it("adding a meal is blocked until name, catalog ingredients, and a step are filled; portion units must match", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), true);
+    const before = window.__sbTables.meals.length;
+    window.openMealEditor(null);
+    document.getElementById("me-name").value = "";
+    document.getElementById("me-steps").value = "Fry onions.";
+    window.__mealIng = new Set(["minced beef", "onions", "garlic", "salt", "black pepper"]);
+    await window.saveMealEditor(false);
+    assert.match(document.getElementById("me-err").textContent, /Name/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    document.getElementById("me-name").value = "Ops test chilli";
+    document.getElementById("me-steps").value = "";
+    await window.saveMealEditor(false);
+    assert.match(document.getElementById("me-err").textContent, /instruction step/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    document.getElementById("me-steps").value = "Fry onions.";
+    window.__mealPortions = { "minced beef": [100, "ml"] };
+    await window.saveMealEditor(false);
+    assert.match(document.getElementById("me-err").textContent, /Portion unit for minced beef must be g/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    window.__mealPortions = { "minced beef": [200, "g"], salt: [1, "g"] };
+    await window.saveMealEditor(true);
+    assert.match(document.getElementById("me-err").textContent, /category/);
+    assert.equal(window.__sbTables.meals.length, before);
+
+    document.getElementById("me-category").value = "curry_stew";
+    window.__mealPortions = { "minced beef": [200, "g"], salt: [1, "g"] };
+    await window.saveMealEditor(false);
+    const added = window.__sbTables.meals.find((m) => m.name === "Ops test chilli");
+    assert.ok(added);
+    assert.equal(added.reviewed_at, null);
+    // Portion arrays are created inside the page, so copy them before deep-equal.
+    assert.deepEqual([...(added.portions["minced beef"] || [])], [200, "g"]);
+    assert.deepEqual([...(added.portions.salt || [])], [1, "g"]);
+    const card = document.getElementById("meals-new").textContent;
+    assert.match(card, /serves 4/);
+    assert.match(card, /serves 6/);
+    assert.match(card, /Written for 2/);
+  });
+
+  it("unpublish sends a live dinner back to New meal, and there is no delete or add-admin control", async () => {
+    const live = {
+      id: 12,
+      name: "Live salmon traybake",
+      emoji: "🐟",
+      time: 30,
+      ing: ["salmon fillet", "potatoes", "broccoli", "lemons", "olive oil", "garlic", "salt", "black pepper"],
+      recipe: { steps: ["Roast potatoes.", "Add salmon."], tip: "Hot oven." },
+      tags: ["dinner", "fish"],
+      category: "oven_bake",
+      source: "seed",
+      created_at: "2026-09-01T10:00:00.000Z",
+      reviewed_at: "2026-09-08T12:00:00.000Z",
+    };
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [live], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showMealsScreen();
+    assert.equal(typeof window.adminDeleteMeal, "undefined");
+    assert.ok(!document.body.innerHTML.includes("Add admin"));
+    assert.ok(!document.body.innerHTML.includes("adminDeleteMeal"));
+    window.openMealEditor(12);
+    const modal = document.getElementById("modal").innerHTML;
+    assert.ok(modal.includes("Unpublish"));
+    assert.ok(!modal.includes("adminDeleteMeal"));
+    assert.ok(!modal.includes(">Remove<"));
+    await window.saveMealEditor("unpublish");
+    assert.equal(window.__sbTables.meals.length, 1);
+    assert.equal(window.__sbTables.meals[0].reviewed_at, null);
+    assert.ok(document.getElementById("me-err").textContent.includes("Unpublished"));
+    assert.ok(document.getElementById("meals-new").textContent.includes("Live salmon traybake"));
+    assert.ok(!document.getElementById("meals-live").textContent.includes("Live salmon traybake"));
+  });
+
+  it("adding an ingredient is blocked until shop, category, and price are set", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    assert.equal(window.ingredientAddError({}), "Pick a shop.");
+    assert.equal(window.ingredientAddError({ shop: "tesco" }), "Pick a category.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "fruit" }), "Enter a price.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "pantry", price: 1, name: "Salt", meal_key: "salt", pack_qty: 2, pack_unit: "g" }), "");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "grocery", price: 1, name: "Penne", meal_key: "penne" }), "Pick a category.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "grocery", price: 1, name: "Penne", updating: true }), "");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "pantry", price: 1, name: "Harissa" }), "Give it a meal key.");
+    assert.equal(window.ingredientAddError({ shop: "tesco", category: "fruit", price: 1.2, name: "Limes", meal_key: "limes", pack_qty: 5, pack_unit: "pc" }), "");
+
+    window.nav("ingredients");
+    document.getElementById("ing-add-name").value = "Harissa";
+    document.getElementById("ing-add-key").value = "harissa";
+    document.getElementById("ing-add-cat").value = "pantry";
+    document.getElementById("ing-add-shop").value = "tesco";
+    await window.saveNewIngredient();
+    assert.equal(document.getElementById("ing-add-err").textContent, "Enter a price.");
+    assert.equal(window.__sbTables.ingredient_prices.length, 0);
+
+    document.getElementById("ing-add-price").value = "1.40";
+    document.getElementById("ing-add-qty").value = "180";
+    document.getElementById("ing-add-unit").value = "g";
+    await window.saveNewIngredient();
+    const row = window.__sbTables.ingredient_prices[0];
+    assert.ok(row);
+    assert.equal(row.store, "tesco");
+    assert.equal(row.meal_key, "harissa");
+    assert.equal(row.category, "pantry");
+    assert.equal(row.price_gbp, 1.4);
+    assert.equal(row.slug, "harissa");
+    assert.equal(row.pack_qty, 180);
+    assert.equal(row.pack_unit, "g");
+    const list = document.getElementById("ingredients-list").textContent;
+    assert.ok(list.includes("Harissa"));
+    assert.ok(list.includes("not yet usable in baskets"));
+  });
+
+  it("saves shelf prices by row without rewriting the product name, and removes rows that have no meal key", async () => {
+    const prices = [
+      { id: 9, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", meal_key: null, product_name: "Tesco Penne 500g", pack_size: "500g", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+      { id: 10, slug: "penne", display_name: "Penne", category: "grocery", store: "sainsburys", meal_key: null, product_name: "Sainsbury's Penne", pack_size: "500g", price_gbp: 0.7, pack_qty: 500, pack_unit: "g" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    assert.match(document.getElementById("ingredients-list").textContent, /Grocery/);
+    document.getElementById("ing-price-0-tesco").value = "0.85";
+    document.getElementById("ing-product-0-sainsburys").value = "Sainsbury's Penne Rigate";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.length, 2);
+    const tesco = rows.find((r) => r.id === 9);
+    const sains = rows.find((r) => r.id === 10);
+    assert.equal(tesco.price_gbp, 0.85);
+    assert.equal(tesco.product_name, "Tesco Penne 500g");
+    assert.equal(tesco.category, "grocery");
+    assert.equal(sains.product_name, "Sainsbury's Penne Rigate");
+    assert.equal(sains.price_gbp, 0.7);
+    window.confirm = () => true;
+    await window.deleteIngredient(0);
+    assert.equal(window.__sbTables.ingredient_prices.length, 0);
+  });
+
+  it("edits the price of a group that already has all four shops", async () => {
+    const prices = ["tesco", "sainsburys", "asda", "waitrose"].map((store, i) => ({
+      id: i + 1,
+      slug: "penne",
+      display_name: "Penne",
+      category: "grocery",
+      store,
+      meal_key: null,
+      product_name: store + " penne",
+      pack_size: "500g",
+      price_gbp: 0.5 + i / 10,
+      pack_qty: 500,
+      pack_unit: "g",
+    }));
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    const before = prices.map((r) => ({ ...r }));
+    document.getElementById("ing-price-0-asda").value = "1.15";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.length, 4);
+    const asda = rows.find((r) => r.store === "asda");
+    assert.equal(asda.price_gbp, 1.15);
+    assert.equal(asda.product_name, "asda penne");
+    assert.equal(asda.display_name, "Penne");
+    assert.equal(asda.category, "grocery");
+    assert.equal(asda.slug, "penne");
+    assert.equal(asda.pack_size, "500g");
+    assert.equal(asda.pack_qty, 500);
+    assert.equal(asda.pack_unit, "g");
+    for (const store of ["tesco", "sainsburys", "waitrose"]) {
+      const row = rows.find((r) => r.store === store);
+      const prior = before.find((r) => r.store === store);
+      assert.equal(row.price_gbp, prior.price_gbp);
+      assert.equal(row.product_name, prior.product_name);
+      assert.equal(row.display_name, prior.display_name);
+      assert.equal(row.category, prior.category);
+      assert.equal(row.slug, prior.slug);
+    }
+  });
+
+  it("fills a missing shop on a grocery group and keeps the stored slug", async () => {
+    const prices = ["tesco", "sainsburys", "asda"].map((store, i) => ({
+      id: i + 1,
+      slug: "chicken-breast",
+      display_name: "Chicken breast fillets",
+      category: "grocery",
+      store,
+      meal_key: null,
+      product_name: store + " fillets",
+      pack_size: "650g",
+      price_gbp: 4 + i,
+      pack_qty: 650,
+      pack_unit: "g",
+    }));
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    document.getElementById("ing-price-0-waitrose").value = "5.40";
+    document.getElementById("ing-product-0-waitrose").value = "Waitrose chicken breast fillets";
+    document.getElementById("ing-pack-0-waitrose").value = "600g";
+    document.getElementById("ing-qty-0-waitrose").value = "600";
+    document.getElementById("ing-unit-0-waitrose").value = "g";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.length, 4);
+    const added = rows.find((r) => r.store === "waitrose");
+    assert.ok(added);
+    assert.equal(added.slug, "chicken-breast");
+    assert.notEqual(added.slug, "chicken-breast-fillets");
+    assert.equal(added.display_name, "Chicken breast fillets");
+    assert.equal(added.category, "grocery");
+    assert.equal(added.product_name, "Waitrose chicken breast fillets");
+    assert.equal(added.meal_key, null);
+    assert.equal(added.price_gbp, 5.4);
+    assert.equal(added.pack_size, "600g");
+    assert.equal(added.pack_qty, 600);
+    assert.equal(added.pack_unit, "g");
+    assert.equal(rows.find((r) => r.id === 1).price_gbp, 4);
+    assert.equal(rows.find((r) => r.id === 1).product_name, "tesco fillets");
+  });
+
+  it("writes the pack label when it was edited and leaves the other shops' labels", async () => {
+    const prices = [
+      { id: 9, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", meal_key: null, product_name: "Tesco Penne 500g", pack_size: "500g", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+      { id: 10, slug: "penne", display_name: "Penne", category: "grocery", store: "sainsburys", meal_key: null, product_name: "Sainsbury's Penne", pack_size: "500g", price_gbp: 0.7, pack_qty: 500, pack_unit: "g" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    document.getElementById("ing-pack-0-tesco").value = "1kg";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.find((r) => r.id === 9).pack_size, "1kg");
+    assert.equal(rows.find((r) => r.id === 9).price_gbp, 0.6);
+    assert.equal(rows.find((r) => r.id === 10).pack_size, "500g");
+  });
+
+  it("keeps the shelf product when the field is cleared, and a missing shop needs a product name", async () => {
+    const prices = [
+      { id: 9, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", meal_key: null, product_name: "Tesco Penne 500g", pack_size: "500g", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    document.getElementById("ing-product-0-tesco").value = "";
+    document.getElementById("ing-price-0-tesco").value = "0.99";
+    await window.saveIngredientGroup(0);
+    const tesco = window.__sbTables.ingredient_prices.find((r) => r.id === 9);
+    assert.equal(tesco.product_name, "Tesco Penne 500g");
+    assert.equal(tesco.price_gbp, 0.99);
+    document.getElementById("ing-price-0-waitrose").value = "1.20";
+    document.getElementById("ing-product-0-waitrose").value = "   ";
+    await window.saveIngredientGroup(0);
+    assert.equal(window.__sbTables.ingredient_prices.length, 1);
+    assert.match(document.getElementById("ing-err-0").textContent, /Name the shelf product/);
+  });
+
+  it("rejects a partial ingredient_prices insert or upsert that omits a NOT NULL column", async () => {
+    const tables = {
+      ingredient_prices: [
+        { id: 1, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", product_name: "Tesco Penne", price_gbp: 0.6 },
+      ],
+    };
+    const before = structuredClone(tables.ingredient_prices);
+    const partial = { slug: "penne", store: "tesco", price_gbp: 0.9 };
+    assert.match(ingredientPriceWriteError(partial).message, /display_name/);
+    const inserted = await makeQuery(tables, "ingredient_prices").insert(partial);
+    assert.match(inserted.error.message, /not-null constraint/);
+    assert.equal(tables.ingredient_prices.length, 1);
+    assert.equal(tables.ingredient_prices[0].price_gbp, 0.6);
+    const upserted = await makeQuery(tables, "ingredient_prices").upsert(partial, { onConflict: "slug,store" });
+    assert.match(upserted.error.message, /not-null constraint/);
+    assert.deepEqual(tables.ingredient_prices, before);
+    const profiles = { profiles: [] };
+    const kept = await makeQuery(profiles, "profiles").upsert({ id: "u1" }, { onConflict: "id" });
+    assert.equal(kept.error, null);
+    assert.equal(profiles.profiles.length, 1);
+  });
+});
+
+describe("shop switch uses that shop's packs", () => {
+  const ragu = {
+    name: "Beef ragù spaghetti",
+    ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+    portions: { salt: [0.5, "tsp"], garlic: [2, "clove"], onions: [1, "pc"], passata: [400, "g"], parmesan: [30, "g"], "olive oil": [1, "tbsp"], "soy sauce": [1, "tsp"], spaghetti: [180, "g"], "minced beef": [400, "g"], "mixed herbs": [1, "tsp"], "stock cubes": [1, "pc"], "black pepper": [0.25, "tsp"] },
+  };
+  const shakshuka = {
+    name: "Shakshuka",
+    ing: ["bell peppers", "black pepper", "chilli flakes", "cumin", "eggs", "feta", "garlic", "olive oil", "onions", "paprika", "passata", "salt", "tortillas"],
+    portions: { eggs: [4, "pc"], feta: [80, "g"], salt: [0.75, "tsp"], cumin: [1, "tsp"], garlic: [4, "clove"], onions: [1, "pc"], paprika: [1, "tsp"], passata: [400, "g"], "olive oil": [2, "tbsp"], tortillas: [4, "pc"], "bell peppers": [2, "pc"], "chilli flakes": [0.5, "tsp"] },
+  };
+  const tortilla = {
+    name: "Spanish tortilla with tomato salad",
+    ing: ["black pepper", "eggs", "olive oil", "onions", "potatoes", "salt", "tomatoes"],
+    portions: { eggs: [5, "pc"], salt: [0.5, "tsp"], onions: [1, "pc"], potatoes: [400, "g"], tomatoes: [3, "pc"], "olive oil": [5, "tbsp"] },
+  };
+  const salmon = { name: "Salmon traybake", ing: ["black pepper", "broccoli", "garlic", "lemons", "olive oil", "paprika", "potatoes", "salmon fillet", "salt"] };
+  const weekPrices = [
+    ["bell peppers", "sainsburys", 1.99, 3, "pc"], ["bell peppers", "tesco", 2.10, 3, "pc"],
+    ["black pepper", "sainsburys", 0.87, 55, "g"], ["black pepper", "tesco", 1.20, 25, "g"],
+    ["broccoli", "sainsburys", 1.40, 300, "g"], ["broccoli", "tesco", 0.90, 1, "pc"],
+    ["chilli flakes", "sainsburys", 1.15, 32, "g"], ["chilli flakes", "tesco", 1.00, 32, "g"],
+    ["cumin", "sainsburys", 1.15, 43, "g"], ["cumin", "tesco", 1.00, 43, "g"],
+    ["eggs", "sainsburys", 1.80, 6, "pc"], ["eggs", "tesco", 1.80, 6, "pc"],
+    ["feta", "sainsburys", 2.35, 200, "g"], ["feta", "tesco", 2.25, 200, "g"],
+    ["garlic", "sainsburys", 0.50, 10, "clove"], ["garlic", "tesco", 0.87, 40, "clove"],
+    ["lemons", "sainsburys", 0.89, 4, "pc"], ["lemons", "tesco", 1.45, 4, "pc"],
+    ["minced beef", "sainsburys", 5.05, 500, "g"], ["minced beef", "tesco", 6.75, 500, "g"],
+    ["mixed herbs", "sainsburys", 0.82, 18, "g"], ["mixed herbs", "tesco", 1.00, 18, "g"],
+    ["olive oil", "sainsburys", 5.75, 33, "tbsp"], ["olive oil", "tesco", 5.75, 33, "tbsp"],
+    ["onions", "sainsburys", 0.95, 3, "pc"], ["onions", "tesco", 0.95, 6, "pc"],
+    ["paprika", "sainsburys", 1.15, 44, "g"], ["paprika", "tesco", 1.00, 50, "g"],
+    ["parmesan", "sainsburys", 2.90, 80, "g"], ["parmesan", "tesco", 4.00, 200, "g"],
+    ["passata", "sainsburys", 0.45, 500, "g"], ["passata", "tesco", 0.60, 500, "g"],
+    ["potatoes", "sainsburys", 1.32, 2000, "g"], ["potatoes", "tesco", 1.32, 2000, "g"],
+    ["salmon fillet", "sainsburys", 3.59, 2, "pc"], ["salmon fillet", "tesco", 4.90, 2, "pc"],
+    ["salt", "sainsburys", 0.75, 750, "g"], ["salt", "tesco", 1.90, 1500, "g"],
+    ["soy sauce", "sainsburys", 0.55, 150, "ml"], ["soy sauce", "tesco", 0.55, 150, "ml"],
+    ["spaghetti", "sainsburys", 0.75, 500, "g"], ["spaghetti", "tesco", 0.75, 500, "g"],
+    ["stock cubes", "sainsburys", 1.10, 10, "pc"], ["stock cubes", "tesco", 1.00, 10, "pc"],
+    ["tomatoes", "sainsburys", 0.99, 6, "pc"], ["tomatoes", "tesco", 0.99, 6, "pc"],
+    ["tortillas", "sainsburys", 0.99, 8, "pc"], ["tortillas", "tesco", 1.40, 8, "pc"],
+  ].map(([meal_key, store, price_gbp, pack_qty, pack_unit], i) => ({
+    id: i + 1, meal_key, store, price_gbp, pack_qty, pack_unit, product_name: meal_key, display_name: meal_key,
+  }));
+
+  async function loadWeek() {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: weekPrices.map((r) => ({ ...r })) },
+    });
+    const S = window.__plentry.state();
+    S.weekServings = 6;
+    S.prefs.servings = 6;
+    S.menuOptions = [ragu, shakshuka, tortilla, salmon];
+    S.selected = [ragu.name, shakshuka.name, tortilla.name, salmon.name];
+    S.basketEdit = null;
+    S.pantry = {};
+    await window.loadShelfPrices();
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    window.renderShop();
+    return { window, document, S };
+  }
+
+  it("Tesco then Sainsbury's at 6 servings shows each shop's total and pay's hold", async () => {
+    const { window, document } = await loadWeek();
+    const qty = (name) => window.__plentry.getBasket().find((b) => b.i === name).q;
+    assert.equal(qty("garlic"), 1);
+    assert.equal(qty("onions"), 2);
+    const before = document.getElementById("store-compare").textContent;
+    assert.ok(document.getElementById("store-tesco").textContent.includes("£91.39"), before);
+    assert.ok(document.getElementById("store-sains").textContent.includes("£85.31"), before);
+    assert.ok(!document.getElementById("store-sains").textContent.includes("£104.97"));
+    window.pickStore("sains");
+    assert.equal(qty("garlic"), 2);
+    assert.equal(qty("onions"), 3);
+    assert.ok(document.getElementById("store-tesco").textContent.includes("£91.39"));
+    assert.ok(document.getElementById("store-sains").textContent.includes("£85.31"));
+    assert.ok(document.getElementById("order-btn").textContent.includes("£85.31"));
+    window.openBasket();
+    const drawer = document.getElementById("drawer-stores").textContent;
+    assert.ok(drawer.includes("£91.39"));
+    assert.ok(drawer.includes("£85.31"));
+    window.__plentry.state().user = { id: "u1", email: "t@t.com", name: "T" };
+    window.confirmOrder();
+    const modal = document.getElementById("modal").textContent;
+    assert.ok(modal.includes("£110.91"), modal);
+    assert.ok(!modal.includes("£104.97"));
+    assert.ok(!modal.includes("£126.75"));
+  });
+
+  it("an edited basket keeps added and removed lines and refreshes derived counts", async () => {
+    const { window, document, S } = await loadWeek();
+    const lines = window.__plentry.getBasket()
+      .filter((b) => b.i !== "parmesan")
+      .map((b) => ({ i: b.i, q: b.i === "garlic" ? 7 : b.q }));
+    lines.push({ i: "rice", q: 1 });
+    S.basketEdit = lines;
+    S.basketFor = JSON.stringify(S.selected);
+    window.pickStore("sains");
+    const names = window.__plentry.getBasket().map((b) => b.i);
+    assert.ok(names.includes("rice"));
+    assert.ok(!names.includes("parmesan"));
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "garlic").q, 2);
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "rice").q, 1);
+    assert.ok(document.getElementById("store-sains").textContent.includes("£85.31"));
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    window.confirmOrder();
+    assert.ok(document.getElementById("modal").textContent.includes("£110.91"));
+  });
+
+  it("duplicate meal_key and store rows keep the lowest id on the shelf", async () => {
+    const { window } = await loadApp({
+      tables: {
+        meals: [],
+        orders: [],
+        profiles: [],
+        ingredient_prices: [
+          { id: 3, meal_key: "garlic", store: "tesco", price_gbp: 0.5, pack_qty: 10, pack_unit: "clove", product_name: "low", display_name: "garlic" },
+          { id: 8, meal_key: "garlic", store: "tesco", price_gbp: 9, pack_qty: 40, pack_unit: "clove", product_name: "high", display_name: "garlic" },
+          { meal_key: "onions", store: "tesco", price_gbp: 0.95, pack_qty: 6, pack_unit: "pc", product_name: "first", display_name: "onions" },
+          { meal_key: "onions", store: "tesco", price_gbp: 1.5, pack_qty: 3, pack_unit: "pc", product_name: "second", display_name: "onions" },
+        ],
+      },
+    });
+    await window.loadShelfPrices();
+    assert.equal(window.storePackMap("tesco").garlic.pack, 10);
+    const garlic = window.shelfRow("garlic", { id: "tesco" });
+    assert.equal(Number(garlic.price_gbp), 0.5);
+    assert.equal(garlic.product_name, "low");
+    const onions = window.shelfRow("onions", { id: "tesco" });
+    assert.equal(Number(onions.pack_qty), 6);
+    assert.equal(onions.product_name, "first");
   });
 });

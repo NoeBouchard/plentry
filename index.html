@@ -471,6 +471,33 @@
     </div>
   </div>
 
+  <!-- INGREDIENTS (admin) -->
+  <div class="screen" id="scr-ingredients">
+    <div class="card">
+      <h2>Ingredient catalog</h2>
+      <p class="sub">Shop, category, and a price are required. A key that is not already in the code catalog is saved here but flagged <b>not yet usable in baskets</b> — checkout still rejects unknown keys. Pack quantity and unit are stored per shop for the next basket change. Seasonings stay 1 pack.</p>
+      <div class="field"><label>Name</label><input id="ing-add-name" placeholder="Limes"></div>
+      <div class="field"><label>Meal key</label><input id="ing-add-key" placeholder="limes"></div>
+      <div class="field"><label>Category</label><select id="ing-add-cat"><option value="">— choose —</option><option value="protein">Protein</option><option value="dairy">Dairy</option><option value="veg">Vegetables</option><option value="fruit">Fruit</option><option value="carbs">Carbs</option><option value="pantry">Pantry</option></select></div>
+      <div class="grid2">
+        <div class="field"><label>Shop</label><select id="ing-add-shop"><option value="">— choose —</option><option value="tesco">Tesco</option><option value="sainsburys">Sainsbury's</option><option value="asda">Asda</option><option value="waitrose">Waitrose</option></select></div>
+        <div class="field"><label>Price £</label><input id="ing-add-price" type="number" min="0" step="0.01" placeholder="1.20"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Pack label</label><input id="ing-add-pack" placeholder="5 pk"></div>
+        <div class="field"><label>Pack qty</label><input id="ing-add-qty" type="number" min="0" step="0.01" placeholder="5"></div>
+      </div>
+      <div class="field"><label>Pack unit</label><select id="ing-add-unit"><option value="">— none —</option><option>g</option><option>ml</option><option>pc</option><option>clove</option><option>tbsp</option><option>tsp</option></select></div>
+      <div class="err" id="ing-add-err"></div>
+      <button class="btn" style="width:100%;margin-top:8px" type="button" onclick="saveNewIngredient()">Add ingredient</button>
+    </div>
+    <div class="card">
+      <h2>By category</h2>
+      <input id="ingredients-q" placeholder="Search ingredient…" oninput="renderIngredients()" style="margin-bottom:10px">
+      <div id="ingredients-list"><p class="sub">Loading…</p></div>
+    </div>
+  </div>
+
   <!-- ADMIN OPS (founder only — nav button revealed by JS for the admin email) -->
   <div class="screen" id="scr-admin">
     <div class="card">
@@ -495,6 +522,7 @@
     <button data-s="orders" onclick="nav('orders')"><span class="ico">📦</span>Orders</button>
     <button data-s="profile" onclick="nav('profile')"><span class="ico">👤</span>Profile</button>
     <button data-s="meals" id="nav-meals" style="display:none" onclick="nav('meals')"><span class="ico">📒</span>Meals</button>
+    <button data-s="ingredients" id="nav-ingredients" style="display:none" onclick="nav('ingredients')"><span class="ico">🥬</span>Ingredients</button>
     <button data-s="admin" id="nav-admin" style="display:none" onclick="nav('admin')"><span class="ico">🧑‍🍳</span>Ops</button>
     <button data-s="inbox" id="nav-inbox" style="display:none" onclick="nav('inbox')"><span class="ico">📨</span>Inbox<span class="inbox-badge" id="inbox-badge">0</span></button>
   </nav>
@@ -613,7 +641,7 @@ const HOLD_BUFFER=0.30;
 function gbp(n){return Math.round(Number(n||0)*100)/100;}
 function plentryFee(shop){return gbp(shop*COMMISSION);}
 function customerTotal(shop){return gbp(Number(shop||0)+plentryFee(shop));}
-function holdAmount(shop){return gbp(customerTotal(shop)*(1+HOLD_BUFFER));}
+function holdAmount(shop){return Math.round(Number(shop||0)*(1+COMMISSION)*(1+HOLD_BUFFER)*100)/100;}
 function captureChargePence(storeGbp){
   const storePence=Math.round(Number(storeGbp)*100);
   if(!storePence||storePence<=0)return 0;
@@ -671,8 +699,8 @@ const SAMPLE_WEEK_ITEMS=[
   {name:"curry paste",qty:1,unit:"jar"},{name:"passata",qty:1,unit:"500g"},
   {name:"onions",qty:2,unit:"3 pk"},{name:"garlic",qty:2,unit:"bulb"},
   {name:"bell peppers",qty:1,unit:"3 pk"},{name:"broccoli",qty:1,unit:"head"},
-  {name:"spinach",qty:1,unit:"240g"},{name:"lemons",qty:1,unit:"3 pk"},
-  {name:"potatoes",qty:1,unit:"1kg"},{name:"olive oil",qty:1,unit:"500ml"},
+  {name:"spinach",qty:1,unit:"240g"},{name:"lemons",qty:1,unit:"4 pk"},
+  {name:"potatoes",qty:1,unit:"2kg"},{name:"olive oil",qty:1,unit:"500ml"},
   {name:"feta",qty:1,unit:"200g"},{name:"yoghurt",qty:1,unit:"500g"},
   {name:"parmesan",qty:1,unit:"80g"},
 ];
@@ -742,7 +770,11 @@ const PHOTO_BY_ING={
 const PHOTO_FALLBACK=U("photo-1546069901-ba9599a7e63c");
 const PHOTO_ING_ORDER=["chicken thighs","salmon fillet","minced beef","halloumi","eggs","chickpeas","spaghetti","rice","tortillas","potatoes","tomatoes","chopped tomatoes","broccoli","spinach","passata","curry paste","coconut milk","feta"];
 const IS_MOBILE=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const INGREDIENTS={
+// Code catalog. pay's CATALOG and basketFor/PACKS must stay the same keys (I-O12, I-P04).
+// ingredient_prices can add rows, but a new key is not copied in here: checkout would
+// reject it, and parsing pack_size labels would change pack math. Flag those rows
+// "not yet usable in baskets" until basketFor reads per-shop pack_qty/pack_unit.
+const INGREDIENTS_FALLBACK={
   "chicken thighs":{unit:"500g",pack:4,pu:"pc",price:3.80},"salmon fillet":{unit:"2 pc",pack:2,pu:"pc",price:4.50},
   "minced beef":{unit:"500g",pack:500,pu:"g",price:3.95},"halloumi":{unit:"225g",pack:225,pu:"g",price:2.75},
   "eggs":{unit:"6 pk",pack:6,pu:"pc",price:1.55},"chickpeas":{unit:"400g tin",pack:400,pu:"g",price:0.65},
@@ -752,12 +784,12 @@ const INGREDIENTS={
   "onions":{unit:"6 pk",pack:6,pu:"pc",price:0.85},"garlic":{unit:"4 pk",pack:40,pu:"clove",price:0.35},
   "bell peppers":{unit:"3 pk",pack:3,pu:"pc",price:1.60},"broccoli":{unit:"head",pack:1,pu:"pc",price:0.90},
   "spinach":{unit:"240g",pack:240,pu:"g",price:1.30},"tomatoes":{unit:"6 pk",pack:6,pu:"pc",price:1.20},
-  "lemons":{unit:"3 pk",pack:3,pu:"pc",price:1.00},"potatoes":{unit:"1kg",pack:1000,pu:"g",price:1.15},
+  "lemons":{unit:"4 pk",pack:4,pu:"pc",price:1.00},"potatoes":{unit:"2kg",pack:2000,pu:"g",price:1.15},
   "olive oil":{unit:"500ml",pack:33,pu:"tbsp",price:3.50},"feta":{unit:"200g",pack:200,pu:"g",price:1.95},
   "yoghurt":{unit:"500g",pack:500,pu:"g",price:1.25},"parmesan":{unit:"80g",pack:80,pu:"g",price:1.85},
   "chopped tomatoes":{unit:"400g tin",pack:400,pu:"g",price:0.50},"butter":{unit:"250g",pack:250,pu:"g",price:1.99},
   "fresh coriander":{unit:"30g bunch",pack:30,pu:"g",price:0.70},
-  "tomato puree":{unit:"200g",pack:65,pu:"g",price:0.65},"fresh ginger":{unit:"100g",pack:100,pu:"g",price:1.25},
+  "tomato puree":{unit:"200g",pack:200,pu:"g",price:0.65},"fresh ginger":{unit:"100g",pack:100,pu:"g",price:1.25},
   "garam masala":{unit:"jar",pack:20,pu:"tsp",price:1.10},"limes":{unit:"5 pk",pack:5,pu:"pc",price:1.20},
   "spring onions":{unit:"bunch",pack:6,pu:"pc",price:0.70},"penne":{unit:"500g",pack:500,pu:"g",price:0.60},
   "arborio rice":{unit:"500g",pack:500,pu:"g",price:2.50},"fresh basil":{unit:"30g",pack:30,pu:"g",price:0.55},
@@ -768,6 +800,8 @@ const INGREDIENTS={
   "chilli flakes":{unit:"jar",pack:null,pu:"",price:1.00},"mixed herbs":{unit:"jar",pack:null,pu:"",price:1.10},
   "soy sauce":{unit:"150ml",pack:null,pu:"",price:0.55},"stock cubes":{unit:"10 pk",pack:null,pu:"",price:1.10},
 };
+let INGREDIENTS={...INGREDIENTS_FALLBACK};
+function catalogKeyUsable(key){return !!INGREDIENTS_FALLBACK[String(key||"").trim().toLowerCase()];}
 // Cupboard: oils, aromatics, spices. Tick to skip on the shop. Groceries stay in the basket.
 /* portions:start */
 const SEASONINGS=["salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
@@ -794,11 +828,40 @@ function scalePortion(amount, unit, key, servings){
   if(unit==="pc"||unit==="clove")return Math.ceil(a*af);
   return a*af;
 }
-function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
+// Duplicate shelf rows for one meal_key and store: lowest numeric id, otherwise the first row.
+function firstShelfRow(rows){
+  let best=null;
+  (Array.isArray(rows)?rows:[]).forEach(function(r){
+    if(!r)return;
+    if(!best){best=r;return;}
+    const id=r.id==null||r.id===""?null:+r.id;
+    const bid=best.id==null||best.id===""?null:+best.id;
+    const has=id!==null&&Number.isFinite(id);
+    const bhas=bid!==null&&Number.isFinite(bid);
+    if(has&&(!bhas||id<bid))best=r;
+  });
+  return best;
+}
+function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePacks){
   const cat=catalog||{};
+  const shelf=storePacks&&typeof storePacks==="object"&&!Array.isArray(storePacks)?storePacks:{};
+  function packOf(key){
+    const code=cat[key];
+    if(!code||!(code.pack>0))return 0;
+    const row=shelf[key];
+    const qty=row?+row.pack:0;
+    if(!(qty>0))return code.pack;
+    const cu=String(code.pu||"").toLowerCase();
+    const su=String(row.pu||"").toLowerCase();
+    if(su===cu)return qty;
+    if((cu==="g"&&su==="kg")||(cu==="ml"&&su==="l"))return qty*1000;
+    if((cu==="kg"&&su==="g")||(cu==="l"&&su==="ml"))return qty/1000;
+    return code.pack;
+  }
   const have={};
   (Array.isArray(cupboardTicks)?cupboardTicks:[]).forEach(function(k){have[String(k)]=1;});
   const need={};
+  const hasNoPortion={};
   const seen={};
   const meals=Array.isArray(weekMeals)?weekMeals:[];
   function markSeasoning(list){
@@ -814,7 +877,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     if(!groceryKeys.length){
       ing.forEach(function(key){
         if(SEASONINGS.indexOf(key)>=0||!cat[key]||!(cat[key].pack>0))return;
-        need[key]=Math.max(need[key]||0,cat[key].pack);
+        hasNoPortion[key]=1;
         seen[key]=1;
       });
       return;
@@ -827,7 +890,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
       if(bad){
         if(strict)throw new Error("unit mismatch "+key);
         console.log("portion unit mismatch",key);
-        need[key]=Math.max(need[key]||0,pack);
+        hasNoPortion[key]=1;
         seen[key]=1;
         return;
       }
@@ -839,12 +902,21 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
   Object.keys(seen).forEach(function(key){
     if(have[key])return;
     if(SEASONINGS.indexOf(key)>=0){packs[key]=1;return;}
-    const pack=cat[key]&&cat[key].pack;
+    const pack=packOf(key);
     if(!(pack>0))return;
-    const amount=need[key]||0;
-    if(!(amount>0))return;
-    let q=Math.ceil(amount/pack-1e-9);
-    if(q<1)q=1;
+    const scaled=need[key]||0;
+    const flagged=hasNoPortion[key]?1:0;
+    if(!(scaled>0)&&!flagged)return;
+    let q;
+    if(!(scaled>0))q=1;
+    else{
+      q=Math.ceil(scaled/pack-1e-9);
+      if(q<1)q=1;
+      if(flagged){
+        const spare=q*pack-scaled;
+        if(spare<pack/2)q=q+1;
+      }
+    }
     if(q>50)q=50;
     packs[key]=q;
   });
@@ -868,7 +940,10 @@ function copyPortions(raw){
   const out={};
   Object.keys(raw).forEach(k=>{
     const v=raw[k];
-    if(!INGREDIENTS[k]||!Array.isArray(v)||v.length<2)return;
+    if(!Array.isArray(v)||v.length<2)return;
+    // Seasonings are stored on some live meals. Keep them as written; the basket never scales them.
+    if(SEASONINGS.indexOf(k)>=0){out[k]=[v[0],v[1]];return;}
+    if(!INGREDIENTS[k])return;
     const unit=String(v[1]);
     const amount=+v[0];
     if(units.indexOf(unit)<0||!Number.isFinite(amount)||amount<0)return;
@@ -1079,17 +1154,29 @@ let SHELF={};let SHELF_READY=false;
 async function loadShelfPrices(){
   if(!sb)return;
   try{
-    const {data,error}=await sb.from("ingredient_prices")
-      .select("meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
+    let res=await sb.from("ingredient_prices")
+      .select("id,meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate,pack_qty,pack_unit");
+    if(res.error)res=await sb.from("ingredient_prices")
+      .select("id,meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
+    const data=res.data,error=res.error;
     if(error||!data)return;
     // key by meal_key when linked to the meal catalog, else display_name — so pantry
     // items outside the meal keys (soy sauce, ketchup, …) still price correctly.
+    // Several rows for one key and store collapse with firstShelfRow (lowest id).
     const byDb={};
-    for(const r of data){const k=r.meal_key||(r.display_name||"").toLowerCase();if(!k)continue;(byDb[k]=byDb[k]||{})[r.store]=r;}
+    for(const r of data){
+      const k=r.meal_key||(r.display_name||"").toLowerCase();
+      if(!k)continue;
+      const bucket=byDb[k]=byDb[k]||{};
+      (bucket[r.store]=bucket[r.store]||[]).push(r);
+    }
     SHELF={};
     for(const [key,stores] of Object.entries(byDb)){
       SHELF[key]={};
-      for(const [appId,dbId] of Object.entries(DB_STORE))if(stores[dbId])SHELF[key][appId]=stores[dbId];
+      for(const [appId,dbId] of Object.entries(DB_STORE)){
+        const row=firstShelfRow(stores[dbId]);
+        if(row)SHELF[key][appId]=row;
+      }
     }
     SHELF_READY=Object.keys(SHELF).length>0;
     if(basket.length)renderShop();
@@ -1098,6 +1185,19 @@ async function loadShelfPrices(){
     renderBasketFab();
     if(basketOpen)renderBasketDrawer();
   }catch(e){}
+}
+function storePackMap(appId){
+  const out={};
+  if(!appId)return out;
+  Object.keys(SHELF||{}).forEach(function(key){
+    const r=SHELF[key]&&SHELF[key][appId];
+    if(!r||!r.meal_key)return;
+    const qty=+r.pack_qty;
+    const pu=String(r.pack_unit||"");
+    if(!(qty>0)||!pu)return;
+    out[String(r.meal_key)]={pack:qty,pu:pu};
+  });
+  return out;
 }
 function shelfRow(item,store){
   const aliases={"mixed herbs":"dried mixed herbs","stock cubes":"chicken stock cubes"};
@@ -1266,7 +1366,8 @@ function syncMfaBanner(){
   if(el)el.classList.toggle("show",mfaPending());
 }
 function mfaPending(){
-  if(S.user&&S.user.email===ADMIN_EMAIL&&mfa.factorId&&mfa.level!=="aal2")return true;
+  const gate=adminStatus||!!(S.user&&S.user.email===ADMIN_EMAIL);
+  if(gate&&mfa.factorId&&mfa.level!=="aal2")return true;
   return mfa.next==="aal2"&&mfa.level!=="aal2";
 }
 const mfaCode=()=>{const el=document.getElementById("mfa-code");return String(el?el.value:"").replace(/\D/g,"");};
@@ -1316,7 +1417,7 @@ async function submitMfaChallenge(){
 function renderSecurityCard(){
   const card=document.getElementById("pr-security");
   if(!card)return;
-  const show=!!(S.user&&S.user.email===ADMIN_EMAIL&&mfaApi());
+  const show=!!(S.user&&adminStatus&&mfaApi());
   card.style.display=show?"":"none";
   if(!show)return;
   const st=document.getElementById("pr-mfa-status"),act=document.getElementById("pr-mfa-actions");
@@ -1820,7 +1921,8 @@ function autoPickWeek(){
   lockWeekServings();
   save();
 }
-function enterApp(){
+async function enterApp(){
+  await checkAdminStatus(); // check admin role after login
   document.getElementById("main-nav").classList.add("show");
   const admin=document.getElementById("nav-admin");
   if(admin)admin.style.display=isAdmin()?"":"none";
@@ -1828,6 +1930,8 @@ function enterApp(){
   if(inboxNav)inboxNav.style.display=isAdmin()?"":"none";
   const mealsNav=document.getElementById("nav-meals");
   if(mealsNav)mealsNav.style.display=isAdmin()?"":"none";
+  const ingredientsNav=document.getElementById("nav-ingredients");
+  if(ingredientsNav)ingredientsNav.style.display=isAdmin()?"":"none";
   syncHeader();
   syncMfaBanner();
   // S-06: a verified authenticator exists but this session has not entered the
@@ -1842,12 +1946,32 @@ function enterApp(){
   });
 }
 
-// ---------- ADMIN OPS (concierge fulfilment; founder account only) ----------
-// RLS does the real gating (supabase/admin_policies.sql) — hiding the nav
-// button is just UI. Statuses: new -> ordered -> delivered.
-// isAdmin() is false while a 2-step code is pending (S-06).
+// ---------- ADMIN OPS (concierge fulfilment; admin role) ----------
+// RLS does the real gating (supabase/admin_roles.sql) — hiding the nav button
+// is just UI. Statuses: new -> ordered -> delivered.
+// isAdmin() is false while a 2-step code is pending (S-06 / I-A10).
+// public.admins is the list. Until that SQL is applied, the founder email still works.
 const ADMIN_EMAIL="noyouchka.bouchard@gmail.com";
-function isAdmin(){return !!(S.user&&S.user.email===ADMIN_EMAIL)&&!mfaPending();}
+let adminStatus=false; // cached after login
+async function checkAdminStatus(){
+  if(!sb||!S.user){adminStatus=false;return false;}
+  try{
+    if(sb.rpc){
+      const rpc=await sb.rpc("is_admin");
+      if(rpc&&!rpc.error&&(rpc.data===true||rpc.data===false)){adminStatus=rpc.data===true;return adminStatus;}
+    }
+  }catch(e){}
+  try{
+    const {data,error}=await sb.from("admins").select("user_id").eq("user_id",S.user.id).maybeSingle();
+    if(!error&&data){adminStatus=true;return true;}
+    if(error){adminStatus=S.user.email===ADMIN_EMAIL;return adminStatus;}
+    const all=await sb.from("admins").select("user_id").limit(1);
+    const empty=!all||all.error||!all.data||!all.data.length;
+    adminStatus=!!(empty&&S.user.email===ADMIN_EMAIL);
+  }catch(e){adminStatus=S.user.email===ADMIN_EMAIL;}
+  return adminStatus;
+}
+function isAdmin(){return !!(S.user&&adminStatus)&&!mfaPending();}
 function adminListText(o){
   const items=(o.items&&o.items.basket)||[];
   const d=orderDelivery(o);
@@ -1979,16 +2103,32 @@ function coerceMealRow(m){
   row.ing=parse(row.ing);
   row.tags=parse(row.tags);
   row.recipe=parse(row.recipe);
+  row.portions=parse(row.portions);
   return row;
 }
 function mealRecipeBlockHtml(m){
   const ing=Array.isArray(m.ing)?m.ing:[];
   const rec=storedRecipe(m);
   const steps=(rec&&rec.steps)||[];
+  let stepNum=0;
   const method=steps.length
-    ?`<ol class="me-steps">${steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>${rec.tip?`<div class="recipe-preview">Tip: ${esc(rec.tip)}</div>`:""}`
+    ?steps.map(s=>{
+        const parsed=parseStepWithHeading(s);
+        if(parsed.heading)return `<div class="recipe-heading">${esc(parsed.heading)}</div><div class="recipe-step"><span class="n">${++stepNum}</span><span>${esc(parsed.text)}</span></div>`;
+        return `<div class="recipe-step"><span class="n">${++stepNum}</span><span>${esc(parsed.text)}</span></div>`;
+      }).join("")+(rec&&rec.tip?`<div class="recipe-preview">Tip: ${esc(rec.tip)}</div>`:"")
     :`<div class="recipe-preview">No method yet — add instructions before verify.</div>`;
-  return `<div class="sdetail" style="white-space:normal">${esc(ing.join(", ")||"No ingredients")}</div>${method}`;
+  const cat=m&&m.category?(MEAL_CATEGORY_LABELS[m.category]||m.category):"";
+  const photo=m&&m.image_url&&safeUrl(m.image_url)!=="#"?`<img src="${safeUrl(m.image_url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover">`:"";
+  const serves=[2,4,6].map(n=>{
+    const scaled=formatScaledIng(m,n);
+    const list=scaled?esc(scaled):esc(ing.join(", ")||"No ingredients");
+    const note=n===2?"":`<p class="sub">Written for 2 — you're cooking for ${n}: use your largest pan or two, and allow a few extra minutes to brown meat.</p>`;
+    const who=n===2?"quantities for 2":("serves "+n);
+    return `<div class="sdetail">${cookMinutes(m,n)} min · ${who}</div><div class="sdetail" style="white-space:normal">${list}</div>${note}`;
+  }).join("");
+  return `<div class="row" style="margin-top:6px;align-items:center">${photo}<div class="sdetail">${cookMinutes(m,2)} min${cat?" · "+esc(cat):""}</div></div>
+    ${serves}${method}`;
 }
 function toggleMealDetails(key,ev){
   if(ev)ev.stopPropagation();
@@ -2030,7 +2170,7 @@ async function loadAdminMeals(){
   window.__adminMealsErr="";
   if(!sb){window.__adminMeals=fallback();return window.__adminMeals;}
   const tries=[
-    "id,name,emoji,time,category,ing,image_url,recipe,tags,source,created_at,reviewed_at",
+    "id,name,emoji,time,category,ing,image_url,recipe,tags,portions,source,created_at,reviewed_at",
     "id,name,emoji,time,category,ing,recipe,tags,source,created_at,reviewed_at",
     "id,name,emoji,time,category,ing,tags,source,created_at,reviewed_at",
     "id,name,emoji,time,category,ing,tags,reviewed_at",
@@ -2082,15 +2222,21 @@ function renderMeals(){
   const q=String(qEl&&qEl.value||"").trim().toLowerCase();
   const match=m=>!q||String(m.name||"").toLowerCase().includes(q)||mealTags(m).some(t=>t.toLowerCase().includes(q))||(Array.isArray(m.ing)&&m.ing.some(i=>String(i).toLowerCase().includes(q)));
   const shown=pub.filter(match);
-  const groups={meat:[],fish:[],vegetarian:[],vegan:[],other:[]};
-  const labels={meat:"Meat",fish:"Fish",vegetarian:"Vegetarian",vegan:"Vegan",other:"Other"};
-  shown.forEach(m=>{(groups[mealDiet(m)]||groups.other).push(m);});
-  const counts=["meat","fish","vegetarian","vegan"].map(k=>`${groups[k].length} ${labels[k].toLowerCase()}`).join(" · ");
+  // Group by category (7 values) instead of diet
+  const groups={};
+  MEAL_CATEGORIES.forEach(c=>groups[c]=[]);
+  groups.other=[];
+  shown.forEach(m=>{
+    const cat=m.category&&MEAL_CATEGORIES.indexOf(m.category)>=0?m.category:"other";
+    groups[cat].push(m);
+  });
+  const counts=MEAL_CATEGORIES.map(k=>`${groups[k].length} ${esc(MEAL_CATEGORY_LABELS[k]||k)}`).filter(s=>!s.startsWith("0 ")).join(" · ");
   const err=window.__adminMealsErr?`<p class="err">${esc(window.__adminMealsErr)}</p>`:"";
-  const sections=["meat","fish","vegetarian","vegan","other"].map(k=>{
+  const sections=MEAL_CATEGORIES.concat(["other"]).map(k=>{
     const list=groups[k];
     if(!list.length)return "";
-    return `<div class="cat-group"><div class="cat-head"><b>${labels[k]}</b><span class="sdetail">${list.length}</span></div>${
+    const label=k==="other"?"Uncategorized":MEAL_CATEGORY_LABELS[k]||k;
+    return `<div class="cat-group"><div class="cat-head"><b>${esc(label)}</b><span class="sdetail">${list.length}</span></div>${
       list.map((m,i)=>mealCardOpsHtml(m,false,k+"-"+i)).join("")
     }</div>`;
   }).join("");
@@ -2105,6 +2251,265 @@ async function showMealsScreen(){
   await loadAdminMeals();
   renderMeals();
 }
+
+// ---------- ADMIN INGREDIENTS ----------
+// ingredient_prices is one row per shop, matched by meal_key (not slug).
+// store is tesco | sainsburys | asda | waitrose. pack_qty / pack_unit are per shop
+// so a later basketFor can use them instead of the single catalog pack.
+const INGREDIENT_CATEGORIES=["protein","dairy","veg","fruit","carbs","pantry"];
+// grocery / fresh are already on live price rows. Show them; new adds still use the six above.
+const LEGACY_PRICE_CATEGORIES=["grocery","fresh"];
+const INGREDIENT_CATEGORY_LABELS={protein:"Protein",dairy:"Dairy",veg:"Vegetables",fruit:"Fruit",carbs:"Carbs",pantry:"Pantry",grocery:"Grocery",fresh:"Fresh"};
+const PRICE_STORES=[{id:"tesco",label:"Tesco"},{id:"sainsburys",label:"Sainsbury's"},{id:"asda",label:"Asda"},{id:"waitrose",label:"Waitrose"}];
+const PACK_UNITS=["g","ml","pc","clove","tbsp","tsp"];
+function ingredientSlug(key){
+  return String(key||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,80);
+}
+function ingredientAddError(f){
+  f=f||{};
+  const shop=String(f.shop||"").trim();
+  const category=String(f.category||"").trim();
+  const name=String(f.name||"").trim();
+  const mealKey=String(f.meal_key||"").trim().toLowerCase();
+  const price=+f.price;
+  const unit=String(f.pack_unit||"").trim();
+  const qtyRaw=f.pack_qty;
+  const qty=(qtyRaw==null||qtyRaw==="")?null:+qtyRaw;
+  const updating=!!f.updating;
+  if(!shop||!PRICE_STORES.some(s=>s.id===shop))return "Pick a shop.";
+  if(!category)return "Pick a category.";
+  // The add form needs one of the six categories. A missing shop on a live grocery/fresh group inherits that category.
+  const inherited=!!f.groupSave&&category===String(f.groupCategory||"");
+  if(!updating&&!inherited&&INGREDIENT_CATEGORIES.indexOf(category)<0)return "Pick a category.";
+  if(!(price>0))return "Enter a price.";
+  if(!name)return "Name the ingredient.";
+  if(!updating&&f.groupSave&&!String(f.product_name||"").trim())return "Name the shelf product.";
+  if(!updating&&!f.groupSave&&!mealKey)return "Give it a meal key.";
+  if(unit&&PACK_UNITS.indexOf(unit)<0)return "Pack unit must match a catalog unit (g, ml, pc, clove, tbsp, tsp).";
+  if((qty!=null&&!(qty>0))||(qty>0&&!unit)||(unit&&!(qty>0)))return "Pack quantity and unit must be set together.";
+  return "";
+}
+async function loadIngredientPricesAdmin(){
+  if(!isAdmin()){window.__adminIngredients=[];return [];}
+  if(!sb){window.__adminIngredients=[];return [];}
+  const cols=["id,slug,meal_key,display_name,category,store,product_name,pack_size,price_gbp,pack_qty,pack_unit","id,slug,meal_key,display_name,category,store,product_name,pack_size,price_gbp"];
+  for(const c of cols){
+    try{
+      const {data,error}=await sb.from("ingredient_prices").select(c).order("display_name").limit(500);
+      if(error)continue;
+      window.__adminIngredients=data||[];
+      return window.__adminIngredients;
+    }catch(e){}
+  }
+  window.__adminIngredients=[];
+  return [];
+}
+function renderIngredients(){
+  const el=document.getElementById("ingredients-list");
+  if(!el)return;
+  if(!isAdmin()){el.innerHTML='<p class="sub">Admin only.</p>';return;}
+  const rows=Array.isArray(window.__adminIngredients)?window.__adminIngredients:[];
+  const q=String((document.getElementById("ingredients-q")||{}).value||"").trim().toLowerCase();
+  const byKey={};
+  for(const r of rows){
+    const key=r.meal_key||r.display_name||r.slug||"";
+    if(!key)continue;
+    const blob=(key+" "+(r.display_name||"")+" "+(r.category||"")).toLowerCase();
+    if(q&&blob.indexOf(q)<0)continue;
+    if(!byKey[key])byKey[key]={key,name:r.display_name||r.meal_key||key,meal_key:r.meal_key||"",category:r.category||"other",rows:[]};
+    byKey[key].rows.push(r);
+  }
+  const groups={};
+  const cats=INGREDIENT_CATEGORIES.concat(LEGACY_PRICE_CATEGORIES);
+  cats.forEach(c=>groups[c]=[]);
+  groups.other=[];
+  const list=Object.values(byKey);
+  window.__ingGroups=list;
+  list.forEach((g,i)=>{g.i=i;(groups[cats.indexOf(g.category)>=0?g.category:"other"]).push(g);});
+  const sections=cats.concat(["other"]).map(cat=>{
+    const items=groups[cat];
+    if(!items.length)return "";
+    const label=cat==="other"?"Other":INGREDIENT_CATEGORY_LABELS[cat]||cat;
+    return `<div class="cat-group"><div class="cat-head"><b>${esc(label)}</b><span class="sdetail">${items.length}</span></div>${items.map(ingredientCardHtml).join("")}</div>`;
+  }).join("");
+  el.innerHTML=sections||'<p class="sub">No ingredients loaded.</p>';
+}
+function ingredientCardHtml(g){
+  const usable=catalogKeyUsable(g.meal_key);
+  const prices=PRICE_STORES.map(s=>{
+    const row=g.rows.find(r=>r.store===s.id);
+    return row?`${esc(s.label)} £${Number(row.price_gbp||0).toFixed(2)}`:"";
+  }).filter(Boolean).join(" · ");
+  const shops=PRICE_STORES.map(s=>{
+    const row=g.rows.find(r=>r.store===s.id)||{};
+    return `<div style="margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:12px">
+      <b>${esc(s.label)}</b>
+      <div class="field" style="margin-top:6px"><label>Shelf product</label><input id="ing-product-${g.i}-${s.id}" value="${esc(row.product_name||"")}"></div>
+      <div class="grid2" style="margin-top:6px">
+        <div class="field"><label>Price £</label><input id="ing-price-${g.i}-${s.id}" type="number" min="0" step="0.01" value="${row.price_gbp!=null?Number(row.price_gbp):""}"></div>
+        <div class="field"><label>Pack label</label><input id="ing-pack-${g.i}-${s.id}" value="${esc(row.pack_size||"")}"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Pack qty</label><input id="ing-qty-${g.i}-${s.id}" type="number" min="0" step="0.01" value="${row.pack_qty!=null?esc(String(row.pack_qty)):""}"></div>
+        <div class="field"><label>Pack unit</label><select id="ing-unit-${g.i}-${s.id}"><option value=""></option>${PACK_UNITS.map(u=>`<option ${row.pack_unit===u?"selected":""}>${u}</option>`).join("")}</select></div>
+      </div>
+      <input type="hidden" id="ing-id-${g.i}-${s.id}" value="${row.id||""}">
+    </div>`;
+  }).join("");
+  return `<div class="store me-card">
+    <div><b>${esc(g.name)}</b>${usable?"":' <span class="tag newcoming">not yet usable in baskets</span>'}</div>
+    <div class="sdetail">${g.meal_key?esc(g.meal_key):""}${prices?" · "+prices:""}</div>
+    <button type="button" class="btn ghost sm" style="margin-top:8px" onclick="toggleIngredient(${g.i})">Prices &amp; packs</button>
+    <div id="ing-det-${g.i}" hidden>
+      ${shops}
+      <div class="err" id="ing-err-${g.i}"></div>
+      <div class="row" style="gap:8px">
+        <button type="button" class="btn sm" onclick="saveIngredientGroup(${g.i})">Save</button>
+        <button type="button" class="btn ghost sm" onclick="deleteIngredient(${g.i})">Remove</button>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleIngredient(i){
+  const el=document.getElementById("ing-det-"+i);
+  if(el)el.hidden=!el.hidden;
+}
+function ingredientFieldsFromGroup(i,store){
+  const g=(window.__ingGroups||[])[i]||{};
+  const priceEl=document.getElementById("ing-price-"+i+"-"+store);
+  const packEl=document.getElementById("ing-pack-"+i+"-"+store);
+  const qtyEl=document.getElementById("ing-qty-"+i+"-"+store);
+  const unitEl=document.getElementById("ing-unit-"+i+"-"+store);
+  const productEl=document.getElementById("ing-product-"+i+"-"+store);
+  const existing=(g.rows||[]).find(r=>r.store===store)||null;
+  return {
+    name:g.name,meal_key:g.meal_key,category:g.category,shop:store,
+    price:priceEl?priceEl.value:"",
+    pack_size:packEl?packEl.value:"",
+    pack_qty:qtyEl?qtyEl.value:"",
+    pack_unit:unitEl?unitEl.value:"",
+    product_name:productEl?productEl.value:"",
+    existing:existing,
+    updating:!!existing,
+  };
+}
+async function insertIngredientRow(fields){
+  const mealKey=String(fields.meal_key||"").trim().toLowerCase();
+  const qty=fields.pack_qty===""||fields.pack_qty==null?null:+fields.pack_qty;
+  const unit=String(fields.pack_unit||"").trim();
+  const row={
+    slug:ingredientSlug(mealKey||fields.name),
+    display_name:String(fields.name||"").trim(),
+    category:fields.category,
+    store:fields.shop,
+    meal_key:mealKey||null,
+    product_name:String(fields.name||"").trim(),
+    pack_size:String(fields.pack_size||"").trim()||null,
+    price_gbp:+fields.price,
+    pack_qty:qty,
+    pack_unit:unit||null,
+  };
+  let res=await sb.from("ingredient_prices").insert(row);
+  if(res.error&&/pack_qty|pack_unit/.test(String(res.error.message||""))){
+    delete row.pack_qty;delete row.pack_unit;
+    res=await sb.from("ingredient_prices").insert(row);
+  }
+  return res.error;
+}
+async function saveNewIngredient(){
+  if(!sb||!isAdmin())return;
+  const errEl=document.getElementById("ing-add-err");
+  const fields={
+    name:(document.getElementById("ing-add-name")||{}).value,
+    meal_key:(document.getElementById("ing-add-key")||{}).value,
+    category:(document.getElementById("ing-add-cat")||{}).value,
+    shop:(document.getElementById("ing-add-shop")||{}).value,
+    price:(document.getElementById("ing-add-price")||{}).value,
+    pack_size:(document.getElementById("ing-add-pack")||{}).value,
+    pack_qty:(document.getElementById("ing-add-qty")||{}).value,
+    pack_unit:(document.getElementById("ing-add-unit")||{}).value,
+  };
+  const msg=ingredientAddError(fields);
+  if(msg){if(errEl)errEl.textContent=msg;return;}
+  const error=await insertIngredientRow(fields);
+  if(error){if(errEl)errEl.textContent=error.message||"Could not add.";return;}
+  if(errEl)errEl.textContent="";
+  ["ing-add-name","ing-add-key","ing-add-price","ing-add-pack","ing-add-qty"].forEach(id=>{const n=document.getElementById(id);if(n)n.value="";});
+  await loadShelfPrices();
+  await showIngredientsScreen();
+}
+async function saveIngredientGroup(i){
+  if(!sb||!isAdmin())return;
+  const errEl=document.getElementById("ing-err-"+i);
+  const g=(window.__ingGroups||[])[i];
+  if(!g)return;
+  // Postgres checks NOT NULL and the BEFORE INSERT trigger before ON CONFLICT,
+  // so a partial upsert cannot update a row. Each existing shop is its own
+  // update; a missing shop is a separate full insert. Not one transaction.
+  const known=g.rows.find(r=>r&&r.slug);
+  const groupSlug=known?known.slug:ingredientSlug(g.meal_key||g.name);
+  const groupName=(known&&known.display_name)||g.name;
+  const groupCategory=(known&&known.category)||g.category;
+  const groupKey=known&&known.meal_key!=null?known.meal_key:(g.meal_key||null);
+  for(const s of PRICE_STORES){
+    const fields=ingredientFieldsFromGroup(i,s.id);
+    const blank=fields.price===""&&!fields.pack_qty&&!fields.pack_unit&&!fields.existing;
+    if(blank)continue;
+    if(fields.price===""&&fields.existing)fields.price=fields.existing.price_gbp;
+    fields.groupSave=true;
+    fields.groupCategory=groupCategory;
+    const msg=ingredientAddError(fields);
+    if(msg){if(errEl)errEl.textContent=s.label+": "+msg;return;}
+    const qty=fields.pack_qty===""||fields.pack_qty==null?null:+fields.pack_qty;
+    const unit=String(fields.pack_unit||"").trim()||null;
+    const product=String(fields.product_name||"").trim();
+    const pack=String(fields.pack_size||"").trim();
+    let error=null;
+    if(fields.existing&&fields.existing.id){
+      const patch={price_gbp:+fields.price,pack_qty:qty,pack_unit:unit};
+      // A blank shelf name means leave the stored product. Pack label is written only when it changed.
+      if(product&&product!==String(fields.existing.product_name||"").trim())patch.product_name=product;
+      if(pack!==String(fields.existing.pack_size||"").trim())patch.pack_size=pack||null;
+      error=(await sb.from("ingredient_prices").update(patch).eq("id",fields.existing.id)).error;
+    }else{
+      const row={
+        slug:groupSlug,
+        display_name:groupName,
+        category:groupCategory,
+        product_name:product,
+        meal_key:groupKey,
+        store:s.id,
+        price_gbp:+fields.price,
+        pack_size:pack||null,
+        pack_qty:qty,
+        pack_unit:unit,
+      };
+      error=(await sb.from("ingredient_prices").insert(row)).error;
+    }
+    if(error){if(errEl)errEl.textContent=error.message||"Could not save.";return;}
+  }
+  await loadShelfPrices();
+  await showIngredientsScreen();
+}
+async function deleteIngredient(i){
+  if(!sb||!isAdmin())return;
+  const g=(window.__ingGroups||[])[i];
+  if(!g)return;
+  const ids=[...new Set((g.rows||[]).map(r=>+r.id).filter(id=>id>0))];
+  if(!ids.length){alert("Could not remove: this row has no id.");return;}
+  if(!confirm("Remove "+(g.name||"this ingredient")+" from the shelf?"))return;
+  for(const id of ids){
+    const {error}=await sb.from("ingredient_prices").delete().eq("id",id);
+    if(error){alert("Could not remove: "+(error.message||""));return;}
+  }
+  await loadShelfPrices();
+  await showIngredientsScreen();
+}
+async function showIngredientsScreen(){
+  await loadIngredientPricesAdmin();
+  renderIngredients();
+}
+
 function mealEditorHtml(m){
   const id=m&&m.id?+m.id:0;
   const keys=catalogNames();
@@ -2125,6 +2530,9 @@ function mealEditorHtml(m){
     <h3>Ingredients</h3>
     <p class="sub" style="margin-bottom:4px">Only catalog keys — these are what the shop can price.</p>
     <div class="me-ing">${keys.map((name,i)=>`<button type="button" id="me-ing-${i}" class="${ingSet.has(name)?"sel":""}" onclick="adminToggleIng(${i})">${esc(name)}</button>`).join("")}</div>
+    <h3>Portions for 2</h3>
+    <p class="sub" style="margin-bottom:4px">Amount in the catalog pack unit. Seasonings stay 1 pack and are not listed.</p>
+    <div id="me-portions"></div>
     <h3>Instructions</h3>
     <p class="sub" style="margin-bottom:4px">One step per line, quantities for 2 people.</p>
     <textarea id="me-steps" rows="8" style="width:100%;padding:10px;border-radius:12px;border:1.5px solid var(--line);background:var(--card2);color:var(--text);font:inherit">${esc(rec.steps.join("\n"))}</textarea>
@@ -2140,7 +2548,6 @@ function mealEditorHtml(m){
       <button type="button" class="btn" style="flex:1" onclick="saveMealEditor(true)">Verify &amp; publish</button>
     </div>
     <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">
-      ${id?`<button type="button" class="btn ghost sm" onclick="adminDeleteMeal(${id})">Remove</button>`:""}
       ${id&&m.reviewed_at?`<button type="button" class="btn ghost sm" onclick="saveMealEditor('unpublish')">Unpublish</button>`:""}
       <button type="button" class="btn ghost sm" onclick="closeModal()">Close</button>
     </div>`;
@@ -2153,7 +2560,9 @@ function openMealEditor(id){
   window.__editingMealId=id?+id:0;
   window.__mealIng=new Set(completeIng(m||{}));
   if(!window.__mealIng.size){window.__mealIng.add("salt");window.__mealIng.add("black pepper");}
+  window.__mealPortions=copyPortions(m&&m.portions)||{};
   openModal(mealEditorHtml(m||{}));
+  renderMealPortions();
 }
 function adminToggleIng(i){
   const name=catalogNames()[i];
@@ -2162,6 +2571,31 @@ function adminToggleIng(i){
   else window.__mealIng.add(name);
   const btn=document.getElementById("me-ing-"+i);
   if(btn)btn.classList.toggle("sel",window.__mealIng.has(name));
+  renderMealPortions();
+}
+function syncMealPortionsFromDom(){
+  const prev=window.__mealPortions||{};
+  document.querySelectorAll("[data-por-key]").forEach(el=>{
+    const k=el.getAttribute("data-por-key");
+    const unit=el.getAttribute("data-por-unit")||"";
+    if(el.value==="")delete prev[k];
+    else prev[k]=[el.value,unit];
+  });
+  window.__mealPortions=prev;
+}
+function renderMealPortions(){
+  syncMealPortionsFromDom();
+  const host=document.getElementById("me-portions");
+  if(!host)return;
+  const prev=window.__mealPortions||{};
+  const keys=[...(window.__mealIng||[])].filter(k=>SEASONINGS.indexOf(k)<0&&INGREDIENTS[k]&&INGREDIENTS[k].pack>0);
+  if(!keys.length){host.innerHTML='<p class="sub">Pick groceries to set 2-serving amounts.</p>';return;}
+  host.innerHTML=keys.map((k,i)=>{
+    const spec=prev[k];
+    const amount=spec&&Array.isArray(spec)&&spec[0]!=null&&spec[0]!==""?spec[0]:"";
+    const pu=(INGREDIENTS[k]&&INGREDIENTS[k].pu)||"";
+    return `<div class="row" style="margin-bottom:6px"><span style="flex:1">${esc(k)}</span><input data-por-key="${esc(k)}" data-por-unit="${esc(pu)}" id="me-por-${i}" type="number" min="0" step="0.01" value="${esc(String(amount))}" style="max-width:110px"><span class="sdetail">${esc(pu)}</span></div>`;
+  }).join("");
 }
 function adminSuggestTags(){
   const name=(document.getElementById("me-name")&&document.getElementById("me-name").value)||"";
@@ -2184,11 +2618,28 @@ function readMealEditor(){
   const dietEl=document.querySelector('input[name="me-diet"]:checked');
   const diet=dietEl&&MEAL_DIET.indexOf(dietEl.value)>=0?dietEl.value:"meat";
   const extras=[...document.querySelectorAll("input.me-tag:checked")].map(el=>el.value).filter(t=>MEAL_TAGS.indexOf(t)>=0&&MEAL_DIET.indexOf(t)<0&&t!=="dinner");
-  const tags=[diet,"dinner"].concat(extras).filter((t,i,a)=>a.indexOf(t)===i).slice(0,12);
+  const dietTags=diet==="vegan"?["vegan","vegetarian"]:[diet];
+  const tags=dietTags.concat(["dinner"]).concat(extras).filter((t,i,a)=>a.indexOf(t)===i).slice(0,9);
+  syncMealPortionsFromDom();
+  const portions={};
+  for(const k of Object.keys(window.__mealPortions||{})){
+    if(ing.indexOf(k)<0)continue;
+    const spec=window.__mealPortions[k];
+    if(!Array.isArray(spec)||spec.length<2||spec[0]===""||spec[0]==null)continue;
+    // Seasonings stay 1 pack in the basket. Keep whatever the row already stores.
+    if(SEASONINGS.indexOf(k)>=0){portions[k]=[spec[0],spec[1]];continue;}
+    const amount=+spec[0];
+    const unit=String(spec[1]||"");
+    const pu=INGREDIENTS[k]&&INGREDIENTS[k].pu;
+    if(!Number.isFinite(amount)||amount<=0)return {error:"Portion for "+k+" needs an amount."};
+    if(!pu||unit!==pu)return {error:"Portion unit for "+k+" must be "+(pu||"the catalog pack unit")+"."};
+    portions[k]=[Math.round(amount*100)/100,unit];
+  }
   if(!name)return {error:"Name the dinner."};
   if(ing.length<3)return {error:"Pick at least a few ingredients from the catalog."};
   if(!validMeal({name,ing}))return {error:"Ingredients must all be catalog keys."};
-  return {row:{name,emoji,time,category,ing,recipe:{steps:steps.length?steps:["Cook according to the ingredients."],tip},tags,source:"ops"}};
+  if(!steps.length)return {error:"Add at least one instruction step."};
+  return {row:{name,emoji,time,category,ing,portions:Object.keys(portions).length?portions:null,recipe:{steps,tip},tags,source:"ops"}};
 }
 async function saveMealEditor(mode){
   if(!sb||!isAdmin())return;
@@ -2196,6 +2647,7 @@ async function saveMealEditor(mode){
   const parsed=readMealEditor();
   if(parsed.error){if(err)err.textContent=parsed.error;return;}
   const publish=mode===true;
+  if(publish&&!parsed.row.category){if(err)err.textContent="Pick a category before publishing.";return;}
   const unpublish=mode==="unpublish";
   if(publish&&!(parsed.row.recipe&&parsed.row.recipe.steps&&parsed.row.recipe.steps[0]&&parsed.row.recipe.steps[0]!=="Cook according to the ingredients.")){
     if(err)err.textContent="Add a real method (one step per line) before publishing.";
@@ -2243,13 +2695,6 @@ async function adminVerifyMeal(id){
   else{await loadAdminMeals();renderMeals();closeModal();}
 }
 async function adminMarkMealReviewed(id){return adminVerifyMeal(id);}
-async function adminDeleteMeal(id){
-  if(!sb||!isAdmin()||!id)return;
-  if(!confirm("Remove this dinner from the catalog?"))return;
-  const {error}=await sb.from("meals").delete().eq("id",id);
-  if(error)alert("Could not remove: "+(error.message||""));
-  else{closeModal();await loadAdminMeals();renderMeals();}
-}
 async function renderAdmin(){
   const el=document.getElementById("admin-list");
   if(!el)return;
@@ -2388,7 +2833,7 @@ async function loadCatalogMeals(){
 function mealNeedCost(m,s){
   const meal=m&&m.name?(mealByName(m.name)||m):m;
   if(!meal)return 0;
-  const packs=basketFor([meal],weekServings(),cupboardTicks(),INGREDIENTS,false);
+  const packs=basketFor([meal],weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(s&&s.id));
   return Object.entries(packs).reduce((t,[i,q])=>{
     const r=s?shelfRow(i,s):null;
     const pence=r?Number(r.price_gbp):NaN;
@@ -2770,8 +3215,11 @@ function toggleStapleAt(idx){
 }
 
 // ---------- SHOP ----------
+function derivedBuy(store){
+  return basketFor(selectedMeals(),weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(store&&store.id));
+}
 function needList(){
-  const buy=basketFor(selectedMeals(),weekServings(),cupboardTicks(),INGREDIENTS,false);
+  const buy=derivedBuy(preferredStoreObj());
   let pantryValue=0;
   selectedMeals().forEach(r=>{(r.ing||[]).forEach(i=>{
     if(haveItem(i))pantryValue+=0.5*ingInfo(i).price;
@@ -2784,6 +3232,39 @@ function storeTotalForItems(buy,s){
     const r=shelfRow(i,s);
     return t+q*(r?Number(r.price_gbp):ingInfo(i).price*s.mult);
   },0)+s.fee;
+}
+// Each shop's comparison total uses that shop's packs, not the shared basket.
+function compareQuote(s){
+  const buy=derivedBuy(s);
+  const t=storeTotalForItems(buy,s);
+  const keys=Object.keys(buy);
+  const covered=keys.length?keys.filter(k=>shelfRow(k,s)).length/keys.length:0;
+  return {t,pay:customerTotal(t),fee:plentryFee(t),live:false,q:null,shelf:SHELF_READY&&covered===1,buy};
+}
+// Shop change. An unedited basket is replaced. An edited basket keeps the user's
+// lines (added lines stay, removed lines stay gone) and the auto-derived counts
+// follow the new shop. Pay still rebuilds from the meals, so the confirm hold
+// uses compareQuote, not this line list.
+function rebaseBasketForStore(store){
+  if(!store)return false;
+  const buy=derivedBuy(store);
+  const before=basket.map(b=>b.i+":"+b.q).sort().join("|");
+  if(basketEditsThisWeek()){
+    const next=S.basketEdit.filter(b=>b&&INGREDIENTS[b.i]).map(b=>{
+      const derived=buy[b.i];
+      const q=derived!=null?derived:Math.max(1,Math.min(20,Math.round(+b.q||1)));
+      return {i:b.i,q};
+    });
+    S.basketEdit=next.length?next:null;
+    S.basketFor=selectedKey();
+    basket=next.map(b=>({i:b.i,q:b.q}));
+  }else{
+    basket=Object.entries(buy).map(([i,q])=>({i,q}));
+  }
+  const after=basket.map(b=>b.i+":"+b.q).sort().join("|");
+  if(before===after)return false;
+  liveQuote=null;liveQuoteKey="";
+  return true;
 }
 function mealsChanged(){
   S.basketEdit=null;
@@ -2911,7 +3392,7 @@ function renderBasketDrawer(){
   if(!panel)return;
   const s=preferredStoreObj();
   const q=s?storeQuote(s):null;
-  const totals=STORES.map(st=>({s:st,...storeQuote(st)})).sort((a,b)=>a.pay-b.pay);
+  const totals=STORES.map(st=>({s:st,...compareQuote(st)})).sort((a,b)=>a.pay-b.pay);
   const best=totals[0],worst=totals[totals.length-1];
   const groceries=[],cupboard=[];
   basket.forEach((b,idx)=>{ (isStaple(b.i)?cupboard:groceries).push(idx); });
@@ -3011,7 +3492,7 @@ function renderShop(){
   }
   else tbl.innerHTML=`<tr><th>Item</th><th>Qty</th><th class="right">Est. price</th></tr>`+
     basket.map(b=>`<tr><td>${esc(b.i)} <span style="color:var(--muted);font-size:.74rem">(${esc(ingInfo(b.i).unit)})</span></td><td>${+b.q}</td><td class="right">£${(b.q*ingInfo(b.i).price).toFixed(2)}</td></tr>`).join("")+pantryRows();
-  const totals=STORES.map(s=>({s,...storeQuote(s)})).sort((a,b)=>a.pay-b.pay);
+  const totals=STORES.map(s=>({s,...compareQuote(s)})).sort((a,b)=>a.pay-b.pay);
   const best=totals[0],worst=totals[totals.length-1];
   const anyLive=totals.some(x=>x.live);
   document.getElementById("store-compare").innerHTML=totals.map(({s,pay,live,shelf},idx)=>
@@ -3034,8 +3515,11 @@ function renderShop(){
 function pickStore(id){
   const next=STORES.find(s=>s.id===id);
   if(!next)return;
+  const switching=!(chosenStore&&chosenStore.id===id);
   chosenStore=next;
-  S.prefs.preferredStore=chosenStore.id;save();
+  S.prefs.preferredStore=chosenStore.id;
+  const changed=switching&&rebaseBasketForStore(chosenStore);
+  save();
   STORES.forEach(s=>{const el=document.getElementById("store-"+s.id);if(el)el.style.borderColor=s.id===id?"var(--green)":"var(--line)";});
   const {pay}=storeQuote(chosenStore);
   const label=`Place my order — £${pay.toFixed(2)} at ${chosenStore.name} →`;
@@ -3044,6 +3528,7 @@ function pickStore(id){
   renderShopTableOnly();
   if(basketOpen)renderBasketDrawer();
   renderBasketFab();
+  if(changed)fetchLiveQuote();
 }
 // re-render just the items table after picking a store (shows matched products)
 function renderShopTableOnly(){
@@ -3109,7 +3594,7 @@ function confirmOrder(){
     openAuth("Create an account so we can take the card hold and order to your door.");
     return;
   }
-  const {t,pay,fee,live}=storeQuote(chosenStore);
+  const {t,pay,fee,live}=compareQuote(chosenStore);
   closeBasket();
   const preview=basket.slice(0,8).map(b=>`${+b.q}× ${esc(b.i)}`).join(" · ");
   const extra=basket.length>8?` · +${basket.length-8} more`:"";
@@ -3169,7 +3654,7 @@ async function placeOrder(){
   window.__deliveryReplace=false;
   const cbtn=document.getElementById("confirm-btn");
   if(cbtn){cbtn.disabled=true;cbtn.textContent="Starting checkout…";}
-  const {t}=storeQuote(chosenStore);
+  const {t}=compareQuote(chosenStore);
   const items=orderItemsPayload();
   const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total:t,eta:chosenStore.eta,
     items,meals:[...S.selected],
@@ -3681,6 +4166,7 @@ function nav(s){
     if(s==="admin"){renderAdmin();refreshInboxBadge();renderBasketFab();}
     if(s==="inbox"){renderInbox();refreshInboxBadge();renderBasketFab();}
     if(s==="meals"){showMealsScreen();renderBasketFab();}
+    if(s==="ingredients"){showIngredientsScreen();renderBasketFab();}
     if(mfaPending())openMfaChallenge();
   }catch(e){
     console.error(e);
