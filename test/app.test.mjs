@@ -1954,6 +1954,52 @@ describe("I-A12 admin meals and ingredients", () => {
     assert.equal(rows.find((r) => r.id === 1).product_name, "tesco fillets");
   });
 
+  it("writes the pack label when it was edited and leaves the other shops' labels", async () => {
+    const prices = [
+      { id: 9, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", meal_key: null, product_name: "Tesco Penne 500g", pack_size: "500g", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+      { id: 10, slug: "penne", display_name: "Penne", category: "grocery", store: "sainsburys", meal_key: null, product_name: "Sainsbury's Penne", pack_size: "500g", price_gbp: 0.7, pack_qty: 500, pack_unit: "g" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    document.getElementById("ing-pack-0-tesco").value = "1kg";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.find((r) => r.id === 9).pack_size, "1kg");
+    assert.equal(rows.find((r) => r.id === 9).price_gbp, 0.6);
+    assert.equal(rows.find((r) => r.id === 10).pack_size, "500g");
+  });
+
+  it("keeps the shelf product when the field is cleared, and a missing shop needs a product name", async () => {
+    const prices = [
+      { id: 9, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", meal_key: null, product_name: "Tesco Penne 500g", pack_size: "500g", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    document.getElementById("ing-product-0-tesco").value = "";
+    document.getElementById("ing-price-0-tesco").value = "0.99";
+    await window.saveIngredientGroup(0);
+    const tesco = window.__sbTables.ingredient_prices.find((r) => r.id === 9);
+    assert.equal(tesco.product_name, "Tesco Penne 500g");
+    assert.equal(tesco.price_gbp, 0.99);
+    document.getElementById("ing-price-0-waitrose").value = "1.20";
+    document.getElementById("ing-product-0-waitrose").value = "   ";
+    await window.saveIngredientGroup(0);
+    assert.equal(window.__sbTables.ingredient_prices.length, 1);
+    assert.match(document.getElementById("ing-err-0").textContent, /Name the shelf product/);
+  });
+
   it("rejects a partial ingredient_prices insert or upsert that omits a NOT NULL column", async () => {
     const tables = {
       ingredient_prices: [

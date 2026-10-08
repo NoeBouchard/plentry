@@ -2220,6 +2220,7 @@ function ingredientAddError(f){
   if(!updating&&!inherited&&INGREDIENT_CATEGORIES.indexOf(category)<0)return "Pick a category.";
   if(!(price>0))return "Enter a price.";
   if(!name)return "Name the ingredient.";
+  if(!updating&&f.groupSave&&!String(f.product_name||"").trim())return "Name the shelf product.";
   if(!updating&&!f.groupSave&&!mealKey)return "Give it a meal key.";
   if(unit&&PACK_UNITS.indexOf(unit)<0)return "Pack unit must match a catalog unit (g, ml, pc, clove, tbsp, tsp).";
   if((qty!=null&&!(qty>0))||(qty>0&&!unit)||(unit&&!(qty>0)))return "Pack quantity and unit must be set together.";
@@ -2399,21 +2400,24 @@ async function saveIngredientGroup(i){
     const qty=fields.pack_qty===""||fields.pack_qty==null?null:+fields.pack_qty;
     const unit=String(fields.pack_unit||"").trim()||null;
     const product=String(fields.product_name||"").trim();
+    const pack=String(fields.pack_size||"").trim();
     let error=null;
     if(fields.existing&&fields.existing.id){
       const patch={price_gbp:+fields.price,pack_qty:qty,pack_unit:unit};
-      if(product!==String(fields.existing.product_name||"").trim())patch.product_name=product;
+      // A blank shelf name means leave the stored product. Pack label is written only when it changed.
+      if(product&&product!==String(fields.existing.product_name||"").trim())patch.product_name=product;
+      if(pack!==String(fields.existing.pack_size||"").trim())patch.pack_size=pack||null;
       error=(await sb.from("ingredient_prices").update(patch).eq("id",fields.existing.id)).error;
     }else{
       const row={
         slug:groupSlug,
         display_name:groupName,
         category:groupCategory,
-        product_name:product||groupName,
+        product_name:product,
         meal_key:groupKey,
         store:s.id,
         price_gbp:+fields.price,
-        pack_size:String(fields.pack_size||"").trim()||null,
+        pack_size:pack||null,
         pack_qty:qty,
         pack_unit:unit,
       };
