@@ -182,8 +182,8 @@ describe("S-04 server-built basket", () => {
     const legacy = { name: "Old dinner", ing: ["eggs", "onions", "salt"] };
     assert.deepEqual(
       basketFor([legacy, { name: "Another", ing: ["eggs", "onions"] }], 6, [], PACKS, true),
-      { eggs: 2, onions: 2, salt: 1 },
-      "two no-portions dinners sharing ingredients = 2 packs each (additive)",
+      { eggs: 1, onions: 1, salt: 1 },
+      "a meal without portions contributes 1 pack, shared keys stay at 1",
     );
     assert.throws(() => basketFor([{ ing: [], portions: { "minced beef": [400, "pc"] } }], 2, [], PACKS, true), /unit mismatch/);
     const soft = basketFor([{ ing: [], portions: { "minced beef": [400, "pc"] } }], 2, [], PACKS, false);
@@ -230,11 +230,8 @@ describe("S-04 server-built basket", () => {
     const order1 = basketFor([ragu, pomodoroNoPorts], 2, [], PACKS, true);
     const order2 = basketFor([pomodoroNoPorts, ragu], 2, [], PACKS, true);
     assert.deepEqual(order1, order2, "ragù then no-portions pomodoro equals reversed");
-    assert.equal(order1.passata, 2, "ragù (400g) + no-portions pomodoro (1 pack = 500g) = 2 packs at 2 servings");
-    assert.equal(order1.spaghetti, 2, "ragù (180g) + no-portions pomodoro (1 pack = 500g) = 2 packs at 2 servings");
-    const twoNoPorts = basketFor([pomodoroNoPorts, pomodoroNoPorts], 2, [], PACKS, true);
-    assert.equal(twoNoPorts.passata, 2, "two no-portions dinners sharing passata = 2 packs (additive)");
-    assert.equal(twoNoPorts.spaghetti, 2, "two no-portions dinners sharing spaghetti = 2 packs (additive)");
+    assert.equal(order1.passata, 2, "ragù (400g) + no-portions pomodoro (any no-portions adds 1 pack) = 2 packs at 2 servings");
+    assert.equal(order1.spaghetti, 2, "ragù (180g) + no-portions pomodoro (any no-portions adds 1 pack) = 2 packs at 2 servings");
     const salmon = { name: "Salmon traybake", ing: ["broccoli", "lemons", "olive oil", "salmon fillet", "soy sauce"] };
     const mix1 = basketFor([ragu, salmon], 4, [], PACKS, true);
     const mix2 = basketFor([salmon, ragu], 4, [], PACKS, true);

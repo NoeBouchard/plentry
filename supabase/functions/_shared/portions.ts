@@ -37,7 +37,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
   const have={};
   (Array.isArray(cupboardTicks)?cupboardTicks:[]).forEach(function(k){have[String(k)]=1;});
   const need={};
-  const noPortionsCount={};
+  const hasNoPortion={};
   const seen={};
   const meals=Array.isArray(weekMeals)?weekMeals:[];
   function markSeasoning(list){
@@ -53,7 +53,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     if(!groceryKeys.length){
       ing.forEach(function(key){
         if(SEASONINGS.indexOf(key)>=0||!cat[key]||!(cat[key].pack>0))return;
-        noPortionsCount[key]=(noPortionsCount[key]||0)+1;
+        hasNoPortion[key]=1;
         seen[key]=1;
       });
       return;
@@ -66,7 +66,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
       if(bad){
         if(strict)throw new Error("unit mismatch "+key);
         console.log("portion unit mismatch",key);
-        noPortionsCount[key]=(noPortionsCount[key]||0)+1;
+        hasNoPortion[key]=1;
         seen[key]=1;
         return;
       }
@@ -81,7 +81,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     const pack=cat[key]&&cat[key].pack;
     if(!(pack>0))return;
     const scaled=need[key]||0;
-    const fromNoPortion=(noPortionsCount[key]||0)*pack;
+    const fromNoPortion=hasNoPortion[key]?pack:0;
     const amount=scaled+fromNoPortion;
     if(!(amount>0))return;
     let q=Math.ceil(amount/pack-1e-9);
