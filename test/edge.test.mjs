@@ -25,6 +25,7 @@ import {
   normServings,
   scalePortion,
   servingsFromHousehold,
+  storePacksFromPrices,
 } from "../supabase/functions/_shared/portions.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -293,6 +294,85 @@ describe("S-04 server-built basket", () => {
       portions: { potatoes: [400, "g"] },
     };
     assert.equal(basketFor([tortilla], 6, [], PACKS, true).potatoes, 1);
+  });
+
+  it("I-P02 store packs: garlic 10 at Sainsbury's and Waitrose, 40 at Tesco; parmesan 200g at Tesco and Asda, 80g at Sainsbury's and Waitrose", () => {
+    const ragu = {
+      name: "Beef ragù spaghetti",
+      ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+      portions: { salt: [0.5, "tsp"], garlic: [2, "clove"], onions: [1, "pc"], passata: [400, "g"], parmesan: [30, "g"], "olive oil": [1, "tbsp"], "soy sauce": [1, "tsp"], spaghetti: [180, "g"], "minced beef": [400, "g"], "mixed herbs": [1, "tsp"], "stock cubes": [1, "pc"], "black pepper": [0.25, "tsp"] },
+    };
+    const shakshuka = {
+      name: "Shakshuka",
+      ing: ["bell peppers", "black pepper", "chilli flakes", "cumin", "eggs", "feta", "garlic", "olive oil", "onions", "paprika", "passata", "salt", "tortillas"],
+      portions: { eggs: [4, "pc"], feta: [80, "g"], salt: [0.75, "tsp"], cumin: [1, "tsp"], garlic: [4, "clove"], onions: [1, "pc"], paprika: [1, "tsp"], passata: [400, "g"], "olive oil": [2, "tbsp"], tortillas: [4, "pc"], "bell peppers": [2, "pc"], "chilli flakes": [0.5, "tsp"] },
+    };
+    const tortilla = {
+      name: "Spanish tortilla with tomato salad",
+      ing: ["black pepper", "eggs", "olive oil", "onions", "potatoes", "salt", "tomatoes"],
+      portions: { eggs: [5, "pc"], salt: [0.5, "tsp"], onions: [1, "pc"], potatoes: [400, "g"], tomatoes: [3, "pc"], "olive oil": [5, "tbsp"] },
+    };
+    const salmon = { name: "Salmon traybake", ing: ["black pepper", "broccoli", "garlic", "lemons", "olive oil", "paprika", "potatoes", "salmon fillet", "salt"] };
+    const week = [ragu, shakshuka, tortilla, salmon];
+    const garlic = (pack) => basketFor(week, 4, [], PACKS, true, { garlic: { pack, pu: "clove" } }).garlic;
+    assert.equal(garlic(40), 1, "Tesco 40-clove pack");
+    assert.equal(garlic(10), 2, "Sainsbury's and Waitrose 10-clove bulb");
+    const parm = (pack) => basketFor([ragu], 6, [], PACKS, true, { parmesan: { pack, pu: "g" } }).parmesan;
+    assert.equal(parm(200), 1, "Tesco and Asda 200g");
+    assert.equal(parm(80), 2, "Sainsbury's and Waitrose 80g, 90g need at 6 servings");
+    assert.equal(basketFor(week, 4, ["garlic"], PACKS, true, { garlic: { pack: 10, pu: "clove" } }).garlic, undefined);
+    assert.equal(basketFor([{ ing: ["salt"], portions: { salt: [2, "tsp"] } }], 6, [], PACKS, true, { salt: { pack: 750, pu: "g" } }).salt, 1);
+  });
+
+  it("I-P02 Waitrose potatoes are 2500g, and a unit mismatch keeps the code pack", () => {
+    const heavy = { name: "Potato pot", ing: ["potatoes"], portions: { potatoes: [2200, "g"] } };
+    assert.equal(basketFor([heavy], 2, [], PACKS, true).potatoes, 2, "2200g needs two 2kg bags");
+    assert.equal(basketFor([heavy], 2, [], PACKS, true, { potatoes: { pack: 2500, pu: "g" } }).potatoes, 1);
+    assert.equal(basketFor([heavy], 2, [], PACKS, true, { potatoes: { pack: 2.5, pu: "kg" } }).potatoes, 1, "kg converts exactly to g");
+    const week = [
+      { name: "Spanish tortilla with tomato salad", ing: ["potatoes"], portions: { potatoes: [400, "g"] } },
+      { name: "Salmon traybake", ing: ["potatoes", "salmon fillet"] },
+    ];
+    assert.equal(basketFor(week, 4, [], PACKS, true, { potatoes: { pack: 2500, pu: "g" } }).potatoes, 1);
+    const masala = { name: "Masala", ing: ["garam masala"], portions: { "garam masala": [25, "tsp"] } };
+    assert.equal(basketFor([masala], 2, [], PACKS, true)["garam masala"], 2);
+    assert.equal(basketFor([masala], 2, [], PACKS, true, { "garam masala": { pack: 38, pu: "g" } })["garam masala"], 2, "38g is not 38 tsp");
+    const onions = { name: "Onions", ing: ["red onions"], portions: { "red onions": [4, "pc"] } };
+    assert.equal(basketFor([onions], 2, [], PACKS, true, { "red onions": { pack: 1000, pu: "g" } })["red onions"], 2, "1000g does not replace a 3pc pack");
+  });
+
+  it("I-P04 the same store rows give the client and pay the same pack counts and the same hold", () => {
+    const ragu = {
+      name: "Beef ragù spaghetti",
+      ing: ["garlic", "parmesan", "minced beef", "salt"],
+      portions: { garlic: [2, "clove"], parmesan: [30, "g"], "minced beef": [400, "g"], salt: [0.5, "tsp"] },
+    };
+    const rows = [
+      { meal_key: "garlic", pack_qty: "10", pack_unit: "clove", price_gbp: 0.5 },
+      { meal_key: "parmesan", pack_qty: 80, pack_unit: "g", price_gbp: 2.9 },
+      { meal_key: "minced beef", pack_qty: 500, pack_unit: "g", price_gbp: 3.95 },
+      { meal_key: null, display_name: "Garlic", pack_qty: 1, pack_unit: "pc", price_gbp: 9 },
+    ];
+    const fromPay = storePacksFromPrices(rows);
+    const fromClient = { garlic: { pack: 10, pu: "clove" }, parmesan: { pack: 80, pu: "g" }, "minced beef": { pack: 500, pu: "g" } };
+    assert.deepEqual(fromPay, fromClient);
+    const payPacks = basketFor([ragu], 4, [], PACKS, false, fromPay);
+    const clientPacks = basketFor([ragu], 4, [], PACKS, false, fromClient);
+    assert.deepEqual(payPacks, clientPacks);
+    assert.equal(payPacks.garlic, 1);
+    assert.equal(payPacks.parmesan, 1);
+    assert.equal(payPacks["minced beef"], 2);
+    assert.equal(payPacks.salt, 1);
+    const price = { garlic: 0.5, parmesan: 2.9, "minced beef": 3.95, salt: 2.5 };
+    let groceries = 0;
+    for (const [k, q] of Object.entries(payPacks)) groceries += q * price[k];
+    groceries = Math.round(groceries * 100) / 100;
+    assert.equal(groceries, Math.round((0.5 + 2.9 + 3.95 * 2 + 2.5) * 100) / 100);
+    const fee = 3.5;
+    const est = Math.round((groceries + fee) * 100) / 100;
+    const hold = Math.round(est * 1.05 * 1.30 * 100);
+    assert.equal(hold, Math.round(17.3 * 1.05 * 1.30 * 100));
+    assert.equal(hold, 2361);
   });
 });
 

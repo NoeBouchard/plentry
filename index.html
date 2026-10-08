@@ -828,8 +828,22 @@ function scalePortion(amount, unit, key, servings){
   if(unit==="pc"||unit==="clove")return Math.ceil(a*af);
   return a*af;
 }
-function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
+function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePacks){
   const cat=catalog||{};
+  const shelf=storePacks&&typeof storePacks==="object"&&!Array.isArray(storePacks)?storePacks:{};
+  function packOf(key){
+    const code=cat[key];
+    if(!code||!(code.pack>0))return 0;
+    const row=shelf[key];
+    const qty=row?+row.pack:0;
+    if(!(qty>0))return code.pack;
+    const cu=String(code.pu||"").toLowerCase();
+    const su=String(row.pu||"").toLowerCase();
+    if(su===cu)return qty;
+    if((cu==="g"&&su==="kg")||(cu==="ml"&&su==="l"))return qty*1000;
+    if((cu==="kg"&&su==="g")||(cu==="l"&&su==="ml"))return qty/1000;
+    return code.pack;
+  }
   const have={};
   (Array.isArray(cupboardTicks)?cupboardTicks:[]).forEach(function(k){have[String(k)]=1;});
   const need={};
@@ -874,7 +888,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
   Object.keys(seen).forEach(function(key){
     if(have[key])return;
     if(SEASONINGS.indexOf(key)>=0){packs[key]=1;return;}
-    const pack=cat[key]&&cat[key].pack;
+    const pack=packOf(key);
     if(!(pack>0))return;
     const scaled=need[key]||0;
     const flagged=hasNoPortion[key]?1:0;
@@ -1126,8 +1140,11 @@ let SHELF={};let SHELF_READY=false;
 async function loadShelfPrices(){
   if(!sb)return;
   try{
-    const {data,error}=await sb.from("ingredient_prices")
+    let res=await sb.from("ingredient_prices")
+      .select("meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate,pack_qty,pack_unit");
+    if(res.error)res=await sb.from("ingredient_prices")
       .select("meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
+    const data=res.data,error=res.error;
     if(error||!data)return;
     // key by meal_key when linked to the meal catalog, else display_name — so pantry
     // items outside the meal keys (soy sauce, ketchup, …) still price correctly.
@@ -1145,6 +1162,19 @@ async function loadShelfPrices(){
     renderBasketFab();
     if(basketOpen)renderBasketDrawer();
   }catch(e){}
+}
+function storePackMap(appId){
+  const out={};
+  if(!appId)return out;
+  Object.keys(SHELF||{}).forEach(function(key){
+    const r=SHELF[key]&&SHELF[key][appId];
+    if(!r||!r.meal_key)return;
+    const qty=+r.pack_qty;
+    const pu=String(r.pack_unit||"");
+    if(!(qty>0)||!pu)return;
+    out[String(r.meal_key)]={pack:qty,pu:pu};
+  });
+  return out;
 }
 function shelfRow(item,store){
   const aliases={"mixed herbs":"dried mixed herbs","stock cubes":"chicken stock cubes"};
@@ -2788,7 +2818,7 @@ async function loadCatalogMeals(){
 function mealNeedCost(m,s){
   const meal=m&&m.name?(mealByName(m.name)||m):m;
   if(!meal)return 0;
-  const packs=basketFor([meal],weekServings(),cupboardTicks(),INGREDIENTS,false);
+  const packs=basketFor([meal],weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(s&&s.id));
   return Object.entries(packs).reduce((t,[i,q])=>{
     const r=s?shelfRow(i,s):null;
     const pence=r?Number(r.price_gbp):NaN;
@@ -3171,7 +3201,7 @@ function toggleStapleAt(idx){
 
 // ---------- SHOP ----------
 function needList(){
-  const buy=basketFor(selectedMeals(),weekServings(),cupboardTicks(),INGREDIENTS,false);
+  const buy=basketFor(selectedMeals(),weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(preferredStoreObj()&&preferredStoreObj().id));
   let pantryValue=0;
   selectedMeals().forEach(r=>{(r.ing||[]).forEach(i=>{
     if(haveItem(i))pantryValue+=0.5*ingInfo(i).price;

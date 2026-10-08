@@ -67,8 +67,8 @@ describe("source contracts", () => {
 
   it("I-O12 pay rebuilds items.basket server-side and Telegram links come from the store whitelist", () => {
     assert.match(pay, /import \{ basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket \} from '\.\.\/_shared\/orders\.ts'/);
-    assert.match(pay, /import \{ PACKS, SEASONINGS, basketFor, normServings \} from '\.\.\/_shared\/portions\.ts'/);
-    assert.match(pay, /const packs = basketFor\(weekMeals, servings, ticks, PACKS, false\)/);
+    assert.match(pay, /import \{ PACKS, SEASONINGS, basketFor, normServings, storePacksFromPrices \} from '\.\.\/_shared\/portions\.ts'/);
+    assert.match(pay, /const packs = basketFor\(weekMeals, servings, ticks, PACKS, false, storePacksFromPrices\(data \|\| \[\]\)\)/);
     assert.match(pay, /const rebuilt = rebuildBasket\(rawBasket, data \|\| \[\], store\)/);
     assert.match(pay, /update\(\{ total: est, items: priced\.items \}\)/);
     assert.match(pay, /meals: names/);

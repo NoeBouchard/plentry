@@ -7,7 +7,8 @@
 // If any no-portions dinner (or a unit mismatch) uses that ingredient, add
 // one extra pack only when the spare in the last pack is under half a pack.
 // Several such dinners share that one extra. A key used only by no-portions
-// dinners is 1 pack.
+// dinners is 1 pack. The optional store-pack argument replaces the code pack
+// when its unit matches, or converts exactly between g/kg and ml/l.
 
 /* portions:start */
 const SEASONINGS=["salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
@@ -34,8 +35,22 @@ function scalePortion(amount, unit, key, servings){
   if(unit==="pc"||unit==="clove")return Math.ceil(a*af);
   return a*af;
 }
-function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
+function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePacks){
   const cat=catalog||{};
+  const shelf=storePacks&&typeof storePacks==="object"&&!Array.isArray(storePacks)?storePacks:{};
+  function packOf(key){
+    const code=cat[key];
+    if(!code||!(code.pack>0))return 0;
+    const row=shelf[key];
+    const qty=row?+row.pack:0;
+    if(!(qty>0))return code.pack;
+    const cu=String(code.pu||"").toLowerCase();
+    const su=String(row.pu||"").toLowerCase();
+    if(su===cu)return qty;
+    if((cu==="g"&&su==="kg")||(cu==="ml"&&su==="l"))return qty*1000;
+    if((cu==="kg"&&su==="g")||(cu==="l"&&su==="ml"))return qty/1000;
+    return code.pack;
+  }
   const have={};
   (Array.isArray(cupboardTicks)?cupboardTicks:[]).forEach(function(k){have[String(k)]=1;});
   const need={};
@@ -80,7 +95,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
   Object.keys(seen).forEach(function(key){
     if(have[key])return;
     if(SEASONINGS.indexOf(key)>=0){packs[key]=1;return;}
-    const pack=cat[key]&&cat[key].pack;
+    const pack=packOf(key);
     if(!(pack>0))return;
     const scaled=need[key]||0;
     const flagged=hasNoPortion[key]?1:0;
@@ -103,6 +118,21 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
 /* portions:end */
 
 export { SEASONINGS, normServings, servingsFromHousehold, scalePortion, basketFor }
+
+// Shelf rows for one store, keyed by meal_key. basketFor decides whether the
+// unit is usable. Rows with no meal_key are not basket packs.
+export function storePacksFromPrices(rows: Array<{ meal_key?: string | null, pack_qty?: number | string | null, pack_unit?: string | null }> | null | undefined) {
+  const out: Record<string, { pack: number, pu: string }> = {}
+  for (const r of rows || []) {
+    const key = r && r.meal_key ? String(r.meal_key) : ""
+    if (!key || out[key]) continue
+    const qty = Number(r.pack_qty)
+    const pu = String(r.pack_unit || "")
+    if (!(qty > 0) || !pu) continue
+    out[key] = { pack: qty, pu }
+  }
+  return out
+}
 
 // pack = how many of `pu` are in one shop pack. null = a seasoning (always 1).
 export const PACKS: Record<string, { pack: number | null, pu: string }> = {

@@ -24,11 +24,11 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 2. **Agent lock:** [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Product changes: branch → PR → CI (see [ENGINEERING.md](ENGINEERING.md)). **You click once:** GitHub ruleset on `main` — require a pull request with **0** approvals, require status check **test** only. Do not require Supabase Preview, Vercel, or a second person.
 3. After the advisor (or you) add a dinner: **Meals → New meal** → run its record through [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) → **Verify & publish** (or Remove).
 4. **Recipe source-check** — work the 75 pending records in `meal-ingredient verification/STATUS.md`, 5 per session, most-ordered dishes first; apply each DB patch via the Meals tab. Decide `tomato purée` as a 36th key once 3 records want it.
-5. ~~**Servings (LIVE 6 Oct 2026)**~~ — PR #3 merged, SQL applied, `pay` v29 and static deployed to production. Basket lines are whole packs from `meals.portions`. Known issue: basket can depend on meal pick order (fix PR in progress).
+5. ~~**Servings (LIVE 6 Oct 2026)**~~ — PR #3 merged, SQL applied, `pay` v29 and static deployed to production. Basket lines are whole packs from `meals.portions`. The meal-order half-pack fix is folded into the admin pull request and is not live yet.
 
 ## Next product
 
-- **Per-shop packs + database catalog.** `ingredient_prices.pack_qty` / `pack_unit` are editable per shop. `basketFor` should use the row for the order's store instead of the single `PACKS` entry, and `pay` `rebuildBasket` should accept a `meal_key` that has a price row. Until then, admin-added keys are flagged not usable in baskets. Do not edit `basketFor` in the same change as PR #7.
+- **Database catalog.** Per-shop `pack_qty` / `pack_unit` are what `basketFor` uses when the unit matches. `pay` still rejects a `meal_key` that is not in the 46-key code catalog. Admin-added keys stay flagged not usable in baskets until that changes.
 
 ## Next product (older)
 
