@@ -262,6 +262,38 @@ describe("S-04 server-built basket", () => {
     assert.equal(forward["olive oil"], 1);
     assert.equal(forward.potatoes, 1);
   });
+
+  it("potatoes are a 2kg bag: the Tesco week at 4 servings is 1 pack", () => {
+    assert.equal(PACKS.potatoes.pack, 2000);
+    assert.equal(PACKS.potatoes.pu, "g");
+    const ragu = {
+      name: "Beef ragù spaghetti",
+      ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+      portions: { salt: [0.5, "tsp"], garlic: [2, "clove"], onions: [1, "pc"], passata: [400, "g"], parmesan: [30, "g"], "olive oil": [1, "tbsp"], "soy sauce": [1, "tsp"], spaghetti: [180, "g"], "minced beef": [400, "g"], "mixed herbs": [1, "tsp"], "stock cubes": [1, "pc"], "black pepper": [0.25, "tsp"] },
+    };
+    const shakshuka = {
+      name: "Shakshuka",
+      ing: ["bell peppers", "black pepper", "chilli flakes", "cumin", "eggs", "feta", "garlic", "olive oil", "onions", "paprika", "passata", "salt", "tortillas"],
+      portions: { eggs: [4, "pc"], feta: [80, "g"], salt: [0.75, "tsp"], cumin: [1, "tsp"], garlic: [4, "clove"], onions: [1, "pc"], paprika: [1, "tsp"], passata: [400, "g"], "olive oil": [2, "tbsp"], tortillas: [4, "pc"], "bell peppers": [2, "pc"], "chilli flakes": [0.5, "tsp"] },
+    };
+    const tortilla = {
+      name: "Spanish tortilla with tomato salad",
+      ing: ["black pepper", "eggs", "olive oil", "onions", "potatoes", "salt", "tomatoes"],
+      portions: { eggs: [5, "pc"], salt: [0.5, "tsp"], onions: [1, "pc"], potatoes: [400, "g"], tomatoes: [3, "pc"], "olive oil": [5, "tbsp"] },
+    };
+    const salmon = { name: "Salmon traybake", ing: ["black pepper", "broccoli", "garlic", "lemons", "olive oil", "paprika", "potatoes", "salmon fillet", "salt"] };
+    const packs = basketFor([ragu, shakshuka, tortilla, salmon], 4, [], PACKS, true);
+    assert.equal(packs.potatoes, 1, "800g from the tortilla, spare 1200g of a 2kg bag, so salmon does not add a bag");
+  });
+
+  it("Spanish tortilla alone at 6 servings is 1 potato pack (1200g into a 2kg bag)", () => {
+    const tortilla = {
+      name: "Spanish tortilla with tomato salad",
+      ing: ["black pepper", "eggs", "olive oil", "onions", "potatoes", "salt", "tomatoes"],
+      portions: { potatoes: [400, "g"] },
+    };
+    assert.equal(basketFor([tortilla], 6, [], PACKS, true).potatoes, 1);
+  });
 });
 
 describe("edge functions parse", () => {

@@ -12,7 +12,9 @@ Vault history of **functional** product changes. Newest first. Agents append her
 
 3. **Stripe description** — Checkout copy said "~15% buffer". The multiplier is 1.30, so the text now says "~30% buffer".
 
-**Tests:** `npm test` on `main` is **114/114** (the vault line that said 109 was stale). This change is **117/117**: ragù + no-portions pomodoro is 2 passata and 1 spaghetti at 2 servings in both orders; the Tesco week (ragù, Shakshuka, Spanish tortilla, Salmon traybake) at 2 servings keeps garlic, olive oil and potatoes at 1 pack; two no-portions dinners sharing an ingredient stay at 1 pack; client hold matches pay. Beef ragù alone at 4 servings is still 2×500g mince, 2×500g passata, 1×500g spaghetti.
+**Shelf packs:** one pack size per key, taken from live `ingredient_prices` where Tesco, Asda and Sainsbury’s agree (or all four). Potatoes **2000g** (was 1000g; the £1.32 line is a 2kg bag). Lemons **4** (was 3). Tomato purée **200g** (was 65g). Waitrose potatoes are 2.5kg and are not a separate size. Prices unchanged.
+
+**Tests:** `npm test` on `main` is **114/114** (the vault line that said 109 was stale). This change is **119/119**: ragù + no-portions pomodoro is 2 passata and 1 spaghetti at 2 servings in both orders; the Tesco week at 2 servings keeps garlic, olive oil and potatoes at 1 pack, and at 4 servings potatoes stay 1 pack; tortilla alone at 6 servings is 1200g of potato, 1 × 2kg bag; two no-portions dinners sharing an ingredient stay at 1 pack; client hold matches pay. Beef ragù alone at 4 servings is still 2×500g mince, 2×500g passata, 1×500g spaghetti.
 
 **Why:** Found in the 8 Oct internal dry-run smoke. PR branch `cursor/fix-basket-order-dependency-cd89`.
 
