@@ -2,25 +2,30 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
-## 2026-10-06 18:00 UTC — meal categories, new tag structure, 11 new ingredient keys
+## 2026-10-06 16:06 BST — meal categories, new tag structure, 11 new ingredient keys (PR #4)
 
+- **Merged:** commit `0ef39e9`, GitHub Actions test passed.
 - **Categories:** every verified meal has exactly one category from 7 values (`pasta`, `rice_bowl`, `oven_bake`, `tacos_wraps`, `curry_stew`, `eggs`, `salad`). Stored in `meals.category` (CHECK constraint). Category is allowed null when `reviewed_at` is null (draft meals). The Meals admin UI requires a category to Verify & publish. The advisor/AI function whitelists category. All 77 current meals backfilled with categories per the proposal.
 - **Tags (11-tag closed set):** `dinner` (hidden constant), `quick` (< 30 min), `high_protein`, `low_carb`, `low_calorie`, `meal_prep`, `comfort_food`, plus diet tags (`meat`, `fish`, `vegetarian`, `vegan`). Removed: `gym`, `breakfast`, `lunch`, `snack`. Users' saved `gym` pref migrated to `high_protein`; old meal/snack/lunch tags dropped. **Vegan dishes now carry BOTH `vegan` AND `vegetarian` tags** (changed from "vegan is not also vegetarian"). Tags are stored data; the DB only derives diet, `quick`, and `dinner` via `meal_tags_for` + trigger. `meal_prep`, `comfort_food`, and nutrition tags are curated, so catalog patches must not wipe them. `low_carb` and `low_calorie` are hidden from onboarding/prefs chips until each has ≥ 8 live meals, but kept for users who already selected them. Onboarding goals no longer steer to `low_calorie`.
     10|- **New ingredient keys (46 total, was 35):** `tomato puree`, `fresh ginger`, `garam masala`, `limes`, `spring onions`, `penne`, `arborio rice`, `fresh basil`, `cucumber`, `red onions`, `cheddar`. Added to all three catalog lists (`index.html` `INGREDIENTS`, `ai/index.ts` `CATALOG`, `_shared/orders.ts` `CATALOG`) and `ingredient_prices` rows for the 4 stores. `cheddar` added to `ANIMAL_ING`.
-- **SQL migration:** `meals_categories_tags_ingredients_v2.sql` adds `category` column, backfills all 77 meals with categories and curated tags, updates CHECK constraints, rewrites `meal_tags_for` to derive only diet/quick/dinner, adds `meals_tags_derive` trigger, migrates `profiles.state` (`gym` → `high_protein`), inserts `ingredient_prices` for 11 new keys. **Not applied to production yet — Noé must run manually.**
+- **SQL migration:** `meals_categories_tags_ingredients_v2.sql` adds `category` column, backfills all 77 meals with categories and curated tags, updates CHECK constraints, rewrites `meal_tags_for` to derive only diet/quick/dinner, adds `meals_tags_derive` trigger (SECURITY DEFINER), migrates `profiles.state` (`gym` → `high_protein`), inserts `ingredient_prices` for 11 new keys. Applied to production.
 - **Tests:** `npm test` **89** passing (updated tag/category/ingredient assertions, added `--experimental-strip-types` flag for Node TypeScript support).
 - **Docs updated:** `TAGS.md`, `INVARIANTS.md` (I-W05, I-W06), `CURRENT-STATE.md`, `CHANGELOG.md`.
-- **Staged, not deployed:** PR on branch `cursor/meal-categories-tags-ingredients-3723`, GitHub Actions **test** pending. Merge is not live.
+- **Deployed:** Vercel production `dpl_yGDeo3wMVyD9PxDduTCBB6efsvkC`. Edge functions `pay`, `ai`, `newcoming` redeployed.
 
-## 2026-10-06 — method section headings (display only)
+## 2026-10-06 16:35 BST — method section headings (PR #5)
 
+- **Merged:** commit `af3c7946`, GitHub Actions test passed.
 - Cooking instructions now parse and display section headings for labeled steps. When a step starts with a known label + colon (Sauce:, Meatballs:, Pasta:, To serve:, Base:, Topping:, Filling:, Assembly:, Garnish:), the label renders as a visual heading and is stripped from the step text. Step numbering continues across sections. Display-time parsing only — no database or schema changes. Helper function `parseStepWithHeading()` detects the allowlist. CSS for `.recipe-heading`. Tests cover parsing, rendering, and continuous numbering. Storage unchanged — orders still snapshot plain strings. Closed allowlist prevents false-positives on steps like "Tip:" mixed into body text.
+- **Deployed:** Vercel production `dpl_5XNkkEa7G31hzUK2KQNKYhEoaC6C`. No SQL or edge function changes.
 
-    20|## 2026-10-06 — cooking for 2, 4, or 6 (rebased + pack alignment)
+    20|## 2026-10-06 17:10 BST — cooking for 2, 4, or 6 (PR #3)
 
 - **Rebased** `feat/servings` onto latest `main` (includes PR #4 categories/tags + PR #5 method section headings). Conflicts resolved in `index.html`, docs, tests. Servings + section headings both work.
 - **Pack sizes aligned:** Garlic **40 cloves** (4-pack, was 10), Onions **6 pc** (6-pack, was 3) per live Catalog. Updated `INGREDIENTS`, `PACKS`, tests.
-- Household size sets `prefs.servings` to 2, 4, or 6 (3 people cook for 4; a home of 5–6 cooks for 6). The week locks that number, and each order stores `items.servings`. Profile can change cooking-for for next week only. The basket is whole packs from the verified 2-serving portions (`ceil(need / pack)`), not a price multiplier. Seasonings stay one pack unless ticked off. A dinner with no portions still contributes one pack per grocery. Recipe steps stay written for 2; the modal shows the scaled list and a larger-pan note at 4 and 6. Recipe modal parses section headings (Sauce:, Meatballs:, etc.). `pay` recomputes the hold from database portions. SQL is `plentry/supabase/servings.sql` — apply it, then deploy `pay` and the static site together. All 46 keys. `npm test` **114/114**. Not deployed from this change.
+- **Merged:** commit `b1cdb320`, GitHub Actions test passed.
+- Household size sets `prefs.servings` to 2, 4, or 6 (3 people cook for 4; a home of 5–6 cooks for 6). The week locks that number, and each order stores `items.servings`. Profile can change cooking-for for next week only. The basket is whole packs from the verified 2-serving portions (`ceil(need / pack)`), not a price multiplier. Seasonings stay one pack unless ticked off. A dinner with no portions still contributes one pack per grocery. Recipe steps stay written for 2; the modal shows the scaled list and a larger-pan note at 4 and 6. Recipe modal parses section headings (Sauce:, Meatballs:, etc.). `pay` recomputes the hold from database portions. SQL `plentry/supabase/servings.sql` applied to production. All 46 keys. `npm test` **114/114**.
+- **Deployed:** Vercel production `dpl_FYr7g7rS4RyU2jNEeUt3pzNkbFg1`. Edge function `pay` v29.
 
 ## 2026-10-06 — founder login keeps the authenticator code up
 
