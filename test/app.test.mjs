@@ -46,6 +46,23 @@ describe("money", () => {
     const serverPence = Math.round(charged * (1 + window.__plentry.HOLD_BUFFER) * 100);
     assert.equal(serverPence, Math.round(clientHold * 100));
   });
+
+  it("client hold matches pay hold exactly, no 1p difference (Bug 2 fix)", async () => {
+    const { window } = await loadApp();
+    const testCases = [
+      { shop: 62.68, desc: "Tesco 4 servings from bug report" },
+      { shop: 20, desc: "round number" },
+      { shop: 47.83, desc: "typical fractional" },
+      { shop: 100.01, desc: "edge case" },
+    ];
+    testCases.forEach(({ shop, desc }) => {
+      const clientHold = window.holdAmount(shop);
+      const charged = shop * 1.05;
+      const payHoldPence = Math.round(charged * 1.30 * 100);
+      const payHold = payHoldPence / 100;
+      assert.equal(clientHold, payHold, `${desc}: client ${clientHold} should equal pay ${payHold}`);
+    });
+  });
 });
 
 describe("xss and urls", () => {

@@ -641,7 +641,7 @@ const HOLD_BUFFER=0.30;
 function gbp(n){return Math.round(Number(n||0)*100)/100;}
 function plentryFee(shop){return gbp(shop*COMMISSION);}
 function customerTotal(shop){return gbp(Number(shop||0)+plentryFee(shop));}
-function holdAmount(shop){return gbp(customerTotal(shop)*(1+HOLD_BUFFER));}
+function holdAmount(shop){return Math.round(Number(shop||0)*(1+COMMISSION)*(1+HOLD_BUFFER)*100)/100;}
 function captureChargePence(storeGbp){
   const storePence=Math.round(Number(storeGbp)*100);
   if(!storePence||storePence<=0)return 0;
@@ -699,8 +699,8 @@ const SAMPLE_WEEK_ITEMS=[
   {name:"curry paste",qty:1,unit:"jar"},{name:"passata",qty:1,unit:"500g"},
   {name:"onions",qty:2,unit:"3 pk"},{name:"garlic",qty:2,unit:"bulb"},
   {name:"bell peppers",qty:1,unit:"3 pk"},{name:"broccoli",qty:1,unit:"head"},
-  {name:"spinach",qty:1,unit:"240g"},{name:"lemons",qty:1,unit:"3 pk"},
-  {name:"potatoes",qty:1,unit:"1kg"},{name:"olive oil",qty:1,unit:"500ml"},
+  {name:"spinach",qty:1,unit:"240g"},{name:"lemons",qty:1,unit:"4 pk"},
+  {name:"potatoes",qty:1,unit:"2kg"},{name:"olive oil",qty:1,unit:"500ml"},
   {name:"feta",qty:1,unit:"200g"},{name:"yoghurt",qty:1,unit:"500g"},
   {name:"parmesan",qty:1,unit:"80g"},
 ];
@@ -784,12 +784,12 @@ const INGREDIENTS_FALLBACK={
   "onions":{unit:"6 pk",pack:6,pu:"pc",price:0.85},"garlic":{unit:"4 pk",pack:40,pu:"clove",price:0.35},
   "bell peppers":{unit:"3 pk",pack:3,pu:"pc",price:1.60},"broccoli":{unit:"head",pack:1,pu:"pc",price:0.90},
   "spinach":{unit:"240g",pack:240,pu:"g",price:1.30},"tomatoes":{unit:"6 pk",pack:6,pu:"pc",price:1.20},
-  "lemons":{unit:"3 pk",pack:3,pu:"pc",price:1.00},"potatoes":{unit:"1kg",pack:1000,pu:"g",price:1.15},
+  "lemons":{unit:"4 pk",pack:4,pu:"pc",price:1.00},"potatoes":{unit:"2kg",pack:2000,pu:"g",price:1.15},
   "olive oil":{unit:"500ml",pack:33,pu:"tbsp",price:3.50},"feta":{unit:"200g",pack:200,pu:"g",price:1.95},
   "yoghurt":{unit:"500g",pack:500,pu:"g",price:1.25},"parmesan":{unit:"80g",pack:80,pu:"g",price:1.85},
   "chopped tomatoes":{unit:"400g tin",pack:400,pu:"g",price:0.50},"butter":{unit:"250g",pack:250,pu:"g",price:1.99},
   "fresh coriander":{unit:"30g bunch",pack:30,pu:"g",price:0.70},
-  "tomato puree":{unit:"200g",pack:65,pu:"g",price:0.65},"fresh ginger":{unit:"100g",pack:100,pu:"g",price:1.25},
+  "tomato puree":{unit:"200g",pack:200,pu:"g",price:0.65},"fresh ginger":{unit:"100g",pack:100,pu:"g",price:1.25},
   "garam masala":{unit:"jar",pack:20,pu:"tsp",price:1.10},"limes":{unit:"5 pk",pack:5,pu:"pc",price:1.20},
   "spring onions":{unit:"bunch",pack:6,pu:"pc",price:0.70},"penne":{unit:"500g",pack:500,pu:"g",price:0.60},
   "arborio rice":{unit:"500g",pack:500,pu:"g",price:2.50},"fresh basil":{unit:"30g",pack:30,pu:"g",price:0.55},
@@ -833,6 +833,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
   const have={};
   (Array.isArray(cupboardTicks)?cupboardTicks:[]).forEach(function(k){have[String(k)]=1;});
   const need={};
+  const hasNoPortion={};
   const seen={};
   const meals=Array.isArray(weekMeals)?weekMeals:[];
   function markSeasoning(list){
@@ -848,7 +849,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     if(!groceryKeys.length){
       ing.forEach(function(key){
         if(SEASONINGS.indexOf(key)>=0||!cat[key]||!(cat[key].pack>0))return;
-        need[key]=Math.max(need[key]||0,cat[key].pack);
+        hasNoPortion[key]=1;
         seen[key]=1;
       });
       return;
@@ -861,7 +862,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
       if(bad){
         if(strict)throw new Error("unit mismatch "+key);
         console.log("portion unit mismatch",key);
-        need[key]=Math.max(need[key]||0,pack);
+        hasNoPortion[key]=1;
         seen[key]=1;
         return;
       }
@@ -875,10 +876,19 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     if(SEASONINGS.indexOf(key)>=0){packs[key]=1;return;}
     const pack=cat[key]&&cat[key].pack;
     if(!(pack>0))return;
-    const amount=need[key]||0;
-    if(!(amount>0))return;
-    let q=Math.ceil(amount/pack-1e-9);
-    if(q<1)q=1;
+    const scaled=need[key]||0;
+    const flagged=hasNoPortion[key]?1:0;
+    if(!(scaled>0)&&!flagged)return;
+    let q;
+    if(!(scaled>0))q=1;
+    else{
+      q=Math.ceil(scaled/pack-1e-9);
+      if(q<1)q=1;
+      if(flagged){
+        const spare=q*pack-scaled;
+        if(spare<pack/2)q=q+1;
+      }
+    }
     if(q>50)q=50;
     packs[key]=q;
   });

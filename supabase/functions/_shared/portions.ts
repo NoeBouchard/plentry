@@ -3,9 +3,11 @@
 // and on INGREDIENTS in the client; a contracts test checks they match.
 //
 // Seasonings are never scaled. Aromatics scale a little less at 6. Packs are
-// always whole: ceil(need / pack). A meal with no portions contributes one
-// pack of each grocery (max, not a sum) so an unverified catalog does not
-// multiply the shop.
+// always whole. Portioned meals sum a scaled need, then ceil(need / pack).
+// If any no-portions dinner (or a unit mismatch) uses that ingredient, add
+// one extra pack only when the spare in the last pack is under half a pack.
+// Several such dinners share that one extra. A key used only by no-portions
+// dinners is 1 pack.
 
 /* portions:start */
 const SEASONINGS=["salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
@@ -37,6 +39,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
   const have={};
   (Array.isArray(cupboardTicks)?cupboardTicks:[]).forEach(function(k){have[String(k)]=1;});
   const need={};
+  const hasNoPortion={};
   const seen={};
   const meals=Array.isArray(weekMeals)?weekMeals:[];
   function markSeasoning(list){
@@ -52,7 +55,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     if(!groceryKeys.length){
       ing.forEach(function(key){
         if(SEASONINGS.indexOf(key)>=0||!cat[key]||!(cat[key].pack>0))return;
-        need[key]=Math.max(need[key]||0,cat[key].pack);
+        hasNoPortion[key]=1;
         seen[key]=1;
       });
       return;
@@ -65,7 +68,7 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
       if(bad){
         if(strict)throw new Error("unit mismatch "+key);
         console.log("portion unit mismatch",key);
-        need[key]=Math.max(need[key]||0,pack);
+        hasNoPortion[key]=1;
         seen[key]=1;
         return;
       }
@@ -79,10 +82,19 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     if(SEASONINGS.indexOf(key)>=0){packs[key]=1;return;}
     const pack=cat[key]&&cat[key].pack;
     if(!(pack>0))return;
-    const amount=need[key]||0;
-    if(!(amount>0))return;
-    let q=Math.ceil(amount/pack-1e-9);
-    if(q<1)q=1;
+    const scaled=need[key]||0;
+    const flagged=hasNoPortion[key]?1:0;
+    if(!(scaled>0)&&!flagged)return;
+    let q;
+    if(!(scaled>0))q=1;
+    else{
+      q=Math.ceil(scaled/pack-1e-9);
+      if(q<1)q=1;
+      if(flagged){
+        const spare=q*pack-scaled;
+        if(spare<pack/2)q=q+1;
+      }
+    }
     if(q>50)q=50;
     packs[key]=q;
   });
@@ -112,8 +124,8 @@ export const PACKS: Record<string, { pack: number | null, pu: string }> = {
   "broccoli": { pack: 1, pu: "pc" },
   "spinach": { pack: 240, pu: "g" },
   "tomatoes": { pack: 6, pu: "pc" },
-  "lemons": { pack: 3, pu: "pc" },
-  "potatoes": { pack: 1000, pu: "g" },
+  "lemons": { pack: 4, pu: "pc" },
+  "potatoes": { pack: 2000, pu: "g" },
   "olive oil": { pack: 33, pu: "tbsp" },
   "feta": { pack: 200, pu: "g" },
   "yoghurt": { pack: 500, pu: "g" },
@@ -121,7 +133,7 @@ export const PACKS: Record<string, { pack: number | null, pu: string }> = {
   "chopped tomatoes": { pack: 400, pu: "g" },
   "butter": { pack: 250, pu: "g" },
   "fresh coriander": { pack: 30, pu: "g" },
-  "tomato puree": { pack: 65, pu: "g" },
+  "tomato puree": { pack: 200, pu: "g" },
   "fresh ginger": { pack: 100, pu: "g" },
   "garam masala": { pack: 20, pu: "tsp" },
   "limes": { pack: 5, pu: "pc" },

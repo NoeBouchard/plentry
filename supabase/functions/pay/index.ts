@@ -164,7 +164,7 @@ export default {
       p.set('line_items[0][price_data][unit_amount]', String(amount))
       p.set('line_items[0][price_data][product_data][name]', `Plentry groceries — ${o.store}`)
       p.set('line_items[0][price_data][product_data][description]',
-        'Hold covers the estimate + 5% Plentry fee, with ~15% buffer. You are charged the exact store total plus 5%.')
+        'Hold covers the estimate + 5% Plentry fee, with ~30% buffer. You are charged the exact store total plus 5%.')
       if (ctx.userClaims?.email) p.set('customer_email', ctx.userClaims.email)
       const del = o.address && o.address.delivery
       if (del && del.line1 && del.city && del.postcode) {

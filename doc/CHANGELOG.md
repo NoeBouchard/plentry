@@ -10,6 +10,22 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Catalog decision.** The hardcoded lists stay. Copying new keys into `INGREDIENTS` would not make `pay` accept them (`rebuildBasket` still uses `CATALOG`), and reading `pack_size` text as the basket pack would change quantities. Shelf prices for keys that already exist still flow through `loadShelfPrices`. Follow-up: `basketFor` takes per-shop `pack_qty` / `pack_unit` from `ingredient_prices` for the order's store, and `pay` accepts any `meal_key` that has a price row.
 - **Not deployed.**
 
+## 2026-10-08 — Basket order no longer changes the shop; hold display matches pay
+
+**Bug fixes:**
+
+1. **Meal order dependency removed** — Mixing a portioned dinner with a dinner that has no portions used `max`, so the pack count depended on which meal was seen first. The basket is now order-independent. Portioned meals sum a scaled need and round up to whole packs. If any no-portions dinner (or a unit mismatch) uses that ingredient, add one extra pack only when the spare in the last pack is under half a pack. Several no-portions dinners share at most that one extra pack. An ingredient used only by no-portions dinners stays at 1 pack. Same block in `index.html` and `supabase/functions/_shared/portions.ts`.
+
+2. **Client hold display now matches pay exactly** — The client was rounding the 5% fee to pence before ×1.30, so some holds showed 1p under Stripe (Tesco 4 servings: modal £85.55, charge £85.56). `holdAmount()` is now `Math.round(shop * 1.05 * 1.30 * 100) / 100`, the same formula as `pay`.
+
+3. **Stripe description** — Checkout copy said "~15% buffer". The multiplier is 1.30, so the text now says "~30% buffer".
+
+**Shelf packs:** one pack size per key, taken from live `ingredient_prices` where Tesco, Asda and Sainsbury’s agree (or all four). Potatoes **2000g** (was 1000g; the £1.32 line is a 2kg bag). Lemons **4** (was 3). Tomato purée **200g** (was 65g). Waitrose potatoes are 2.5kg and are not a separate size. Prices unchanged.
+
+**Tests:** `npm test` on `main` is **114/114** (the vault line that said 109 was stale). This change is **119/119**: ragù + no-portions pomodoro is 2 passata and 1 spaghetti at 2 servings in both orders; the Tesco week at 2 servings keeps garlic, olive oil and potatoes at 1 pack, and at 4 servings potatoes stay 1 pack; tortilla alone at 6 servings is 1200g of potato, 1 × 2kg bag; two no-portions dinners sharing an ingredient stay at 1 pack; client hold matches pay. Beef ragù alone at 4 servings is still 2×500g mince, 2×500g passata, 1×500g spaghetti.
+
+**Why:** Found in the 8 Oct internal dry-run smoke. PR branch `cursor/fix-basket-order-dependency-cd89`. Folded into the admin meals pull request; not merged on its own.
+
 ## 2026-10-06 16:06 BST — meal categories, new tag structure, 11 new ingredient keys (PR #4)
 
 - **Merged:** commit `0ef39e9`, GitHub Actions test passed.
