@@ -25,6 +25,7 @@ import {
   normServings,
   scalePortion,
   servingsFromHousehold,
+  firstShelfRow,
   storePacksFromPrices,
 } from "../supabase/functions/_shared/portions.ts";
 
@@ -373,6 +374,20 @@ describe("S-04 server-built basket", () => {
     const hold = Math.round(est * 1.05 * 1.30 * 100);
     assert.equal(hold, Math.round(17.3 * 1.05 * 1.30 * 100));
     assert.equal(hold, 2361);
+  });
+
+  it("duplicate meal_key rows use the lowest id, or the first row when there is no id", () => {
+    const later = { id: 2, meal_key: "garlic", pack_qty: 40, pack_unit: "clove" };
+    const earlier = { id: 1, meal_key: "garlic", pack_qty: 10, pack_unit: "clove" };
+    assert.equal(firstShelfRow([later, earlier]), earlier);
+    assert.deepEqual(storePacksFromPrices([later, earlier]).garlic, { pack: 10, pu: "clove" });
+    const first = { meal_key: "garlic", pack_qty: 40, pack_unit: "clove" };
+    const second = { meal_key: "garlic", pack_qty: 10, pack_unit: "clove" };
+    assert.equal(firstShelfRow([first, second]), first);
+    assert.deepEqual(storePacksFromPrices([first, second]).garlic, { pack: 40, pu: "clove" });
+    const blank = { id: 1, meal_key: "garlic", pack_qty: null, pack_unit: "" };
+    const other = { id: 4, meal_key: "garlic", pack_qty: 10, pack_unit: "clove" };
+    assert.equal(storePacksFromPrices([other, blank]).garlic, undefined);
   });
 });
 

@@ -828,6 +828,20 @@ function scalePortion(amount, unit, key, servings){
   if(unit==="pc"||unit==="clove")return Math.ceil(a*af);
   return a*af;
 }
+// Duplicate shelf rows for one meal_key and store: lowest numeric id, otherwise the first row.
+function firstShelfRow(rows){
+  let best=null;
+  (Array.isArray(rows)?rows:[]).forEach(function(r){
+    if(!r)return;
+    if(!best){best=r;return;}
+    const id=r.id==null||r.id===""?null:+r.id;
+    const bid=best.id==null||best.id===""?null:+best.id;
+    const has=id!==null&&Number.isFinite(id);
+    const bhas=bid!==null&&Number.isFinite(bid);
+    if(has&&(!bhas||id<bid))best=r;
+  });
+  return best;
+}
 function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePacks){
   const cat=catalog||{};
   const shelf=storePacks&&typeof storePacks==="object"&&!Array.isArray(storePacks)?storePacks:{};
@@ -1141,19 +1155,28 @@ async function loadShelfPrices(){
   if(!sb)return;
   try{
     let res=await sb.from("ingredient_prices")
-      .select("meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate,pack_qty,pack_unit");
+      .select("id,meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate,pack_qty,pack_unit");
     if(res.error)res=await sb.from("ingredient_prices")
-      .select("meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
+      .select("id,meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
     const data=res.data,error=res.error;
     if(error||!data)return;
     // key by meal_key when linked to the meal catalog, else display_name — so pantry
     // items outside the meal keys (soy sauce, ketchup, …) still price correctly.
+    // Several rows for one key and store collapse with firstShelfRow (lowest id).
     const byDb={};
-    for(const r of data){const k=r.meal_key||(r.display_name||"").toLowerCase();if(!k)continue;(byDb[k]=byDb[k]||{})[r.store]=r;}
+    for(const r of data){
+      const k=r.meal_key||(r.display_name||"").toLowerCase();
+      if(!k)continue;
+      const bucket=byDb[k]=byDb[k]||{};
+      (bucket[r.store]=bucket[r.store]||[]).push(r);
+    }
     SHELF={};
     for(const [key,stores] of Object.entries(byDb)){
       SHELF[key]={};
-      for(const [appId,dbId] of Object.entries(DB_STORE))if(stores[dbId])SHELF[key][appId]=stores[dbId];
+      for(const [appId,dbId] of Object.entries(DB_STORE)){
+        const row=firstShelfRow(stores[dbId]);
+        if(row)SHELF[key][appId]=row;
+      }
     }
     SHELF_READY=Object.keys(SHELF).length>0;
     if(basket.length)renderShop();
@@ -3200,8 +3223,11 @@ function toggleStapleAt(idx){
 }
 
 // ---------- SHOP ----------
+function derivedBuy(store){
+  return basketFor(selectedMeals(),weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(store&&store.id));
+}
 function needList(){
-  const buy=basketFor(selectedMeals(),weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(preferredStoreObj()&&preferredStoreObj().id));
+  const buy=derivedBuy(preferredStoreObj());
   let pantryValue=0;
   selectedMeals().forEach(r=>{(r.ing||[]).forEach(i=>{
     if(haveItem(i))pantryValue+=0.5*ingInfo(i).price;
@@ -3214,6 +3240,39 @@ function storeTotalForItems(buy,s){
     const r=shelfRow(i,s);
     return t+q*(r?Number(r.price_gbp):ingInfo(i).price*s.mult);
   },0)+s.fee;
+}
+// Each shop's comparison total uses that shop's packs, not the shared basket.
+function compareQuote(s){
+  const buy=derivedBuy(s);
+  const t=storeTotalForItems(buy,s);
+  const keys=Object.keys(buy);
+  const covered=keys.length?keys.filter(k=>shelfRow(k,s)).length/keys.length:0;
+  return {t,pay:customerTotal(t),fee:plentryFee(t),live:false,q:null,shelf:SHELF_READY&&covered===1,buy};
+}
+// Shop change. An unedited basket is replaced. An edited basket keeps the user's
+// lines (added lines stay, removed lines stay gone) and the auto-derived counts
+// follow the new shop. Pay still rebuilds from the meals, so the confirm hold
+// uses compareQuote, not this line list.
+function rebaseBasketForStore(store){
+  if(!store)return false;
+  const buy=derivedBuy(store);
+  const before=basket.map(b=>b.i+":"+b.q).sort().join("|");
+  if(basketEditsThisWeek()){
+    const next=S.basketEdit.filter(b=>b&&INGREDIENTS[b.i]).map(b=>{
+      const derived=buy[b.i];
+      const q=derived!=null?derived:Math.max(1,Math.min(20,Math.round(+b.q||1)));
+      return {i:b.i,q};
+    });
+    S.basketEdit=next.length?next:null;
+    S.basketFor=selectedKey();
+    basket=next.map(b=>({i:b.i,q:b.q}));
+  }else{
+    basket=Object.entries(buy).map(([i,q])=>({i,q}));
+  }
+  const after=basket.map(b=>b.i+":"+b.q).sort().join("|");
+  if(before===after)return false;
+  liveQuote=null;liveQuoteKey="";
+  return true;
 }
 function mealsChanged(){
   S.basketEdit=null;
@@ -3341,7 +3400,7 @@ function renderBasketDrawer(){
   if(!panel)return;
   const s=preferredStoreObj();
   const q=s?storeQuote(s):null;
-  const totals=STORES.map(st=>({s:st,...storeQuote(st)})).sort((a,b)=>a.pay-b.pay);
+  const totals=STORES.map(st=>({s:st,...compareQuote(st)})).sort((a,b)=>a.pay-b.pay);
   const best=totals[0],worst=totals[totals.length-1];
   const groceries=[],cupboard=[];
   basket.forEach((b,idx)=>{ (isStaple(b.i)?cupboard:groceries).push(idx); });
@@ -3441,7 +3500,7 @@ function renderShop(){
   }
   else tbl.innerHTML=`<tr><th>Item</th><th>Qty</th><th class="right">Est. price</th></tr>`+
     basket.map(b=>`<tr><td>${esc(b.i)} <span style="color:var(--muted);font-size:.74rem">(${esc(ingInfo(b.i).unit)})</span></td><td>${+b.q}</td><td class="right">£${(b.q*ingInfo(b.i).price).toFixed(2)}</td></tr>`).join("")+pantryRows();
-  const totals=STORES.map(s=>({s,...storeQuote(s)})).sort((a,b)=>a.pay-b.pay);
+  const totals=STORES.map(s=>({s,...compareQuote(s)})).sort((a,b)=>a.pay-b.pay);
   const best=totals[0],worst=totals[totals.length-1];
   const anyLive=totals.some(x=>x.live);
   document.getElementById("store-compare").innerHTML=totals.map(({s,pay,live,shelf},idx)=>
@@ -3464,8 +3523,11 @@ function renderShop(){
 function pickStore(id){
   const next=STORES.find(s=>s.id===id);
   if(!next)return;
+  const switching=!(chosenStore&&chosenStore.id===id);
   chosenStore=next;
-  S.prefs.preferredStore=chosenStore.id;save();
+  S.prefs.preferredStore=chosenStore.id;
+  const changed=switching&&rebaseBasketForStore(chosenStore);
+  save();
   STORES.forEach(s=>{const el=document.getElementById("store-"+s.id);if(el)el.style.borderColor=s.id===id?"var(--green)":"var(--line)";});
   const {pay}=storeQuote(chosenStore);
   const label=`Place my order — £${pay.toFixed(2)} at ${chosenStore.name} →`;
@@ -3474,6 +3536,7 @@ function pickStore(id){
   renderShopTableOnly();
   if(basketOpen)renderBasketDrawer();
   renderBasketFab();
+  if(changed)fetchLiveQuote();
 }
 // re-render just the items table after picking a store (shows matched products)
 function renderShopTableOnly(){
@@ -3539,7 +3602,7 @@ function confirmOrder(){
     openAuth("Create an account so we can take the card hold and order to your door.");
     return;
   }
-  const {t,pay,fee,live}=storeQuote(chosenStore);
+  const {t,pay,fee,live}=compareQuote(chosenStore);
   closeBasket();
   const preview=basket.slice(0,8).map(b=>`${+b.q}× ${esc(b.i)}`).join(" · ");
   const extra=basket.length>8?` · +${basket.length-8} more`:"";
@@ -3599,7 +3662,7 @@ async function placeOrder(){
   window.__deliveryReplace=false;
   const cbtn=document.getElementById("confirm-btn");
   if(cbtn){cbtn.disabled=true;cbtn.textContent="Starting checkout…";}
-  const {t}=storeQuote(chosenStore);
+  const {t}=compareQuote(chosenStore);
   const items=orderItemsPayload();
   const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total:t,eta:chosenStore.eta,
     items,meals:[...S.selected],

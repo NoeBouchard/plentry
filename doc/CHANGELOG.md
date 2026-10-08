@@ -2,6 +2,13 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-08 — Switching shop uses that shop's packs
+
+- **Comparison.** Each supermarket card is priced with that shop's own pack map. It does not reuse the basket that was built for the shop selected at build time.
+- **Shop change.** `pickStore` rebuilds an unedited basket for the new shop. An edited basket keeps lines the user added and leaves removed lines off; counts the meals derive are recomputed for the new shop. The confirm hold is that shop's derived grocery total plus delivery, the same number `pay` holds. A hand edit does not change the hold: `pay` still rebuilds from the meals.
+- **Duplicate shelf rows.** The same `meal_key` and store uses the lowest numeric `id`, or the first row when there is no id. `firstShelfRow` lives in the shared block. The client and `storePacksFromPrices` both call it. `pay` selects `id` with the price row.
+- **Not deployed.**
+
 ## 2026-10-08 — Per-shop packs on the basket
 
 - **Folded in** `cursor/fix-basket-order-dependency-cd89` at `141594fa` (the half-pack rule, `holdAmount` matching `pay`, potatoes **2000 g**, lemons **4**, tomato purée **200 g**). That branch is not merged on its own. Its changelog section below stays.

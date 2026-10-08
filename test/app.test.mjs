@@ -2039,3 +2039,140 @@ describe("I-A12 admin meals and ingredients", () => {
     assert.equal(profiles.profiles.length, 1);
   });
 });
+
+describe("shop switch uses that shop's packs", () => {
+  const ragu = {
+    name: "Beef ragù spaghetti",
+    ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+    portions: { salt: [0.5, "tsp"], garlic: [2, "clove"], onions: [1, "pc"], passata: [400, "g"], parmesan: [30, "g"], "olive oil": [1, "tbsp"], "soy sauce": [1, "tsp"], spaghetti: [180, "g"], "minced beef": [400, "g"], "mixed herbs": [1, "tsp"], "stock cubes": [1, "pc"], "black pepper": [0.25, "tsp"] },
+  };
+  const shakshuka = {
+    name: "Shakshuka",
+    ing: ["bell peppers", "black pepper", "chilli flakes", "cumin", "eggs", "feta", "garlic", "olive oil", "onions", "paprika", "passata", "salt", "tortillas"],
+    portions: { eggs: [4, "pc"], feta: [80, "g"], salt: [0.75, "tsp"], cumin: [1, "tsp"], garlic: [4, "clove"], onions: [1, "pc"], paprika: [1, "tsp"], passata: [400, "g"], "olive oil": [2, "tbsp"], tortillas: [4, "pc"], "bell peppers": [2, "pc"], "chilli flakes": [0.5, "tsp"] },
+  };
+  const tortilla = {
+    name: "Spanish tortilla with tomato salad",
+    ing: ["black pepper", "eggs", "olive oil", "onions", "potatoes", "salt", "tomatoes"],
+    portions: { eggs: [5, "pc"], salt: [0.5, "tsp"], onions: [1, "pc"], potatoes: [400, "g"], tomatoes: [3, "pc"], "olive oil": [5, "tbsp"] },
+  };
+  const salmon = { name: "Salmon traybake", ing: ["black pepper", "broccoli", "garlic", "lemons", "olive oil", "paprika", "potatoes", "salmon fillet", "salt"] };
+  const weekPrices = [
+    ["bell peppers", "sainsburys", 1.99, 3, "pc"], ["bell peppers", "tesco", 2.10, 3, "pc"],
+    ["black pepper", "sainsburys", 0.87, 55, "g"], ["black pepper", "tesco", 1.20, 25, "g"],
+    ["broccoli", "sainsburys", 1.40, 300, "g"], ["broccoli", "tesco", 0.90, 1, "pc"],
+    ["chilli flakes", "sainsburys", 1.15, 32, "g"], ["chilli flakes", "tesco", 1.00, 32, "g"],
+    ["cumin", "sainsburys", 1.15, 43, "g"], ["cumin", "tesco", 1.00, 43, "g"],
+    ["eggs", "sainsburys", 1.80, 6, "pc"], ["eggs", "tesco", 1.80, 6, "pc"],
+    ["feta", "sainsburys", 2.35, 200, "g"], ["feta", "tesco", 2.25, 200, "g"],
+    ["garlic", "sainsburys", 0.50, 10, "clove"], ["garlic", "tesco", 0.87, 40, "clove"],
+    ["lemons", "sainsburys", 0.89, 4, "pc"], ["lemons", "tesco", 1.45, 4, "pc"],
+    ["minced beef", "sainsburys", 5.05, 500, "g"], ["minced beef", "tesco", 6.75, 500, "g"],
+    ["mixed herbs", "sainsburys", 0.82, 18, "g"], ["mixed herbs", "tesco", 1.00, 18, "g"],
+    ["olive oil", "sainsburys", 5.75, 33, "tbsp"], ["olive oil", "tesco", 5.75, 33, "tbsp"],
+    ["onions", "sainsburys", 0.95, 3, "pc"], ["onions", "tesco", 0.95, 6, "pc"],
+    ["paprika", "sainsburys", 1.15, 44, "g"], ["paprika", "tesco", 1.00, 50, "g"],
+    ["parmesan", "sainsburys", 2.90, 80, "g"], ["parmesan", "tesco", 4.00, 200, "g"],
+    ["passata", "sainsburys", 0.45, 500, "g"], ["passata", "tesco", 0.60, 500, "g"],
+    ["potatoes", "sainsburys", 1.32, 2000, "g"], ["potatoes", "tesco", 1.32, 2000, "g"],
+    ["salmon fillet", "sainsburys", 3.59, 2, "pc"], ["salmon fillet", "tesco", 4.90, 2, "pc"],
+    ["salt", "sainsburys", 0.75, 750, "g"], ["salt", "tesco", 1.90, 1500, "g"],
+    ["soy sauce", "sainsburys", 0.55, 150, "ml"], ["soy sauce", "tesco", 0.55, 150, "ml"],
+    ["spaghetti", "sainsburys", 0.75, 500, "g"], ["spaghetti", "tesco", 0.75, 500, "g"],
+    ["stock cubes", "sainsburys", 1.10, 10, "pc"], ["stock cubes", "tesco", 1.00, 10, "pc"],
+    ["tomatoes", "sainsburys", 0.99, 6, "pc"], ["tomatoes", "tesco", 0.99, 6, "pc"],
+    ["tortillas", "sainsburys", 0.99, 8, "pc"], ["tortillas", "tesco", 1.40, 8, "pc"],
+  ].map(([meal_key, store, price_gbp, pack_qty, pack_unit], i) => ({
+    id: i + 1, meal_key, store, price_gbp, pack_qty, pack_unit, product_name: meal_key, display_name: meal_key,
+  }));
+
+  async function loadWeek() {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: weekPrices.map((r) => ({ ...r })) },
+    });
+    const S = window.__plentry.state();
+    S.weekServings = 6;
+    S.prefs.servings = 6;
+    S.menuOptions = [ragu, shakshuka, tortilla, salmon];
+    S.selected = [ragu.name, shakshuka.name, tortilla.name, salmon.name];
+    S.basketEdit = null;
+    S.pantry = {};
+    await window.loadShelfPrices();
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    window.renderShop();
+    return { window, document, S };
+  }
+
+  it("Tesco then Sainsbury's at 6 servings shows each shop's total and pay's hold", async () => {
+    const { window, document } = await loadWeek();
+    const qty = (name) => window.__plentry.getBasket().find((b) => b.i === name).q;
+    assert.equal(qty("garlic"), 1);
+    assert.equal(qty("onions"), 2);
+    const before = document.getElementById("store-compare").textContent;
+    assert.ok(document.getElementById("store-tesco").textContent.includes("£91.39"), before);
+    assert.ok(document.getElementById("store-sains").textContent.includes("£85.31"), before);
+    assert.ok(!document.getElementById("store-sains").textContent.includes("£104.97"));
+    window.pickStore("sains");
+    assert.equal(qty("garlic"), 2);
+    assert.equal(qty("onions"), 3);
+    assert.ok(document.getElementById("store-tesco").textContent.includes("£91.39"));
+    assert.ok(document.getElementById("store-sains").textContent.includes("£85.31"));
+    assert.ok(document.getElementById("order-btn").textContent.includes("£85.31"));
+    window.openBasket();
+    const drawer = document.getElementById("drawer-stores").textContent;
+    assert.ok(drawer.includes("£91.39"));
+    assert.ok(drawer.includes("£85.31"));
+    window.__plentry.state().user = { id: "u1", email: "t@t.com", name: "T" };
+    window.confirmOrder();
+    const modal = document.getElementById("modal").textContent;
+    assert.ok(modal.includes("£110.91"), modal);
+    assert.ok(!modal.includes("£104.97"));
+    assert.ok(!modal.includes("£126.75"));
+  });
+
+  it("an edited basket keeps added and removed lines and refreshes derived counts", async () => {
+    const { window, document, S } = await loadWeek();
+    const lines = window.__plentry.getBasket()
+      .filter((b) => b.i !== "parmesan")
+      .map((b) => ({ i: b.i, q: b.i === "garlic" ? 7 : b.q }));
+    lines.push({ i: "rice", q: 1 });
+    S.basketEdit = lines;
+    S.basketFor = JSON.stringify(S.selected);
+    window.pickStore("sains");
+    const names = window.__plentry.getBasket().map((b) => b.i);
+    assert.ok(names.includes("rice"));
+    assert.ok(!names.includes("parmesan"));
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "garlic").q, 2);
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "rice").q, 1);
+    assert.ok(document.getElementById("store-sains").textContent.includes("£85.31"));
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    window.confirmOrder();
+    assert.ok(document.getElementById("modal").textContent.includes("£110.91"));
+  });
+
+  it("duplicate meal_key and store rows keep the lowest id on the shelf", async () => {
+    const { window } = await loadApp({
+      tables: {
+        meals: [],
+        orders: [],
+        profiles: [],
+        ingredient_prices: [
+          { id: 3, meal_key: "garlic", store: "tesco", price_gbp: 0.5, pack_qty: 10, pack_unit: "clove", product_name: "low", display_name: "garlic" },
+          { id: 8, meal_key: "garlic", store: "tesco", price_gbp: 9, pack_qty: 40, pack_unit: "clove", product_name: "high", display_name: "garlic" },
+          { meal_key: "onions", store: "tesco", price_gbp: 0.95, pack_qty: 6, pack_unit: "pc", product_name: "first", display_name: "onions" },
+          { meal_key: "onions", store: "tesco", price_gbp: 1.5, pack_qty: 3, pack_unit: "pc", product_name: "second", display_name: "onions" },
+        ],
+      },
+    });
+    await window.loadShelfPrices();
+    assert.equal(window.storePackMap("tesco").garlic.pack, 10);
+    const garlic = window.shelfRow("garlic", { id: "tesco" });
+    assert.equal(Number(garlic.price_gbp), 0.5);
+    assert.equal(garlic.product_name, "low");
+    const onions = window.shelfRow("onions", { id: "tesco" });
+    assert.equal(Number(onions.pack_qty), 6);
+    assert.equal(onions.product_name, "first");
+  });
+});

@@ -43,7 +43,7 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
   if (!s) return { error: 'unknown store' }
   let priceQuery = await admin
     .from('ingredient_prices')
-    .select('meal_key,display_name,product_name,pack_size,price_gbp,pack_qty,pack_unit')
+    .select('id,meal_key,display_name,product_name,pack_size,price_gbp,pack_qty,pack_unit')
     .eq('store', s.db)
   if (priceQuery.error) {
     priceQuery = await admin

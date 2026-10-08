@@ -9,6 +9,8 @@
 // Several such dinners share that one extra. A key used only by no-portions
 // dinners is 1 pack. The optional store-pack argument replaces the code pack
 // when its unit matches, or converts exactly between g/kg and ml/l.
+// firstShelfRow picks one shelf row when meal_key and store are duplicated:
+// the lowest numeric id, or the first row when ids are missing.
 
 /* portions:start */
 const SEASONINGS=["salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
@@ -34,6 +36,20 @@ function scalePortion(amount, unit, key, servings){
   if(!(a>=0))return 0;
   if(unit==="pc"||unit==="clove")return Math.ceil(a*af);
   return a*af;
+}
+// Duplicate shelf rows for one meal_key and store: lowest numeric id, otherwise the first row.
+function firstShelfRow(rows){
+  let best=null;
+  (Array.isArray(rows)?rows:[]).forEach(function(r){
+    if(!r)return;
+    if(!best){best=r;return;}
+    const id=r.id==null||r.id===""?null:+r.id;
+    const bid=best.id==null||best.id===""?null:+best.id;
+    const has=id!==null&&Number.isFinite(id);
+    const bhas=bid!==null&&Number.isFinite(bid);
+    if(has&&(!bhas||id<bid))best=r;
+  });
+  return best;
 }
 function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePacks){
   const cat=catalog||{};
@@ -117,17 +133,24 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePac
 }
 /* portions:end */
 
-export { SEASONINGS, normServings, servingsFromHousehold, scalePortion, basketFor }
+export { SEASONINGS, normServings, servingsFromHousehold, scalePortion, basketFor, firstShelfRow }
 
 // Shelf rows for one store, keyed by meal_key. basketFor decides whether the
-// unit is usable. Rows with no meal_key are not basket packs.
-export function storePacksFromPrices(rows: Array<{ meal_key?: string | null, pack_qty?: number | string | null, pack_unit?: string | null }> | null | undefined) {
-  const out: Record<string, { pack: number, pu: string }> = {}
+// unit is usable. Rows with no meal_key are not basket packs. Duplicate
+// meal_key rows use firstShelfRow (lowest id, else the first row).
+export function storePacksFromPrices(rows: Array<{ id?: number | string | null, meal_key?: string | null, pack_qty?: number | string | null, pack_unit?: string | null }> | null | undefined) {
+  const groups: Record<string, Array<{ id?: number | string | null, meal_key?: string | null, pack_qty?: number | string | null, pack_unit?: string | null }>> = {}
   for (const r of rows || []) {
     const key = r && r.meal_key ? String(r.meal_key) : ""
-    if (!key || out[key]) continue
-    const qty = Number(r.pack_qty)
-    const pu = String(r.pack_unit || "")
+    if (!key) continue
+    ;(groups[key] = groups[key] || []).push(r)
+  }
+  const out: Record<string, { pack: number, pu: string }> = {}
+  for (const key of Object.keys(groups)) {
+    const row = firstShelfRow(groups[key])
+    if (!row) continue
+    const qty = Number(row.pack_qty)
+    const pu = String(row.pack_unit || "")
     if (!(qty > 0) || !pu) continue
     out[key] = { pack: qty, pu }
   }

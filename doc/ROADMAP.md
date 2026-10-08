@@ -28,7 +28,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 
 ## Next product
 
-- **Database catalog.** Per-shop `pack_qty` / `pack_unit` are what `basketFor` uses when the unit matches. `pay` still rejects a `meal_key` that is not in the 46-key code catalog. Admin-added keys stay flagged not usable in baskets until that changes.
+- **Database catalog.** Per-shop `pack_qty` / `pack_unit` are what `basketFor` uses when the unit matches. The shop comparison and a shop change use that store's packs. The confirm hold matches `pay`. `pay` still rejects a `meal_key` that is not in the 46-key code catalog. Admin-added keys stay flagged not usable in baskets until that changes.
 
 ## Next product (older)
 
