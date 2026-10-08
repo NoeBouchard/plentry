@@ -2,6 +2,20 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-08 — Basket calculation fixes (order dependency, hold display)
+
+**Bug fixes:**
+
+1. **Meal order dependency removed** — The basket (pack counts per ingredient) is now deterministic regardless of the order meals were selected. Previously, mixing portioned and non-portioned meals could produce different baskets depending on order (e.g., Beef ragù then Veggie pomodoro at Tesco 2 servings gave different pack counts vs. reversed order). Fix: each no-portions dinner contributes one full pack of each ingredient additively (count × pack size), portioned meals accumulate scaled amounts additively, then round to whole packs once. Applied identically to `index.html` and `supabase/functions/_shared/portions.ts` (byte-for-byte between markers).
+
+2. **Client hold display now matches pay exactly** — Fixed 1p discrepancy where the client showed hold 1p lower than Stripe charged in some cases (e.g., Tesco 4 servings: client modal showed £85.55, Stripe charged £85.56). The client was rounding the 5% fee to pence before applying ×1.30, while pay computed `Math.round(est × 1.05 × 1.30 × 100)` in one step. Client `holdAmount()` now uses the same formula: `Math.round(shop * 1.05 * 1.30 * 100) / 100`.
+
+3. **Stripe description text corrected** — Changed "~15% buffer" to "~30% buffer" in `pay/index.ts` Checkout Session description to reflect the actual 1.30 hold multiplier (raised 19 Sep 2026).
+
+**Tests:** Added meal-order invariance test (both orders of ragù + no-portions pomodoro give identical baskets, exact pack counts verified) and client-vs-pay hold parity test with multiple shop totals. All tests passing. Verified: Beef ragù alone at 4 servings still produces 2×500g mince, 2×500g passata, 1×500g spaghetti per the spec.
+
+**Why:** Found in internal testing (8 Oct dry-run smoke). These were correctness bugs affecting money calculation and customer trust. PR branch `cursor/fix-basket-order-dependency-cd89`.
+
 ## 2026-10-06 16:06 BST — meal categories, new tag structure, 11 new ingredient keys (PR #4)
 
 - **Merged:** commit `0ef39e9`, GitHub Actions test passed.
