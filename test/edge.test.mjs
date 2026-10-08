@@ -230,12 +230,37 @@ describe("S-04 server-built basket", () => {
     const order1 = basketFor([ragu, pomodoroNoPorts], 2, [], PACKS, true);
     const order2 = basketFor([pomodoroNoPorts, ragu], 2, [], PACKS, true);
     assert.deepEqual(order1, order2, "ragù then no-portions pomodoro equals reversed");
-    assert.equal(order1.passata, 2, "ragù (400g) + no-portions pomodoro (any no-portions adds 1 pack) = 2 packs at 2 servings");
-    assert.equal(order1.spaghetti, 2, "ragù (180g) + no-portions pomodoro (any no-portions adds 1 pack) = 2 packs at 2 servings");
+    assert.equal(order1.passata, 2, "400g leaves 100g spare in a 500g pack, under half, so +1");
+    assert.equal(order1.spaghetti, 1, "180g leaves 320g spare in a 500g pack, so no extra");
     const salmon = { name: "Salmon traybake", ing: ["broccoli", "lemons", "olive oil", "salmon fillet", "soy sauce"] };
     const mix1 = basketFor([ragu, salmon], 4, [], PACKS, true);
     const mix2 = basketFor([salmon, ragu], 4, [], PACKS, true);
     assert.deepEqual(mix1, mix2, "portioned meal + non-portioned meal is order-independent");
+  });
+
+  it("half-pack spare: Tesco week at 2 servings does not add a pack when spare is at least half", () => {
+    const ragu = {
+      name: "Beef ragù spaghetti",
+      ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+      portions: { salt: [0.5, "tsp"], garlic: [2, "clove"], onions: [1, "pc"], passata: [400, "g"], parmesan: [30, "g"], "olive oil": [1, "tbsp"], "soy sauce": [1, "tsp"], spaghetti: [180, "g"], "minced beef": [400, "g"], "mixed herbs": [1, "tsp"], "stock cubes": [1, "pc"], "black pepper": [0.25, "tsp"] },
+    };
+    const shakshuka = {
+      name: "Shakshuka",
+      ing: ["bell peppers", "black pepper", "chilli flakes", "cumin", "eggs", "feta", "garlic", "olive oil", "onions", "paprika", "passata", "salt", "tortillas"],
+      portions: { eggs: [4, "pc"], feta: [80, "g"], salt: [0.75, "tsp"], cumin: [1, "tsp"], garlic: [4, "clove"], onions: [1, "pc"], paprika: [1, "tsp"], passata: [400, "g"], "olive oil": [2, "tbsp"], tortillas: [4, "pc"], "bell peppers": [2, "pc"], "chilli flakes": [0.5, "tsp"] },
+    };
+    const tortilla = {
+      name: "Spanish tortilla with tomato salad",
+      ing: ["black pepper", "eggs", "olive oil", "onions", "potatoes", "salt", "tomatoes"],
+      portions: { eggs: [5, "pc"], salt: [0.5, "tsp"], onions: [1, "pc"], potatoes: [400, "g"], tomatoes: [3, "pc"], "olive oil": [5, "tbsp"] },
+    };
+    const salmon = { name: "Salmon traybake", ing: ["black pepper", "broccoli", "garlic", "lemons", "olive oil", "paprika", "potatoes", "salmon fillet", "salt"] };
+    const forward = basketFor([ragu, shakshuka, tortilla, salmon], 2, [], PACKS, true);
+    const reverse = basketFor([salmon, tortilla, shakshuka, ragu], 2, [], PACKS, true);
+    assert.deepEqual(forward, reverse);
+    assert.equal(forward.garlic, 1);
+    assert.equal(forward["olive oil"], 1);
+    assert.equal(forward.potatoes, 1);
   });
 });
 

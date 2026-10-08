@@ -3,9 +3,11 @@
 // and on INGREDIENTS in the client; a contracts test checks they match.
 //
 // Seasonings are never scaled. Aromatics scale a little less at 6. Packs are
-// always whole: ceil(need / pack). A meal with no portions contributes one
-// pack of each grocery (max, not a sum) so an unverified catalog does not
-// multiply the shop.
+// always whole. Portioned meals sum a scaled need, then ceil(need / pack).
+// If any no-portions dinner (or a unit mismatch) uses that ingredient, add
+// one extra pack only when the spare in the last pack is under half a pack.
+// Several such dinners share that one extra. A key used only by no-portions
+// dinners is 1 pack.
 
 /* portions:start */
 const SEASONINGS=["salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
@@ -81,11 +83,18 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict){
     const pack=cat[key]&&cat[key].pack;
     if(!(pack>0))return;
     const scaled=need[key]||0;
-    const fromNoPortion=hasNoPortion[key]?pack:0;
-    const amount=scaled+fromNoPortion;
-    if(!(amount>0))return;
-    let q=Math.ceil(amount/pack-1e-9);
-    if(q<1)q=1;
+    const flagged=hasNoPortion[key]?1:0;
+    if(!(scaled>0)&&!flagged)return;
+    let q;
+    if(!(scaled>0))q=1;
+    else{
+      q=Math.ceil(scaled/pack-1e-9);
+      if(q<1)q=1;
+      if(flagged){
+        const spare=q*pack-scaled;
+        if(spare<pack/2)q=q+1;
+      }
+    }
     if(q>50)q=50;
     packs[key]=q;
   });
