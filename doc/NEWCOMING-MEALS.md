@@ -11,7 +11,7 @@ Queue of catalog dinners that are **not founder-verified** (`meals.reviewed_at` 
 3. Ingredients (catalog keys only), instructions (one step per line, qty for 2), diet + extra tags. **Fill tags from ingredients** if you want a starting set.
 4. Before publishing, take it through [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) (`verify.py build` creates its record; three stages against a chef source).
 5. **Verify & publish** — sets `reviewed_at`. Customers get it on New week / Modify from Postgres; no extra deploy.
-6. **Save to New meal** if it is not ready. **Unpublish** on a live dish sends it back here. **Remove** deletes the row.
+6. **Save to New meal** if it is not ready. **Unpublish** on a live dish sends it back here. There is no delete.
 
 Advisor drafts land in New meal automatically (`source` advisor, `reviewed_at` null). Do not verify a bad recipe.
 

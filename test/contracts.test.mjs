@@ -521,9 +521,25 @@ describe("source contracts", () => {
     assert.match(sql, /select public\.is_admin\(\)\s+and \(auth\.jwt\(\)->>'aal'\) = 'aal2'/);
     assert.match(sql, /grant execute on function public\.is_admin_aal2\(\) to authenticated/);
     assert.match(sql, /revoke all on function public\.is_admin_aal2\(\) from public, anon, authenticated/);
-    for (const pol of ["admin select all orders", "admin update all orders", "admin update meals review", "admin insert meals", "admin delete meals"]) {
+    for (const pol of ["admin select all orders", "admin update all orders", "admin update meals review", "admin insert meals"]) {
       assert.match(sql, new RegExp(`create policy "${pol}"[\\s\\S]*?is_admin_aal2\\(\\)`), pol);
     }
+    assert.match(sql, /drop policy if exists "admins insert admins" on public\.admins/);
+    assert.doesNotMatch(sql, /create policy "admins insert admins"/);
+    assert.doesNotMatch(sql, /create policy "admins update admins"/);
+    assert.doesNotMatch(sql, /create policy "admins delete admins"/);
+    const adminsRls = sql.slice(sql.indexOf("alter table public.admins enable row level security"), sql.indexOf("-- Orders / meals writes"));
+    assert.doesNotMatch(adminsRls, /for insert|for update|for delete/);
+    assert.match(sql, /drop policy if exists "admin delete meals" on public\.meals/);
+    assert.doesNotMatch(sql, /create policy "admin delete meals"/);
+    const mealsPol = sql.slice(sql.indexOf("-- Orders / meals writes"), sql.indexOf("-- Prices stay world-readable"));
+    assert.doesNotMatch(mealsPol, /for delete/);
+    assert.doesNotMatch(html, /function adminDeleteMeal/);
+    assert.doesNotMatch(html, /adminDeleteMeal\(/);
+    assert.doesNotMatch(html, /from\("meals"\)\.delete\(/);
+    assert.doesNotMatch(html, /from\("admins"\)\.insert\(/);
+    assert.doesNotMatch(html, /Add admin/);
+    assert.match(html, /saveMealEditor\('unpublish'\)/);
     assert.doesNotMatch(sql, /drop policy if exists "read meals"/);
     assert.match(sql, /create policy "admin read meals" on public\.meals[\s\S]*for select to authenticated[\s\S]*is_admin_aal2\(\)/);
     assert.match(sql, /for select to authenticated\s+using \(public\.is_admin_aal2\(\)\)/);

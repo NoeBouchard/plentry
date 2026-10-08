@@ -2548,7 +2548,6 @@ function mealEditorHtml(m){
       <button type="button" class="btn" style="flex:1" onclick="saveMealEditor(true)">Verify &amp; publish</button>
     </div>
     <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">
-      ${id?`<button type="button" class="btn ghost sm" onclick="adminDeleteMeal(${id})">Remove</button>`:""}
       ${id&&m.reviewed_at?`<button type="button" class="btn ghost sm" onclick="saveMealEditor('unpublish')">Unpublish</button>`:""}
       <button type="button" class="btn ghost sm" onclick="closeModal()">Close</button>
     </div>`;
@@ -2696,13 +2695,6 @@ async function adminVerifyMeal(id){
   else{await loadAdminMeals();renderMeals();closeModal();}
 }
 async function adminMarkMealReviewed(id){return adminVerifyMeal(id);}
-async function adminDeleteMeal(id){
-  if(!sb||!isAdmin()||!id)return;
-  if(!confirm("Delete this dinner from the catalog? Past orders keep the method saved on the order. Use Unpublish instead if you might want it back."))return;
-  const {error}=await sb.from("meals").delete().eq("id",id);
-  if(error)alert("Could not remove: "+(error.message||""));
-  else{closeModal();await loadAdminMeals();renderMeals();}
-}
 async function renderAdmin(){
   const el=document.getElementById("admin-list");
   if(!el)return;

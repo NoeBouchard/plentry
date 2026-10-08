@@ -17,7 +17,9 @@
 -- is_admin() exists.
 --
 -- Roll back the policies only: re-run supabase/admin_mfa.sql (email + aal2).
--- Do not drop public.admins if you have added more people.
+-- That file recreates "admin delete meals". This file drops it again on the next run.
+-- New admins are inserted by hand in the SQL editor. There is no in-app add,
+-- and no insert, update, or delete policy for authenticated users on public.admins.
 
 create table if not exists public.admins (
   id bigint generated always as identity primary key,
@@ -68,12 +70,14 @@ create policy "admins read admins" on public.admins
   for select to authenticated
   using (auth.uid() = user_id or public.is_admin_aal2());
 
+-- RLS stays on. Authenticated users can read (policy above) and cannot write.
+-- A re-run drops the insert policy if an earlier draft of this file created it.
 drop policy if exists "admins insert admins" on public.admins;
-create policy "admins insert admins" on public.admins
-  for insert to authenticated
-  with check (public.is_admin_aal2());
+drop policy if exists "admins update admins" on public.admins;
+drop policy if exists "admins delete admins" on public.admins;
 
--- Orders / meals writes: same five policies as admin_mfa.sql, now the role list.
+-- Orders / meals writes: the admin_mfa.sql policies, now the role list.
+-- The delete policy is dropped below and not recreated.
 drop policy if exists "admin select all orders" on public.orders;
 create policy "admin select all orders" on public.orders
   for select to authenticated
@@ -96,10 +100,11 @@ create policy "admin insert meals" on public.meals
   for insert to authenticated
   with check (public.is_admin_aal2());
 
+-- Unpublish only. Prod has "admin delete meals" (is_founder_aal2() from
+-- admin_mfa.sql). A deleted dinner is still named on a customer's current week;
+-- pay then builds that meal with ing [] and the hold is short. No DELETE policy
+-- for authenticated users after this runs.
 drop policy if exists "admin delete meals" on public.meals;
-create policy "admin delete meals" on public.meals
-  for delete to authenticated
-  using (public.is_admin_aal2());
 
 -- Leave the existing "read meals" policy in place: authenticated users can
 -- already read published meals and drafts. Add admin read of unpublished

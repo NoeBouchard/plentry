@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-08 — Admins stay Noé; meals are unpublished, not deleted
+
+- **Admins.** `public.admins` keeps RLS. Authenticated users have a select policy and no insert, update, or delete policy. `admin_roles.sql` drops `admins insert admins` (and the update and delete names) and does not recreate them. A new admin is inserted by hand in the SQL editor. There is no add-admin control in the app. The founder row in that file is still the migration-role insert.
+- **Capture.** `pay` task `capture` is still the founder email plus aal2 (I-M07). Unchanged.
+- **New keys.** A meal key outside the 46-key code catalog is still stored on the shelf and flagged not usable in baskets. `pay` still rejects it. Unchanged.
+- **Meals.** `admin_roles.sql` drops `admin delete meals` and does not recreate it, including the live policy that uses `is_founder_aal2()`. After a re-run, `meals` has no DELETE policy for authenticated users. The Meals editor has Unpublish and no Remove button. A customer's current week names dinners; if a row is deleted, `pay` builds that dinner with `ing []` and the hold is short.
+- **Not deployed.** `admin_roles.sql` is not applied.
+
 ## 2026-10-08 — Switching shop uses that shop's packs
 
 - **Comparison.** Each supermarket card is priced with that shop's own pack map. It does not reuse the basket that was built for the shop selected at build time.

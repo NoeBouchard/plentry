@@ -1803,6 +1803,44 @@ describe("I-A12 admin meals and ingredients", () => {
     assert.match(card, /Written for 2/);
   });
 
+  it("unpublish sends a live dinner back to New meal, and there is no delete or add-admin control", async () => {
+    const live = {
+      id: 12,
+      name: "Live salmon traybake",
+      emoji: "🐟",
+      time: 30,
+      ing: ["salmon fillet", "potatoes", "broccoli", "lemons", "olive oil", "garlic", "salt", "black pepper"],
+      recipe: { steps: ["Roast potatoes.", "Add salmon."], tip: "Hot oven." },
+      tags: ["dinner", "fish"],
+      category: "oven_bake",
+      source: "seed",
+      created_at: "2026-09-01T10:00:00.000Z",
+      reviewed_at: "2026-09-08T12:00:00.000Z",
+    };
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [live], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showMealsScreen();
+    assert.equal(typeof window.adminDeleteMeal, "undefined");
+    assert.ok(!document.body.innerHTML.includes("Add admin"));
+    assert.ok(!document.body.innerHTML.includes("adminDeleteMeal"));
+    window.openMealEditor(12);
+    const modal = document.getElementById("modal").innerHTML;
+    assert.ok(modal.includes("Unpublish"));
+    assert.ok(!modal.includes("adminDeleteMeal"));
+    assert.ok(!modal.includes(">Remove<"));
+    await window.saveMealEditor("unpublish");
+    assert.equal(window.__sbTables.meals.length, 1);
+    assert.equal(window.__sbTables.meals[0].reviewed_at, null);
+    assert.ok(document.getElementById("me-err").textContent.includes("Unpublished"));
+    assert.ok(document.getElementById("meals-new").textContent.includes("Live salmon traybake"));
+    assert.ok(!document.getElementById("meals-live").textContent.includes("Live salmon traybake"));
+  });
+
   it("adding an ingredient is blocked until shop, category, and price are set", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
