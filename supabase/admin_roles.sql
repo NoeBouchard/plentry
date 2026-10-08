@@ -239,17 +239,26 @@ begin
   if new.store is null or new.store not in ('tesco','sainsburys','asda','waitrose') then
     raise exception 'shop must be tesco, sainsburys, asda, or waitrose';
   end if;
-  -- New admin rows need a known category. Updates keep grocery/fresh and any other existing value.
+  if new.slug is null or btrim(new.slug) = '' then
+    new.slug := trim(both '-' from regexp_replace(lower(coalesce(nullif(btrim(new.meal_key), ''), new.display_name)), '[^a-z0-9]+', '-', 'g'));
+  end if;
+  -- A brand-new slug needs one of the six catalog categories. Another shop for a
+  -- slug that is already grocery or fresh may keep that category. Updates are not checked.
   if tg_op = 'INSERT' then
-    if new.category is null or new.category not in ('protein','dairy','veg','fruit','carbs','pantry') then
+    if new.category is null
+       or (
+         new.category not in ('protein','dairy','veg','fruit','carbs','pantry')
+         and not exists (
+           select 1 from public.ingredient_prices p
+           where p.slug = new.slug and p.category = new.category
+         )
+       )
+    then
       raise exception 'category is required';
     end if;
   end if;
   if new.price_gbp is null or new.price_gbp <= 0 then
     raise exception 'price is required';
-  end if;
-  if new.slug is null or btrim(new.slug) = '' then
-    new.slug := trim(both '-' from regexp_replace(lower(coalesce(nullif(btrim(new.meal_key), ''), new.display_name)), '[^a-z0-9]+', '-', 'g'));
   end if;
   if unit is not null and unit <> '' then
     if unit not in ('g','ml','pc','clove','tbsp','tsp') then

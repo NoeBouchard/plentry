@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extraMeals, loadApp, mockMfa } from "./harness.mjs";
+import { extraMeals, ingredientPriceWriteError, loadApp, makeQuery, mockMfa } from "./harness.mjs";
 
 function weekState() {
   const menuOptions = extraMeals();
@@ -1859,5 +1859,120 @@ describe("I-A12 admin meals and ingredients", () => {
     window.confirm = () => true;
     await window.deleteIngredient(0);
     assert.equal(window.__sbTables.ingredient_prices.length, 0);
+  });
+
+  it("edits the price of a group that already has all four shops", async () => {
+    const prices = ["tesco", "sainsburys", "asda", "waitrose"].map((store, i) => ({
+      id: i + 1,
+      slug: "penne",
+      display_name: "Penne",
+      category: "grocery",
+      store,
+      meal_key: null,
+      product_name: store + " penne",
+      pack_size: "500g",
+      price_gbp: 0.5 + i / 10,
+      pack_qty: 500,
+      pack_unit: "g",
+    }));
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    const before = prices.map((r) => ({ ...r }));
+    document.getElementById("ing-price-0-asda").value = "1.15";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.length, 4);
+    const asda = rows.find((r) => r.store === "asda");
+    assert.equal(asda.price_gbp, 1.15);
+    assert.equal(asda.product_name, "asda penne");
+    assert.equal(asda.display_name, "Penne");
+    assert.equal(asda.category, "grocery");
+    assert.equal(asda.slug, "penne");
+    assert.equal(asda.pack_size, "500g");
+    assert.equal(asda.pack_qty, 500);
+    assert.equal(asda.pack_unit, "g");
+    for (const store of ["tesco", "sainsburys", "waitrose"]) {
+      const row = rows.find((r) => r.store === store);
+      const prior = before.find((r) => r.store === store);
+      assert.equal(row.price_gbp, prior.price_gbp);
+      assert.equal(row.product_name, prior.product_name);
+      assert.equal(row.display_name, prior.display_name);
+      assert.equal(row.category, prior.category);
+      assert.equal(row.slug, prior.slug);
+    }
+  });
+
+  it("fills a missing shop on a grocery group and keeps the stored slug", async () => {
+    const prices = ["tesco", "sainsburys", "asda"].map((store, i) => ({
+      id: i + 1,
+      slug: "chicken-breast",
+      display_name: "Chicken breast fillets",
+      category: "grocery",
+      store,
+      meal_key: null,
+      product_name: store + " fillets",
+      pack_size: "650g",
+      price_gbp: 4 + i,
+      pack_qty: 650,
+      pack_unit: "g",
+    }));
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+    });
+    window.__plentry.state().user = founder;
+    await window.checkAdminStatus();
+    await window.showIngredientsScreen();
+    document.getElementById("ing-price-0-waitrose").value = "5.40";
+    document.getElementById("ing-product-0-waitrose").value = "Waitrose chicken breast fillets";
+    document.getElementById("ing-pack-0-waitrose").value = "600g";
+    document.getElementById("ing-qty-0-waitrose").value = "600";
+    document.getElementById("ing-unit-0-waitrose").value = "g";
+    await window.saveIngredientGroup(0);
+    const rows = window.__sbTables.ingredient_prices;
+    assert.equal(rows.length, 4);
+    const added = rows.find((r) => r.store === "waitrose");
+    assert.ok(added);
+    assert.equal(added.slug, "chicken-breast");
+    assert.notEqual(added.slug, "chicken-breast-fillets");
+    assert.equal(added.display_name, "Chicken breast fillets");
+    assert.equal(added.category, "grocery");
+    assert.equal(added.product_name, "Waitrose chicken breast fillets");
+    assert.equal(added.meal_key, null);
+    assert.equal(added.price_gbp, 5.4);
+    assert.equal(added.pack_size, "600g");
+    assert.equal(added.pack_qty, 600);
+    assert.equal(added.pack_unit, "g");
+    assert.equal(rows.find((r) => r.id === 1).price_gbp, 4);
+    assert.equal(rows.find((r) => r.id === 1).product_name, "tesco fillets");
+  });
+
+  it("rejects a partial ingredient_prices insert or upsert that omits a NOT NULL column", async () => {
+    const tables = {
+      ingredient_prices: [
+        { id: 1, slug: "penne", display_name: "Penne", category: "grocery", store: "tesco", product_name: "Tesco Penne", price_gbp: 0.6 },
+      ],
+    };
+    const before = structuredClone(tables.ingredient_prices);
+    const partial = { slug: "penne", store: "tesco", price_gbp: 0.9 };
+    assert.match(ingredientPriceWriteError(partial).message, /display_name/);
+    const inserted = await makeQuery(tables, "ingredient_prices").insert(partial);
+    assert.match(inserted.error.message, /not-null constraint/);
+    assert.equal(tables.ingredient_prices.length, 1);
+    assert.equal(tables.ingredient_prices[0].price_gbp, 0.6);
+    const upserted = await makeQuery(tables, "ingredient_prices").upsert(partial, { onConflict: "slug,store" });
+    assert.match(upserted.error.message, /not-null constraint/);
+    assert.deepEqual(tables.ingredient_prices, before);
+    const profiles = { profiles: [] };
+    const kept = await makeQuery(profiles, "profiles").upsert({ id: "u1" }, { onConflict: "id" });
+    assert.equal(kept.error, null);
+    assert.equal(profiles.profiles.length, 1);
   });
 });

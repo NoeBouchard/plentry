@@ -546,6 +546,7 @@ describe("source contracts", () => {
     assert.match(sql, /create or replace function public\.validate_ingredient_price\(\)/);
     assert.match(sql, /shop must be tesco, sainsburys, asda, or waitrose/);
     assert.match(priceFn, /tg_op = 'INSERT'[\s\S]*category is required/);
+    assert.match(priceFn, /p\.slug = new\.slug and p\.category = new\.category/);
     assert.match(sql, /price is required/);
     assert.match(sql, /add column if not exists pack_qty numeric/);
     assert.match(sql, /add column if not exists pack_unit text/);
@@ -558,7 +559,9 @@ describe("source contracts", () => {
     assert.match(html, /Portion unit for "/);
     assert.match(html, /not yet usable in baskets/);
     assert.match(html, /id="nav-ingredients"/);
-    assert.match(html, /upsert\(rows,\{onConflict:"slug,store"\}\)/);
+    assert.match(html, /update\(patch\)\.eq\("id",fields\.existing\.id\)/);
+    assert.match(html, /slug:groupSlug/);
+    assert.doesNotMatch(html, /onConflict:"slug,store"/);
     assert.doesNotMatch(html, /product_name:g\.name/);
   });
 
