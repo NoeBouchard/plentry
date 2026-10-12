@@ -2,34 +2,43 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-08 16:16 BST — production ship (PR #8)
+
+- **Merged:** squash commit `330700587d11735cf229d7622099f44fc10203ac` on `main` at 16:16 BST. PR #7 was closed unmerged because #8 supersedes it.
+- **Live:** the half-pack basket rule (shared pack, from PR #7), per-shop pack sizes from `ingredient_prices` with a fallback to code `PACKS`, and the Admin Meals and Ingredients areas.
+- **SQL:** `supabase/admin_roles.sql` applied on production project `ucciqthwxnlkjalwlhvh`. `public.admins` has exactly 1 row (Noé, the founder), with only a SELECT policy for authenticated users. Further admins are added by hand in the SQL editor. `public.meals` has no DELETE policy, so meals are unpublish-only.
+- **Static:** Vercel production `dpl_GK8zziUE3CyJT3QaoKSCEoogNdHn`, aliased to getplentry.com and www. It replaces `dpl_FYr7g7rS4RyU2jNEeUt3pzNkbFg1`.
+- **Edge:** `pay` is v31. Before this ship, production was running `pay` v30. `pay` v29 was the 6 Oct servings ship. No other edge function was redeployed.
+- **Vault only.** This entry records the founder deploy. It does not deploy.
+
 ## 2026-10-08 — Admins stay Noé; meals are unpublished, not deleted
 
 - **Admins.** `public.admins` keeps RLS. Authenticated users have a select policy and no insert, update, or delete policy. `admin_roles.sql` drops `admins insert admins` (and the update and delete names) and does not recreate them. A new admin is inserted by hand in the SQL editor. There is no add-admin control in the app. The founder row in that file is still the migration-role insert.
 - **Capture.** `pay` task `capture` is still the founder email plus aal2 (I-M07). Unchanged.
 - **New keys.** A meal key outside the 46-key code catalog is still stored on the shelf and flagged not usable in baskets. `pay` still rejects it. Unchanged.
 - **Meals.** `admin_roles.sql` drops `admin delete meals` and does not recreate it, including the live policy that uses `is_founder_aal2()`. After a re-run, `meals` has no DELETE policy for authenticated users. The Meals editor has Unpublish and no Remove button. A customer's current week names dinners; if a row is deleted, `pay` builds that dinner with `ing []` and the hold is short.
-- **Not deployed.** `admin_roles.sql` is not applied.
+- **Shipped** later the same day in the production-ship entry above. `admin_roles.sql` is applied.
 
 ## 2026-10-08 — Switching shop uses that shop's packs
 
 - **Comparison.** Each supermarket card is priced with that shop's own pack map. It does not reuse the basket that was built for the shop selected at build time.
 - **Shop change.** `pickStore` rebuilds an unedited basket for the new shop. An edited basket keeps lines the user added and leaves removed lines off; counts the meals derive are recomputed for the new shop. The confirm hold is that shop's derived grocery total plus delivery, the same number `pay` holds. A hand edit does not change the hold: `pay` still rebuilds from the meals.
 - **Duplicate shelf rows.** The same `meal_key` and store uses the lowest numeric `id`, or the first row when there is no id. `firstShelfRow` lives in the shared block. The client and `storePacksFromPrices` both call it. `pay` selects `id` with the price row.
-- **Not deployed.**
+- **Shipped** later the same day in the production-ship entry above.
 
 ## 2026-10-08 — Per-shop packs on the basket
 
 - **Folded in** `cursor/fix-basket-order-dependency-cd89` at `141594fa` (the half-pack rule, `holdAmount` matching `pay`, potatoes **2000 g**, lemons **4**, tomato purée **200 g**). That branch is not merged on its own. Its changelog section below stays.
 - **Store pack.** `basketFor` takes a pack map for the order's store, built from `ingredient_prices.pack_qty` / `pack_unit` matched by `meal_key`. The row is used when `pack_unit` matches the code unit, or converts exactly (`g`/`kg`, `ml`/`l`). Any other unit keeps the code `PACKS` entry (garam masala 38 g does not replace 20 tsp; Sainsbury's red onions 1000 g do not replace 3 pc). A matching unit with a different quantity is used (Sainsbury's onions are 3 pc, not the code 6). Seasonings stay 1 pack. Cupboard ticks still skip the line. The half-pack spare is computed with that store pack. The block does not fetch; `index.html` passes `storePackMap` and `pay` passes `storePacksFromPrices`. No new SQL. The columns are already on `ingredient_prices`.
-- **Not deployed.**
+- **Shipped** later the same day in the production-ship entry above.
 
 ## 2026-10-08 — Admin meals and ingredients
 
-- **Admins list.** `supabase/admin_roles.sql` adds `public.admins` and `is_admin()` / `is_admin_aal2()`. The five Ops/Meals policies, ingredient price writes, inbox, and unpublished meals use that instead of the founder email. The founder row is inserted by the script. Until the table has any row, the founder email still counts, so the account is not locked out between this file and the static ship. **Not applied.** Run it in the SQL editor before deploying `index.html`.
+- **Admins list.** `supabase/admin_roles.sql` adds `public.admins` and `is_admin()` / `is_admin_aal2()`. The five Ops/Meals policies, ingredient price writes, inbox, and unpublished meals use that instead of the founder email. The founder row is inserted by the script. Until the table has any row, the founder email still counts, so the account is not locked out between this file and the static ship. **Applied 8 Oct 2026** on production (`ucciqthwxnlkjalwlhvh`). `public.admins` has exactly 1 row (Noé).
 - **Meals tab** groups the live catalog by the 7 categories. Each card shows the customer view: scaled lists for 2, 4, and 6, the extra minutes, the "Written for 2" note, and the method. Add is blocked until name, at least three catalog ingredients, and one instruction step. Publish also needs a category. Portion units must match the catalog pack unit. Seasoning keys already stored are kept. Remove is a hard delete after a confirm that says past orders keep their snapshotted method — Unpublish is the reversible path. `validate_meal_write` checks admin sessions only (`auth.uid()` is not null), so the advisor and SQL editor keep writing as they do today.
 - **Ingredients tab** groups `ingredient_prices` by category, including live `grocery` and `fresh` rows. Save updates each existing shop by row id (`price_gbp`, `pack_qty`, `pack_unit`, `pack_size` when the pack label was edited, and `product_name` only when that shop's name was edited to a non-empty value). Clearing the shelf name leaves the stored product name. A shop with no row is a separate full insert that needs a shelf product name and reuses the group's slug and category, so `grocery` and `fresh` can gain a missing shop. These statements are not one transaction. A partial upsert cannot do this: Postgres checks NOT NULL and the BEFORE INSERT trigger before it resolves the conflict. Remove deletes by row id, so pantry rows with no `meal_key` can be removed. Add is blocked until shop, a known category, a price, and a meal key are set. A key that is not in the code catalog is saved and flagged **not yet usable in baskets**. `validate_ingredient_price` is also admin-session only, and it does not reject seasoning pack sizes on the shelf. A brand-new slug still needs one of the six catalog categories.
 - **Catalog decision.** The hardcoded lists stay. Copying new keys into `INGREDIENTS` would not make `pay` accept them (`rebuildBasket` still uses `CATALOG`), and reading `pack_size` text as the basket pack would change quantities. Shelf prices for keys that already exist still flow through `loadShelfPrices`. `basketFor` now takes per-shop `pack_qty` / `pack_unit` when the unit matches. A meal key that is not in the code catalog is still rejected by `pay`.
-- **Not deployed.**
+- **Shipped** later the same day in the production-ship entry above. Admin Meals and Ingredients are live.
 
 ## 2026-10-08 — Basket order no longer changes the shop; hold display matches pay
 
@@ -45,7 +54,7 @@ Vault history of **functional** product changes. Newest first. Agents append her
 
 **Tests:** `npm test` on `main` is **114/114** (the vault line that said 109 was stale). This change is **119/119**: ragù + no-portions pomodoro is 2 passata and 1 spaghetti at 2 servings in both orders; the Tesco week at 2 servings keeps garlic, olive oil and potatoes at 1 pack, and at 4 servings potatoes stay 1 pack; tortilla alone at 6 servings is 1200g of potato, 1 × 2kg bag; two no-portions dinners sharing an ingredient stay at 1 pack; client hold matches pay. Beef ragù alone at 4 servings is still 2×500g mince, 2×500g passata, 1×500g spaghetti.
 
-**Why:** Found in the 8 Oct internal dry-run smoke. PR branch `cursor/fix-basket-order-dependency-cd89`. Folded into the admin meals pull request; not merged on its own.
+**Why:** Found in the 8 Oct internal dry-run smoke. PR branch `cursor/fix-basket-order-dependency-cd89`. Folded into PR #8. PR #7 was closed unmerged. Live 8 Oct 2026 with the production ship above.
 
 ## 2026-10-06 16:06 BST — meal categories, new tag structure, 11 new ingredient keys (PR #4)
 

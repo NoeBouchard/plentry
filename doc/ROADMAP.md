@@ -17,6 +17,9 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 - ~~Phone / slot / dots / Inbox~~ — SQL, static, and functions live (founder deploy 24 Sep). https://plentry.vercel.app asks for a UK phone and a 2-hour window.
 
 - ~~Custom domain~~ — https://getplentry.com (5 Oct). `plentry.vercel.app` redirects there.
+- ~~Half-pack basket~~ — shared extra pack, from PR #7, shipped 8 Oct in PR #8. Pack count does not depend on meal order. PR #7 was closed unmerged.
+- ~~Per-shop pack sizes~~ — `ingredient_prices` pack quantity and unit, with a fallback to code `PACKS` (8 Oct, PR #8).
+- ~~Admin Meals and Ingredients~~ — live 8 Oct (PR #8). `admin_roles.sql` applied. Meals are unpublish-only. `public.admins` is one row (Noé).
 
 ## Now
 
@@ -24,11 +27,12 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 2. **Agent lock:** [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Product changes: branch → PR → CI (see [ENGINEERING.md](ENGINEERING.md)). **You click once:** GitHub ruleset on `main` — require a pull request with **0** approvals, require status check **test** only. Do not require Supabase Preview, Vercel, or a second person.
 3. After the advisor (or you) add a dinner: **Meals → New meal** → run its record through [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) → **Verify & publish**. Unpublish sends a live dinner back to New meal. Do not delete the row.
 4. **Recipe source-check** — work the 75 pending records in `meal-ingredient verification/STATUS.md`, 5 per session, most-ordered dishes first; apply each DB patch via the Meals tab. Decide `tomato purée` as a 36th key once 3 records want it.
-5. ~~**Servings (LIVE 6 Oct 2026)**~~ — PR #3 merged, SQL applied, `pay` v29 and static deployed to production. Basket lines are whole packs from `meals.portions`. The meal-order half-pack fix is folded into the admin pull request and is not live yet.
+5. ~~**Servings (LIVE 6 Oct 2026)**~~ — PR #3 merged, SQL applied, `pay` v29 and that static deploy. Basket lines are whole packs from `meals.portions`. ~~**Half-pack basket (LIVE 8 Oct 2026)**~~ — shared extra pack, from PR #7, shipped in PR #8. PR #7 was closed unmerged.
 
 ## Next product
 
-- **Database catalog.** Per-shop `pack_qty` / `pack_unit` are what `basketFor` uses when the unit matches. The shop comparison and a shop change use that store's packs. The confirm hold matches `pay`. `pay` still rejects a `meal_key` that is not in the 46-key code catalog. Admin-added keys stay flagged not usable in baskets until that changes.
+- ~~**Per-shop packs (LIVE 8 Oct 2026)**~~ — `pack_qty` / `pack_unit` from `ingredient_prices` when the unit matches or converts g/kg or ml/l; otherwise the code `PACKS` entry. The shop comparison and a shop change use that store's packs. The confirm hold matches `pay`.
+- **Catalog keys in `pay`.** `pay` still rejects a `meal_key` that is not in the 46-key code catalog. Admin-added keys stay flagged not usable in baskets until that changes.
 
 ## Next product (older)
 
