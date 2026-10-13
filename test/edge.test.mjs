@@ -336,8 +336,8 @@ describe("S-04 server-built basket", () => {
     ];
     assert.equal(basketFor(week, 4, [], PACKS, true, { potatoes: { pack: 2500, pu: "g" } }).potatoes, 1);
     const masala = { name: "Masala", ing: ["garam masala"], portions: { "garam masala": [25, "tsp"] } };
-    assert.equal(basketFor([masala], 2, [], PACKS, true)["garam masala"], 2);
-    assert.equal(basketFor([masala], 2, [], PACKS, true, { "garam masala": { pack: 38, pu: "g" } })["garam masala"], 2, "38g is not 38 tsp");
+    assert.equal(basketFor([masala], 2, [], PACKS, true)["garam masala"], 1, "I-P03 garam masala is 1 pack, not ceil(25 tsp / 20)");
+    assert.equal(basketFor([masala], 2, [], PACKS, true, { "garam masala": { pack: 38, pu: "g" } })["garam masala"], 1, "a 38g shelf row does not scale a seasoning");
     const onions = { name: "Onions", ing: ["red onions"], portions: { "red onions": [4, "pc"] } };
     assert.equal(basketFor([onions], 2, [], PACKS, true, { "red onions": { pack: 1000, pu: "g" } })["red onions"], 2, "1000g does not replace a 3pc pack");
   });
@@ -388,6 +388,55 @@ describe("S-04 server-built basket", () => {
     const blank = { id: 1, meal_key: "garlic", pack_qty: null, pack_unit: "" };
     const other = { id: 4, meal_key: "garlic", pack_qty: 10, pack_unit: "clove" };
     assert.equal(storePacksFromPrices([other, blank]).garlic, undefined);
+  });
+
+  it("I-P03 garam masala is 1 pack at 2, 4 and 6 servings, skipped when ticked, and the hold moves only by that line", () => {
+    // Live portions (2-serving base). Chicken & chickpea curry is 1 tsp.
+    // A 20 tsp jar used to be ceil(tsp × servings/2 / 20): 1 pack at 2, 4 and 6 for that one meal.
+    // A week that sums past 20 tsp (8 tsp base → 24 tsp at 6 servings) used to be 2 packs.
+    assert.deepEqual(PACKS["garam masala"], { pack: null, pu: "" });
+    const meal = (name, tsp) => ({
+      name,
+      ing: ["garam masala", "chicken thighs", "rice", "salt"],
+      portions: { "garam masala": [tsp, "tsp"], "chicken thighs": [4, "pc"], rice: [150, "g"], salt: [0.5, "tsp"] },
+    });
+    const one = meal("Chicken & chickpea curry", 1);
+    const week = [
+      meal("Chicken & chickpea curry", 1),
+      meal("Beef & potato curry", 1),
+      meal("Beef keema with rice", 1),
+      meal("Chicken saag-style curry", 2),
+      meal("Curried Chickpea & Tomato Coconut Soup", 1),
+      meal("Chicken tikka-style wraps", 1),
+      meal("Tandoori-style yoghurt chicken with rice", 1),
+    ];
+    const priceOf = (k) => (k === "garam masala" ? 1.1 : 1);
+    const grocery = (packs) => {
+      let t = 0;
+      for (const [k, q] of Object.entries(packs)) t += q * priceOf(k);
+      return Math.round(t * 100) / 100;
+    };
+    // Tesco delivery £3, then the same hold as pay: (groceries + fee) × 1.05 × 1.30, in pence.
+    const holdPence = (groceries) => {
+      const est = Math.round((groceries + 3) * 100) / 100;
+      return Math.round(est * 1.05 * 1.30 * 100);
+    };
+    for (const servings of [2, 4, 6]) {
+      assert.equal(basketFor([one], servings, [], PACKS, true)["garam masala"], 1, "one curry meal");
+      const packs = basketFor(week, servings, [], PACKS, true);
+      const ticked = basketFor(week, servings, ["garam masala"], PACKS, true);
+      assert.equal(packs["garam masala"], 1, "curry week stays 1 pack at " + servings);
+      assert.equal(ticked["garam masala"], undefined);
+      const rest = { ...packs };
+      delete rest["garam masala"];
+      assert.deepEqual(ticked, rest, "cupboard tick removes only garam masala");
+      const on = grocery(packs);
+      const off = grocery(ticked);
+      assert.equal(Math.round((on - off) * 100) / 100, 1.1);
+      assert.equal(holdPence(on), holdPence(off + 1.1), "hold changes only by the 1-pack line");
+    }
+    assert.equal(basketFor([one], 4, ["garam masala"], PACKS, true)["garam masala"], undefined);
+    assert.equal(basketFor(week, 6, [], PACKS, true, { "garam masala": { pack: 38, pu: "g" } })["garam masala"], 1);
   });
 });
 

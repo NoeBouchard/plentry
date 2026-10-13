@@ -13,7 +13,7 @@
 // the lowest numeric id, or the first row when ids are missing.
 
 /* portions:start */
-const SEASONINGS=["salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
+const SEASONINGS=["salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes","garam masala"];
 function normServings(n){
   const x=Math.round(+n);
   if(x>=5)return 6;
@@ -188,7 +188,6 @@ export const PACKS: Record<string, { pack: number | null, pu: string }> = {
   "fresh coriander": { pack: 30, pu: "g" },
   "tomato puree": { pack: 200, pu: "g" },
   "fresh ginger": { pack: 100, pu: "g" },
-  "garam masala": { pack: 20, pu: "tsp" },
   "limes": { pack: 5, pu: "pc" },
   "spring onions": { pack: 6, pu: "pc" },
   "penne": { pack: 500, pu: "g" },
@@ -197,6 +196,7 @@ export const PACKS: Record<string, { pack: number | null, pu: string }> = {
   "cucumber": { pack: 1, pu: "pc" },
   "red onions": { pack: 3, pu: "pc" },
   "cheddar": { pack: 400, pu: "g" },
+  "garam masala": { pack: null, pu: "" },
   "salt": { pack: null, pu: "" },
   "black pepper": { pack: null, pu: "" },
   "paprika": { pack: null, pu: "" },
