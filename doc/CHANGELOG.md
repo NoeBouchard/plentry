@@ -2,6 +2,13 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-13 — Garam masala is 1 pack
+
+- **Seasoning.** The catalog key `garam masala` is on the shared `SEASONINGS` list in `index.html` and `supabase/functions/_shared/portions.ts` (the block between the portion markers, kept byte-identical). It is 1 pack at 2, 4 and 6 servings. A cupboard tick removes that line and leaves the other lines as they are. `PACKS` and `INGREDIENTS` use `pack: null` (display unit still `jar`, £1.10), the same as salt. A shelf row in grams does not scale it.
+- **Why.** It was a 20 tsp jar, so `basketFor` did `ceil(tsp × servings / 2 / 20)`. Chicken & chickpea curry stores 1 tsp, which was already 1 pack at 2, 4 and 6 (1, 2 and 3 tsp). A week that sums past 20 tsp was more than one jar: 8 tsp across seven dinners is 24 tsp at 6 servings, which was 2 packs and is now 1. The hold moves only by that one £1.10 line.
+- **SQL.** `validate_meal_write` in `admin_roles.sql` keeps its own unit map. `garam masala` is still `"tsp"` there. Empty string is the seasoning skip (salt and the other spices). The trigger checks an admin portion write; it does not scale the shop. Existing curry rows store 1–2 tsp, which still pass. No database change.
+- **Not deployed.** `pay` imports `portions.ts`. A later ship needs the static site and `pay` together.
+
 ## 2026-10-08 16:16 BST — production ship (PR #8)
 
 - **Merged:** squash commit `330700587d11735cf229d7622099f44fc10203ac` on `main` at 16:16 BST. PR #7 was closed unmerged because #8 supersedes it.
