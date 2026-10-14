@@ -19,7 +19,7 @@ cd plentry
 npm test && vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 ```
 
-Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. Not git-connected. Push to GitHub does not update https://getplentry.com.
+Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. As of 13 Oct 2026, a merge to `main` auto-deploys static to production through Vercel's Git integration. `pay` stays a separate Supabase deploy. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](#shipping-pay-and-static-together) before the merge. The command above is the manual static ship, once auto-deploy for `main` is off. Build-then-promote (`--skip-domain`, then `vercel promote`) is in that section.
 
 **Logged out?** Vercel CLI 59 keeps its session in `~/Library/Application Support/com.vercel.cli/auth.json`; when it is missing, `vercel whoami` prints *Logged out* and the scoped deploy fails with *You do not have access to the specified account*. Fix: `vercel login` (device flow — opens vercel.com, approve, back to the terminal), confirm `vercel whoami` → `noebouchard`, re-run the deploy. Never run `vercel teams list` / `vercel login` from an unattended agent: it blocks on the browser step.
 
@@ -61,6 +61,111 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' $B/notify-order     # 4
 ```
 
 Then `supabase functions list --project-ref ucciqthwxnlkjalwlhvh` (versions bumped, ACTIVE, `verify_jwt` only true for `pay`) and the dashboard logs: only `booted (time: …ms)` lines, no `Uncaught`.
+
+## Shipping pay and static together
+
+Use this when a change edits the shared basket: `supabase/functions/_shared/portions.ts`, or the basket block in `index.html` (the region between the portion markers, kept byte-identical with `portions.ts`). `pay` is the function that imports `portions.ts`. It rebuilds the basket and holds `round(shop × 1.05 × 1.30)`. The Confirm screen uses the same formula on the client's basket. Those two copies have to be the same code, or the figure on the screen and the Stripe hold diverge.
+
+A merge to `main` auto-deploys static to production immediately through Vercel's Git integration. `pay` is a separate `supabase functions deploy pay`. "Fire both together after merge" still leaves a gap: the new static is already on https://getplentry.com while `pay` is still the previous version. On 13 Oct 2026 that gap was about 37 seconds.
+
+### What a mismatch does
+
+Confirm shows a hold. `pay` ignores that figure and recomputes the hold.
+
+- **New static, previous `pay`.** The screen uses the new basket. The card is held from the previous basket. When the new basket is the cheaper one, the card hold is larger than the figure on the screen. When the new basket is the dearer one, the card hold is smaller than the figure on the screen.
+- **New `pay`, previous static.** The screen uses the previous basket. The card is held from the new basket. When the new basket is the cheaper one, the card hold is smaller than the figure on the screen. When the new basket is the dearer one, the card hold is larger than the figure on the screen.
+
+The case to avoid is a card authorisation larger than the figure the customer was shown.
+
+### Options
+
+**(a) Deploy `pay` from the PR head, then merge.** Production `pay` moves to the new code while the live site is still the previous static. The merge then auto-deploys static. The gap is new `pay` with the previous screen.
+
+**(b) Deploy `pay` straight after the merge.** The merge auto-deploys static first. The gap is the new screen with the previous `pay`. This is the 13 Oct order (about 37s).
+
+**(c) Turn off Vercel production auto-deploy for `main`, then ship static by hand after `pay`.** In `vercel.json` (its own small config PR; this runbook does not edit that file):
+
+```json
+"git": {
+  "deploymentEnabled": {
+    "main": false
+  }
+}
+```
+
+Branches you leave out stay enabled, so pull-request previews still deploy. A boolean `false` would stop every branch. The setting applies once that commit is on `main`. Until then, a merge still auto-deploys static, so use (a) or (b).
+
+After it has landed, the default is build, then promote. `vercel deploy --prod --yes --skip-domain` creates the production deployment and leaves getplentry.com and www on the previous one. Deploy `pay`. Then `vercel promote` moves the domains. The gap is that alias move, which is seconds. Rollback: skip the promote and the live domains stay put. After a promote, `vercel rollback <previous-deployment-id>` moves the domains back. `pay` rolls back by redeploying the previous source.
+
+The other (c) path is a normal `vercel deploy --prod` immediately after `pay`. The domains move when that upload finishes, so the gap is the static deploy, and `vercel rollback` is still available. Build-then-promote is the default: the gap is seconds, and you can stop before the domains move.
+
+**(d) Make `pay` and the client tolerate a short mismatch.** A product change, so a brief split is acceptable: the screen says the hold can move, or `pay` caps the authorisation at the figure that was shown. It is not a deploy step. The split remains unless the held amount is capped at the shown amount.
+
+### Which interim order, until (c) is on `main`
+
+Use (a) or (b). Pick the one where, during the gap, the amount held is at most the amount shown.
+
+Compare the new hold with the old hold on a week the change can affect.
+
+- The new hold is lower or equal → **(a)**. The screen still shows the old figure. The card is held for the new figure, which is smaller or the same.
+- The new hold is higher → **(b)**. The new screen is up first and shows the higher figure. The card is still held for the old, smaller figure.
+
+Garam masala is the lower-or-equal case: one jar (£1.10) at any servings, where the old 20 tsp jar became two packs once a week summed past 20 tsp. **(a)** was the safer interim. The 13 Oct ship was **(b)**.
+
+### Step order (default, once auto-deploy for `main` is off)
+
+`npm test` has to exit 0 first. Deploy `pay` from the commit you are about to promote. A squash merge changes the SHA and keeps the file bytes when that PR was the tree that landed.
+
+```bash
+cd plentry
+npm test
+URL=$(vercel deploy --prod --yes --skip-domain --scope team_QHpJBQejbrxZ2PhEZQlmbuhj | tail -n 1)
+supabase functions deploy pay
+# pay checks below, then:
+vercel promote "$URL" --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+```
+
+The deployment URL is the last stdout line (`*.vercel.app`). Pass that to `vercel promote`.
+
+### Step order while auto-deploy is still on
+
+**(a)** — new hold is lower or equal. Check out the PR head, rebased onto `main`, with CI green:
+
+```bash
+cd plentry
+npm test && supabase functions deploy pay
+# pay checks below, then merge the PR (static auto-deploys)
+```
+
+**(b)** — new hold is higher. Merge the PR first (static auto-deploys), then from that merge commit:
+
+```bash
+cd plentry
+npm test && supabase functions deploy pay
+```
+
+### Post-ship checks
+
+```bash
+supabase functions list --project-ref ucciqthwxnlkjalwlhvh
+# pay: new version, ACTIVE, verify_jwt true
+
+vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+# deployment id (dpl_…) ; aliases include getplentry.com and www.getplentry.com
+# after (b), inspect https://getplentry.com — $URL is the auto-deployed deployment
+
+curl -fsSL https://getplentry.com/ -o /tmp/plentry-apex.html
+curl -fsSL https://www.getplentry.com/ -o /tmp/plentry-www.html
+cmp /tmp/plentry-apex.html /tmp/plentry-www.html && echo 'apex and www serve the same body'
+
+B=https://ucciqthwxnlkjalwlhvh.supabase.co/functions/v1
+curl -s -o /dev/null -w 'pay OPTIONS %{http_code}\n' -X OPTIONS \
+  -H 'Origin: https://getplentry.com' -H 'Access-Control-Request-Method: POST' "$B/pay"   # 204
+curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
+  -H 'Content-Type: application/json' -d '{}' "$B/pay"   # 401
+```
+
+`www` 308s to the apex. `curl -fsSL` follows that redirect, so matching bodies means both names end on the deployment you just aliased. `vercel inspect` is the check that the deployment id carries both aliases.
 
 ## Live schema check (after any project reset or before trusting the rate limits)
 

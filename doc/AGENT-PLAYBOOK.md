@@ -29,7 +29,7 @@ That is the automated gate. It loads `index.html` in jsdom with a fake Supabase 
 
 **Merge gate:** GitHub Actions job **test** runs the same `npm test` on every PR and on `main`. Do not merge a red PR.
 
-**Production:** `npm test` must exit 0 **before** `vercel deploy --prod` or `supabase functions deploy`. A red suite means stop. Do not ship, do not “deploy anyway and fix later”. Merge is not live.
+**Production:** `npm test` must exit 0 before a merge to `main`, and before `supabase functions deploy`. Merging to `main` auto-deploys static to production (13 Oct 2026). A red suite means stop. Do not ship, do not “deploy anyway and fix later”. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
 
 If you change behaviour the tests encode, **update the tests in the same change**. If tests fail, you are not done.
 
@@ -52,16 +52,16 @@ Do not leave the vault describing the old product (e.g. “no payments”).
 
 ## Deploy (only if asked)
 
-Never deploy from a PR branch. After merge, only if the founder asks:
+Never deploy from a PR branch. Merging to `main` auto-deploys static to production (13 Oct 2026). `pay` is a separate deploy. A manual `vercel deploy --prod` is the path in [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together) once auto-deploy for `main` is off, and for build-then-promote. It is not the step that first puts static live while a merge already aliases getplentry.com. After merge, only if the founder asks:
 
 ```bash
 cd plentry
 npm test                                # MUST be 0. Stop if not.
-vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 supabase functions deploy pay ai newcoming        # if those functions changed
+# Manual static ship (auto-deploy off, or --skip-domain then promote): RUNBOOK.
 ```
 
-Never run the Vercel or functions deploy if `npm test` failed. Vercel is not git-connected. `git push` / merge does not ship the site.
+Never run a Vercel or functions deploy if `npm test` failed. A merge to `main` auto-deploys static. A `git push` of a feature branch does not. Shared basket changes: [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
 
 Money, XSS, RLS, `pay/`, `stripe-webhook`, or capture PRs: `/review-bugbot` and `/review-security` before merge.
 
@@ -76,4 +76,4 @@ Use `doc/SECURITY.md` + this playbook. Report findings; do not add exploit PoCs 
 - Capture more than the Stripe hold.
 - Add a second front-end framework.
 - Deploy to production while `npm test` is red.
-- Push product changes straight to `main`, or treat merge as production.
+- Push product changes straight to `main`. A merge to `main` is the static production ship — see [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).

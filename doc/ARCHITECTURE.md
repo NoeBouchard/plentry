@@ -15,7 +15,7 @@ Browser  index.html (vanilla JS)
         └─ newcoming        Fortnight Telegram of unreviewed meals (cron, not the browser)
 ```
 
-Vercel is **not** git-connected. Production is `vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj` from `plentry/`. Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`.
+As of 13 Oct 2026, merging to `main` auto-deploys static to production through Vercel’s Git integration. `pay` and the other edge functions are still `supabase functions deploy`. A manual `vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj` from `plentry/` is the static ship once auto-deploy for `main` is off. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together) so that hand deploy is not treated as the only way static goes live. Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`.
 
 ## Front end
 

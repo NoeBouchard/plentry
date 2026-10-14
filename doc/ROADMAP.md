@@ -20,6 +20,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 - ~~Half-pack basket~~ — shared extra pack, from PR #7, shipped 8 Oct in PR #8. Pack count does not depend on meal order. PR #7 was closed unmerged.
 - ~~Per-shop pack sizes~~ — `ingredient_prices` pack quantity and unit, with a fallback to code `PACKS` (8 Oct, PR #8).
 - ~~Admin Meals and Ingredients~~ — live 8 Oct (PR #8). `admin_roles.sql` applied. Meals are unpublish-only. `public.admins` is one row (Noé).
+- ~~Garam masala, one jar~~ — unscaled seasoning, one jar per week at any servings. PR #10 squash-merged 13 Oct 2026 as `711f059d9087e65406d3004c7d29aa1d3efd0e9c`. That merge auto-deployed static (`dpl_FjLuhYS8QSV28DcxmqnPzdGWjdWL`); `pay` v33. See [RUNBOOK.md](RUNBOOK.md) before the next shared basket change.
 
 ## Now
 
