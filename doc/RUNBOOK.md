@@ -15,6 +15,10 @@ The action will not run the review when this workflow file is missing from the d
 
 Do step 4 after a pull request that does not change this workflow file shows a green `claude-review`. Until the secret exists, and on any PR that changes the workflow file, the check is red. Requiring it before that blocks every merge.
 
+The repository is public. Pull requests from forks do not receive `CLAUDE_CODE_OAUTH_TOKEN`, so `claude-review` fails on them. That is intended.
+
+`claude-review` becomes a required check only after it has gone green on a real pull request.
+
 ## Local UI
 
 No build. From `plentry/`, `python3 -m http.server 8766` or open `index.html`. Edge functions are the **deployed** ones unless you `supabase functions serve`.
@@ -36,6 +40,58 @@ URL=$(vercel deploy --prod --yes --skip-domain --scope team_QHpJBQejbrxZ2PhEZQlm
 vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj   # READY before any promote
 # shared basket: deploy pay, then promote. Static-only: promote now. See Shipping pay and static together.
 vercel promote "$URL" --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+```
+
+**`VERCEL_TOKEN`.** Team `noebouchards-projects`, team id `team_QHpJBQejbrxZ2PhEZQlmbuhj`. Created 15 Oct 2026, with a 90-day expiry (about 13 Jan 2027). Stored as a box secret for the Plentry Engineering bot. Never print it and never commit it. This runbook has no token value. The REST calls read `$VERCEL_TOKEN` from the environment and send it as `Authorization: Bearer`.
+
+Vercel CLI 63.1.0 returns `User not found (404)` on this team-scoped token. The REST API accepts the same token when `teamId` is set. A logged-in founder session still uses the CLI above (`vercel whoami` → `noebouchard`). The bot uses the REST calls below. Every call includes `teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj`.
+
+**Create a production build without assigning domains** — `POST /v13/deployments`. This is `vercel deploy --prod --yes --skip-domain`. Query `skipAutoDetectionConfirmation=1` is `--yes`. Body `name` is `plentry` (required). `project` is `plentry`. `target` is `production`. `gitSource` is the GitHub shape: `type` `github`, `org` `NoeBouchard`, `repo` `plentry`, `ref` `main`, and `sha` set to the merge SHA (the commit that gets built). `autoAssignCustomDomains` set to `false` is the skip-domain flag. The [create-deployment](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment) response documents that field as applying to custom domains only, default `true`. The published request schema does not list it (`additionalProperties` is false on [the OpenAPI document](https://vercel.com/openapi.json)). CLI `--skip-domain` posts `false` on this same body, and that is what leaves getplentry.com on the previous deployment until promote. Leave the field out and the default assigns the custom domains.
+
+```bash
+curl -sS -X POST \
+  'https://api.vercel.com/v13/deployments?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj&skipAutoDetectionConfirmation=1' \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d @- <<'JSON'
+{
+  "name": "plentry",
+  "project": "plentry",
+  "target": "production",
+  "autoAssignCustomDomains": false,
+  "gitSource": {
+    "type": "github",
+    "org": "NoeBouchard",
+    "repo": "plentry",
+    "ref": "main",
+    "sha": "<merge-sha>"
+  }
+}
+JSON
+```
+
+The response `id` is the deployment id (`dpl_…`). Poll `GET /v13/deployments/{id}` until `readyState` is `READY`. That is `vercel inspect`. Before promote, `readySubstate` is `STAGED` (the deployment has not taken production traffic).
+
+```bash
+curl -sS \
+  "https://api.vercel.com/v13/deployments/$DEPLOYMENT_ID?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj" \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
+```
+
+**Promote** — `POST /v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/$DEPLOYMENT_ID`. This is `vercel promote`. Project id `prj_lf6RxDIun7rFk6NDUagt8Ve0lme0` is the `plentry` project. [Point production traffic to a given deployment](https://vercel.com/docs/rest-api/projects/point-production-traffic-to-a-given-deployment): no request body, and the call does not rebuild. `201` or `202`.
+
+```bash
+curl -sS -X POST \
+  "https://api.vercel.com/v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/$DEPLOYMENT_ID?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj" \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
+```
+
+**Read prod** — `GET /v13/deployments/getplentry.com`. [Get a deployment by ID or URL](https://vercel.com/docs/rest-api/deployments/get-a-deployment-by-id-or-url): path `idOrUrl` is the deployment id or the hostname. This returns the deployment that hostname currently serves. After promote, `id` is `$DEPLOYMENT_ID`. Before promote, `id` is the previous deployment.
+
+```bash
+curl -sS \
+  'https://api.vercel.com/v13/deployments/getplentry.com?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj' \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
 ```
 
 Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. A one-shot `vercel deploy --prod` without `--skip-domain` aliases getplentry.com as soon as the upload finishes. Do not use it when `pay` also changes. From 13 Oct 2026 until this change, a merge to `main` auto-deployed static to production through Vercel's Git integration. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy `main`. Other branches still get preview deployments. `pay` stays a separate Supabase deploy. Shared-basket, static-only, and docs-only merges are in [Shipping pay and static together](#shipping-pay-and-static-together). `--skip-domain` is the current flag (it must be used with `--prod`). It builds the production deployment and leaves the domains on the previous one until `vercel promote`.
@@ -114,6 +170,15 @@ vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 
 `--skip-domain` is the current flag. It has to be used with `--prod`. It creates the production deployment and does not alias the custom domains. `vercel promote` assigns them later. Do not pass `--no-wait`. Stdout's last line is the deployment URL (`*.vercel.app`). The team scope is required.
 
+With `VERCEL_TOKEN`, CLI 63.1.0 returns `User not found (404)`. Send the create from [Production static](#production-static): `POST /v13/deployments?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj&skipAutoDetectionConfirmation=1`, body `target` `production`, `autoAssignCustomDomains` `false`, `gitSource.sha` this merge SHA. Save the response `id` as `DEPLOYMENT_ID`. Poll until `readyState` is `READY` and `readySubstate` is `STAGED`.
+
+```bash
+curl -sS \
+  "https://api.vercel.com/v13/deployments/$DEPLOYMENT_ID?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj" \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
+# readyState READY, readySubstate STAGED. getplentry.com still points at the previous deployment.
+```
+
 Deploy `pay` from that same SHA with Supabase `deploy_edge_function`, then confirm the version before you promote:
 
 - project `ucciqthwxnlkjalwlhvh`
@@ -135,11 +200,22 @@ vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 # aliases include getplentry.com and www.getplentry.com
 ```
 
+REST promote, then read prod. Promote does not rebuild. `201` or `202`. The GET `id` is `$DEPLOYMENT_ID`.
+
+```bash
+curl -sS -X POST \
+  "https://api.vercel.com/v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/$DEPLOYMENT_ID?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj" \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
+curl -sS \
+  'https://api.vercel.com/v13/deployments/getplentry.com?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj' \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
+```
+
 Then the smoke checks below. Until the promote, the live site is the previous static and `pay` is the new one. Promote as soon as the version check passes.
 
 ### Static-only
 
-The change is `index.html` outside the shared basket block, `sw.js`, `manifest.json`, `icons/`, `vendor/`, or the security headers in `vercel.json`, and `pay` and `_shared` did not change. Merge on GO. From the merge SHA: `npm test`, `vercel deploy --prod --yes --skip-domain`, confirm READY with `vercel inspect`, then `vercel promote` and confirm the aliases. Do not deploy `pay`. There is no pay/static mismatch.
+The change is `index.html` outside the shared basket block, `sw.js`, `manifest.json`, `icons/`, `vendor/`, or the security headers in `vercel.json`, and `pay` and `_shared` did not change. Merge on GO. From the merge SHA: `npm test`, `vercel deploy --prod --yes --skip-domain`, confirm READY with `vercel inspect`, then `vercel promote` and confirm the aliases. With `VERCEL_TOKEN`, use the same REST create, READY poll, promote, and `GET /v13/deployments/getplentry.com` from [Production static](#production-static). Do not deploy `pay`. There is no pay/static mismatch.
 
 ### Docs-only
 
@@ -153,7 +229,7 @@ Before you ship, note the deployment id getplentry.com already points at, and th
 
 **Both are already live.** Move them back straight away. Pick the order where, during the gap, the amount held is at most the amount shown. Compare the new hold with the old hold on a week the change can affect.
 
-- The new hold is lower or equal. Roll static back first: `vercel rollback` or `vercel promote <previous-deployment-id> --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj`. Then redeploy `pay` from the previous SHA. During the gap the screen is the old figure and the card is held for the new figure, which is smaller or the same.
+- The new hold is lower or equal. Roll static back first: `vercel rollback` or `vercel promote <previous-deployment-id> --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj`. REST: `POST /v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/<previous-deployment-id>?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj` with `Authorization: Bearer $VERCEL_TOKEN`. Then redeploy `pay` from the previous SHA. During the gap the screen is the old figure and the card is held for the new figure, which is smaller or the same.
 - The new hold is higher. Redeploy `pay` from the previous SHA first. Then roll static back the same way. During the gap the screen still shows the higher figure and the card is held for the old, smaller figure.
 
 `vercel rollback` with no id rolls back to the previous production deployment. Passing an older id than that previous one needs a Pro plan; promoting the recorded previous deployment id works on either plan. Confirm `vercel inspect` aliases and `supabase functions list` (`pay` version, ACTIVE, `verify_jwt` true), then the smoke checks.
@@ -170,6 +246,11 @@ supabase functions list --project-ref ucciqthwxnlkjalwlhvh
 
 vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 # deployment id (dpl_…) ; aliases include getplentry.com and www.getplentry.com
+
+curl -sS \
+  'https://api.vercel.com/v13/deployments/getplentry.com?teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj' \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
+# id is the deployment you promoted
 
 curl -fsSL https://getplentry.com/ -o /tmp/plentry-apex.html
 curl -fsSL https://www.getplentry.com/ -o /tmp/plentry-www.html
