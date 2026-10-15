@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-15 — Claude review uses the opus alias
+
+- **CI.** `.github/workflows/claude-review.yml` sets `--model opus` and `--fallback-model sonnet`. On PR #15, run 38736528055, `--model claude-opus-5-5` errored in 297ms with 0 cost and empty `modelUsage`, so that id is most likely invalid or not available to the subscription token. Sonnet stays the only fallback. `opus` is not repeated on that list.
+- **Why.** The full model id failed before any tokens. The `opus` alias is what the subscription token runs. See [RUNBOOK.md](RUNBOOK.md).
+- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+
 ## 2026-10-15 — Claude review reads the whole app on Opus 5.5
 
 - **CI.** `.github/workflows/claude-review.yml` sets `--model claude-opus-5-5` (Opus 5.5 on a Claude subscription OAuth token), `--fallback-model opus,sonnet`, `--max-turns 100`, and `allowed_bots: cursor` (that bot only; not `*`). PR #15 failed with `Workflow initiated by non-human actor: cursor (type: Bot)` because Cursor cloud-agent pull requests are pushed by that bot. Before the diff, the prompt reads AGENTS.md, `doc/ARCHITECTURE.md`, `doc/INVARIANTS.md`, `doc/CURRENT-STATE.md`, `doc/REQUIREMENTS.md`, all of `index.html`, every file under `supabase/functions/`, every SQL file under `supabase/`, and the tests. It judges the change against every feature it could affect. It checks the ×1.30 hold, the 5% fee, capture, the byte-identical `/* portions:start */`…`/* portions:end */` basket block, RLS and admin rules, XSS, and drift between those docs and the tests. The comment lists the features checked. Read, Grep, and Glob may run on the whole repo. Bash stays `gh pr comment` / `diff` / `view`. The structured `APPROVE` gate is unchanged. Job timeout is 120 minutes.
