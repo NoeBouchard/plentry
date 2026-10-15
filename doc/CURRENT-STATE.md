@@ -1,6 +1,6 @@
 # Current state
 
-Updated: **13 Oct 2026**. If you ship behaviour, change this file in the same change.
+Updated: **15 Oct 2026**. If you ship behaviour, change this file in the same change.
 
 **Agents:** start at [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). Do not restructure the SPA.
 
@@ -9,7 +9,7 @@ Live: https://getplentry.com (static on Vercel). `www.getplentry.com` and `plent
 **Security batch 17 Sep 2026 (see [SECURITY.md](SECURITY.md) status table).** Live Postgres has the hardening: rate limiter, `validate_order` (v3: INSERT forces `unpaid/new`, no client-set holds), `checkout_session`, Vault-backed webhook secret, closed default function privileges. **Live since 24 Sep 2026** (founder deploy after PR #1): static site plus edge functions, including `notify-order`. Customers get a UK phone, a promised 2-hour slot, the hollow timeline, and Issue. Ops gets PHONE / MUST book and Inbox. SQL `orders_slot_issue` was already live. Hold stays 30%; `pay` still captures at most the hold and reads `aal` for the founder code. Exact function version numbers were not re-recorded on this ship. **Founder steps done 18 Sep 13:25 BST:** TOTP enrolled, `admin_mfa.sql` applied (migration `admin_mfa_aal2_policies`), `REQUIRE_ADMIN_MFA=1`, dashboard min password 8. **All 17 findings closed.** Order **#38** captured £55.76, slot saved, status **ordered**. Next: invite when a live hold + capture on this build feels right.
 
 **Workspace:** `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`  
-(moved off `Documents/EVERYTHING/…`. App git repo is `plentry/` → PRs + Actions **test**. As of 13 Oct 2026 a merge to `main` auto-deploys static through Vercel's Git integration. `pay` is still a separate Supabase deploy — see [RUNBOOK.md](RUNBOOK.md). See [ENGINEERING.md](ENGINEERING.md). Vault is workspace-root `doc/`, copied to `plentry/doc/`.)
+(moved off `Documents/EVERYTHING/…`. App git repo is `plentry/` → PRs + Actions **test**. From 13 Oct 2026 until this change, a merge to `main` auto-deployed static through Vercel's Git integration. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy `main`. Other branches still get preview deployments. `pay` is still a separate Supabase deploy — see [RUNBOOK.md](RUNBOOK.md). Production static is still the 13 Oct deployment until the next hand ship. See [ENGINEERING.md](ENGINEERING.md). Vault is workspace-root `doc/`, copied to `plentry/doc/`.)
 
 ## Works in product
 
@@ -64,6 +64,8 @@ Live: https://getplentry.com (static on Vercel). `www.getplentry.com` and `plent
 `npm test` inside `plentry/` — **139** passing (13 Oct 2026). The 12 Oct record of 138 did not include the garam masala test. An older line that said `main` runs 114, and one that said 109, were stale. Suites: `test/app.test.mjs` (jsdom), `test/contracts.test.mjs` (source contracts), `test/edge.test.mjs` (real unit tests on `_shared/ratelimit.ts`, `_shared/orders.ts`, and `_shared/portions.ts`, plus a parse check of every edge function). Covers money, XSS, Modify, cupboard/basket, orders, Meals add/verify, Ops capture + over-hold + unpaid lock, `payApi` errors, delivery address, **UK phone (I-O08–10)**, **promised window (I-O16)**, **Issue + Inbox (I-O18)**, **order recipes (I-O15)**, **servings (I-P01–I-P05)**, **half-pack basket and meal-order invariance (8 Oct 2026)**, **client-vs-pay hold parity (8 Oct 2026)**, **shop-switch pack totals (8 Oct 2026)**, **and** the 17 Sep security invariants (I-S01, I-O11–14, I-X02–03, I-A04–11), **and** the tag/category/ingredient catalog contracts (I-W05, I-W06), **and** admin meals/ingredients (I-A12). See [TESTING.md](TESTING.md) and [INVARIANTS.md](INVARIANTS.md). Must be green before staging UI/money/order/XSS changes. `window.__plentry` is a test hook only.
 
 ## Last production ship
+
+15 Oct 2026 (**not a production ship**): `vercel.json` sets `git.deploymentEnabled` to `{ "main": false }`. Merging to `main` auto-deployed static from 13 Oct 2026 until this change. It does not now. This commit does not alias getplentry.com. The live static deployment is still the 13 Oct one below.
 
 13 Oct 2026 (**static + `pay`**, PR #10): squash-merged as `711f059d9087e65406d3004c7d29aa1d3efd0e9c`. Garam masala is live as one jar per week at any servings. Vercel's Git integration auto-deployed static to production on merge as `dpl_FjLuhYS8QSV28DcxmqnPzdGWjdWL`, created at 14:09:28 BST, aliased to getplentry.com and www. `pay` went from v31 to v33 at 14:10:05 BST. The deployed `pay` files are byte-identical to that merge SHA, and `verify_jwt` is true. A v32 probably existed between v31 and v33; its contents and who deployed it are unclear. Static and `pay` were mismatched for about 37 seconds. No SQL. No other edge function was redeployed.
 

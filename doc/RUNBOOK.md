@@ -16,10 +16,14 @@ Must exit 0 before any production deploy below.
 
 ```bash
 cd plentry
-npm test && vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+npm test
+URL=$(vercel deploy --prod --yes --skip-domain --scope team_QHpJBQejbrxZ2PhEZQlmbuhj | tail -n 1)
+vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj   # READY before any promote
+# shared basket: deploy pay, then promote. Static-only: promote now. See Shipping pay and static together.
+vercel promote "$URL" --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 ```
 
-Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. As of 13 Oct 2026, a merge to `main` auto-deploys static to production through Vercel's Git integration. `pay` stays a separate Supabase deploy. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](#shipping-pay-and-static-together) before the merge. The command above is the manual static ship, once auto-deploy for `main` is off. Build-then-promote (`--skip-domain`, then `vercel promote`) is in that section.
+Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. A one-shot `vercel deploy --prod` without `--skip-domain` aliases getplentry.com as soon as the upload finishes. Do not use it when `pay` also changes. From 13 Oct 2026 until this change, a merge to `main` auto-deployed static to production through Vercel's Git integration. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy `main`. Other branches still get preview deployments. `pay` stays a separate Supabase deploy. Shared-basket, static-only, and docs-only merges are in [Shipping pay and static together](#shipping-pay-and-static-together). `--skip-domain` is the current flag (it must be used with `--prod`). It builds the production deployment and leaves the domains on the previous one until `vercel promote`.
 
 **Logged out?** Vercel CLI 59 keeps its session in `~/Library/Application Support/com.vercel.cli/auth.json`; when it is missing, `vercel whoami` prints *Logged out* and the scoped deploy fails with *You do not have access to the specified account*. Fix: `vercel login` (device flow — opens vercel.com, approve, back to the terminal), confirm `vercel whoami` → `noebouchard`, re-run the deploy. Never run `vercel teams list` / `vercel login` from an unattended agent: it blocks on the browser step.
 
@@ -64,9 +68,11 @@ Then `supabase functions list --project-ref ucciqthwxnlkjalwlhvh` (versions bump
 
 ## Shipping pay and static together
 
-Use this when a change edits the shared basket: `supabase/functions/_shared/portions.ts`, or the basket block in `index.html` (the region between the portion markers, kept byte-identical with `portions.ts`). `pay` is the function that imports `portions.ts`. It rebuilds the basket and holds `round(shop × 1.05 × 1.30)`. The Confirm screen uses the same formula on the client's basket. Those two copies have to be the same code, or the figure on the screen and the Stripe hold diverge.
+Use the full sequence when a change edits the shared basket: `supabase/functions/_shared/portions.ts`, or the basket block in `index.html` (the region between the portion markers, kept byte-identical with `portions.ts`). `pay` is the function that imports `portions.ts`. It rebuilds the basket and holds `round(shop × 1.05 × 1.30)`. The Confirm screen uses the same formula on the client's basket. Those two copies have to be the same code, or the figure on the screen and the Stripe hold diverge.
 
-A merge to `main` auto-deploys static to production immediately through Vercel's Git integration. `pay` is a separate `supabase functions deploy pay`. "Fire both together after merge" still leaves a gap: the new static is already on https://getplentry.com while `pay` is still the previous version. On 13 Oct 2026 that gap was about 37 seconds.
+From 13 Oct 2026 until this change, a merge to `main` auto-deployed static immediately through Vercel's Git integration, and `pay` was a separate `supabase functions deploy pay`. The new static was already on https://getplentry.com while `pay` was still the previous version. On 13 Oct 2026 that gap was about 37 seconds. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`. A merge does not deploy `main`. Branches left out of that object stay enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch. `github.enabled` is the deprecated switch; do not use it.
+
+The default ship is below. Merge on GO, then build static from the merge SHA without moving the domains, deploy `pay`, and promote straight away. The customer-facing gap is the time between that `pay` deploy and the promote. Promote straight away and the gap is seconds.
 
 ### What a mismatch does
 
@@ -77,72 +83,69 @@ Confirm shows a hold. `pay` ignores that figure and recomputes the hold.
 
 The case to avoid is a card authorisation larger than the figure the customer was shown.
 
-### Options
+### Default ship (shared basket)
 
-**(a) Deploy `pay` from the PR head, then merge.** Production `pay` moves to the new code while the live site is still the previous static. The merge then auto-deploys static. The gap is new `pay` with the previous screen.
-
-**(b) Deploy `pay` straight after the merge.** The merge auto-deploys static first. The gap is the new screen with the previous `pay`. This is the 13 Oct order (about 37s).
-
-**(c) Turn off Vercel production auto-deploy for `main`, then ship static by hand after `pay`.** In `vercel.json` (its own small config PR; this runbook does not edit that file):
-
-```json
-"git": {
-  "deploymentEnabled": {
-    "main": false
-  }
-}
-```
-
-Branches you leave out stay enabled, so pull-request previews still deploy. A boolean `false` would stop every branch. The setting applies once that commit is on `main`. Until then, a merge still auto-deploys static, so use (a) or (b).
-
-After it has landed, the default is build, then promote. `vercel deploy --prod --yes --skip-domain` creates the production deployment and leaves getplentry.com and www on the previous one. Deploy `pay`. Then `vercel promote` moves the domains. The gap is that alias move, which is seconds. Rollback: skip the promote and the live domains stay put. After a promote, `vercel rollback <previous-deployment-id>` moves the domains back. `pay` rolls back by redeploying the previous source.
-
-The other (c) path is a normal `vercel deploy --prod` immediately after `pay`. The domains move when that upload finishes, so the gap is the static deploy, and `vercel rollback` is still available. Build-then-promote is the default: the gap is seconds, and you can stop before the domains move.
-
-**(d) Make `pay` and the client tolerate a short mismatch.** A product change, so a brief split is acceptable: the screen says the hold can move, or `pay` caps the authorisation at the figure that was shown. It is not a deploy step. The split remains unless the held amount is capped at the shown amount.
-
-### Which interim order, until (c) is on `main`
-
-Use (a) or (b). Pick the one where, during the gap, the amount held is at most the amount shown.
-
-Compare the new hold with the old hold on a week the change can affect.
-
-- The new hold is lower or equal → **(a)**. The screen still shows the old figure. The card is held for the new figure, which is smaller or the same.
-- The new hold is higher → **(b)**. The new screen is up first and shows the higher figure. The card is still held for the old, smaller figure.
-
-Garam masala is the lower-or-equal case: one jar (£1.10) at any servings, where the old 20 tsp jar became two packs once a week summed past 20 tsp. **(a)** was the safer interim. The 13 Oct ship was **(b)**.
-
-### Step order (default, once auto-deploy for `main` is off)
-
-`npm test` has to exit 0 first. Deploy `pay` from the commit you are about to promote. A squash merge changes the SHA and keeps the file bytes when that PR was the tree that landed.
+Merge on GO. Do not deploy from the PR branch. A squash merge changes the SHA and keeps the file bytes when that PR was the tree that landed. Check out that merge SHA with a clean tree so the upload is that commit. `npm test` has to exit 0 on it.
 
 ```bash
 cd plentry
+git fetch origin main
+git checkout <merge-sha>
 npm test
 URL=$(vercel deploy --prod --yes --skip-domain --scope team_QHpJBQejbrxZ2PhEZQlmbuhj | tail -n 1)
-supabase functions deploy pay
-# pay checks below, then:
+vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+# status READY, and a deployment id (dpl_…). getplentry.com and www still point at the previous deployment.
+```
+
+`--skip-domain` is the current flag. It has to be used with `--prod`. It creates the production deployment and does not alias the custom domains. `vercel promote` assigns them later. Do not pass `--no-wait`. Stdout's last line is the deployment URL (`*.vercel.app`). The team scope is required.
+
+Deploy `pay` from that same SHA with Supabase `deploy_edge_function`, then confirm the version before you promote:
+
+- project `ucciqthwxnlkjalwlhvh`
+- name `pay`
+- entrypoint `index.ts`
+- `verify_jwt` **true**. The platform JWT gate stays on. A POST with no JWT must stay 401.
+- files: `supabase/functions/pay/index.ts`, plus the `_shared` modules it imports: `_shared/ratelimit.ts`, `_shared/orders.ts`, `_shared/portions.ts`. The call uploads only the files you pass. Leave one out and the new version fails to boot.
+
+```bash
+supabase functions list --project-ref ucciqthwxnlkjalwlhvh
+# pay: new version, ACTIVE, verify_jwt true
+```
+
+Straight away:
+
+```bash
 vercel promote "$URL" --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+# aliases include getplentry.com and www.getplentry.com
 ```
 
-The deployment URL is the last stdout line (`*.vercel.app`). Pass that to `vercel promote`.
+Then the smoke checks below. Until the promote, the live site is the previous static and `pay` is the new one. Promote as soon as the version check passes.
 
-### Step order while auto-deploy is still on
+### Static-only
 
-**(a)** — new hold is lower or equal. Check out the PR head, rebased onto `main`, with CI green:
+The change is `index.html` outside the shared basket block, `sw.js`, `manifest.json`, `icons/`, `vendor/`, or the security headers in `vercel.json`, and `pay` and `_shared` did not change. Merge on GO. From the merge SHA: `npm test`, `vercel deploy --prod --yes --skip-domain`, confirm READY with `vercel inspect`, then `vercel promote` and confirm the aliases. Do not deploy `pay`. There is no pay/static mismatch.
 
-```bash
-cd plentry
-npm test && supabase functions deploy pay
-# pay checks below, then merge the PR (static auto-deploys)
-```
+### Docs-only
 
-**(b)** — new hold is higher. Merge the PR first (static auto-deploys), then from that merge commit:
+The merge only changes `doc/`, the README, or other files `.vercelignore` already excludes, and it does not change `pay`, `_shared`, or the static allow-list (`index.html`, `sw.js`, `manifest.json`, `icons/`, `vendor/`, `vercel.json`). Nothing to build, promote, or deploy.
 
-```bash
-cd plentry
-npm test && supabase functions deploy pay
-```
+### Rollback
+
+Before you ship, note the deployment id getplentry.com already points at, and the SHA of the `pay` source that is live.
+
+**Promote has not run.** Do not promote. The domains stay on the previous static. Redeploy `pay` from the previous SHA with `deploy_edge_function` (`verify_jwt` true, and that SHA's `index.ts` plus the same three `_shared` files) so production `pay` matches the live site.
+
+**Both are already live.** Move them back straight away. Pick the order where, during the gap, the amount held is at most the amount shown. Compare the new hold with the old hold on a week the change can affect.
+
+- The new hold is lower or equal. Roll static back first: `vercel rollback` or `vercel promote <previous-deployment-id> --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj`. Then redeploy `pay` from the previous SHA. During the gap the screen is the old figure and the card is held for the new figure, which is smaller or the same.
+- The new hold is higher. Redeploy `pay` from the previous SHA first. Then roll static back the same way. During the gap the screen still shows the higher figure and the card is held for the old, smaller figure.
+
+`vercel rollback` with no id rolls back to the previous production deployment. Passing an older id than that previous one needs a Pro plan; promoting the recorded previous deployment id works on either plan. Confirm `vercel inspect` aliases and `supabase functions list` (`pay` version, ACTIVE, `verify_jwt` true), then the smoke checks.
+
+A static-only ship has no `pay` rollback. If you have not promoted, do nothing to the domains. If you have, `vercel rollback` or promote the previous deployment id. A docs-only merge has nothing to roll back.
+
+While auto-deploy was on, the interim orders were: deploy `pay` from the PR head and then merge, when the new hold was lower or equal; or merge first and then deploy `pay`, when the new hold was higher. The 13 Oct garam masala ship was the second of those (about 37s). Those orders are not the ship anymore.
 
 ### Post-ship checks
 
@@ -152,7 +155,6 @@ supabase functions list --project-ref ucciqthwxnlkjalwlhvh
 
 vercel inspect "$URL" --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
 # deployment id (dpl_…) ; aliases include getplentry.com and www.getplentry.com
-# after (b), inspect https://getplentry.com — $URL is the auto-deployed deployment
 
 curl -fsSL https://getplentry.com/ -o /tmp/plentry-apex.html
 curl -fsSL https://www.getplentry.com/ -o /tmp/plentry-www.html
