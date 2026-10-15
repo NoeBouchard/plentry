@@ -1,0 +1,66 @@
+# Merge gate. Does not deploy. Fails unless Claude's structured verdict is APPROVE.
+# The action skips this job's review when this file differs from the default branch
+# (see doc/RUNBOOK.md, Claude review gate). That includes the PR that adds it.
+name: claude-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  claude-review:
+    name: claude-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Review pull request
+        id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          use_sticky_comment: "true"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request diff for bugs, security issues, and violations of AGENTS.md.
+            Read AGENTS.md. Use `gh pr diff` and `gh pr view` for this PR. The PR branch is checked out.
+
+            Post exactly one pull-request comment with `gh pr comment` (a review comment, not a formal GitHub review approval).
+            The comment must end with exactly one line, and that line must be either:
+            VERDICT: APPROVE
+            or
+            VERDICT: CHANGES_REQUESTED
+
+            Use VERDICT: APPROVE only when the diff has no bug, security issue, or AGENTS.md violation that should block merge.
+            Otherwise use VERDICT: CHANGES_REQUESTED.
+
+            Set structured output `verdict` to the same choice, without the `VERDICT:` prefix: APPROVE or CHANGES_REQUESTED.
+          claude_args: |
+            --allowedTools "Read,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["APPROVE","CHANGES_REQUESTED"]}},"required":["verdict"]}'
+
+      - name: Fail unless verdict is APPROVE
+        if: always()
+        env:
+          STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
+        run: |
+          if [ -z "$STRUCTURED_OUTPUT" ]; then
+            echo "claude-review: no structured_output. Verdict is not APPROVE."
+            exit 1
+          fi
+          verdict="$(printf '%s' "$STRUCTURED_OUTPUT" | jq -er '.verdict')" || {
+            echo "claude-review: structured_output has no verdict."
+            exit 1
+          }
+          echo "claude-review verdict: $verdict"
+          if [ "$verdict" != "APPROVE" ]; then
+            echo "claude-review failed: expected APPROVE."
+            exit 1
+          fi

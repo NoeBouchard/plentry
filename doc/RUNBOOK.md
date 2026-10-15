@@ -1,5 +1,20 @@
 # Runbook
 
+## Claude review gate
+
+On `pull_request` `opened`, `synchronize`, and `reopened`, GitHub Actions job **claude-review** (`.github/workflows/claude-review.yml`) runs `anthropics/claude-code-action@v1`. Claude reviews the PR diff for bugs, security issues, and [AGENTS.md](../AGENTS.md), then posts one PR comment that ends with exactly one line, `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED`. The next step reads the action output `structured_output` (JSON from `--json-schema`) and **fails the job unless `verdict` is `APPROVE`**. It does not deploy, and it does not replace `npm test`.
+
+The action will not run the review when this workflow file is missing from the default branch or its bytes differ from that branch. It skips, logs that the file must match the default branch, and this job then fails for lack of `APPROVE`. The pull request that adds or edits the workflow cannot review itself. After that change is on `main`, a later PR is reviewed, and each push to the PR (`synchronize`) runs the review again.
+
+**Noé, once:**
+
+1. Install the [Claude GitHub app](https://github.com/apps/claude) on this repo (repository admin). In Claude Code, `/install-github-app` does the same install.
+2. On your machine, run `claude setup-token`.
+3. Repo → **Settings → Secrets and variables → Actions → New repository secret**. Name: `CLAUDE_CODE_OAUTH_TOKEN`. Value: the token from step 2. Never commit it.
+4. **Settings → Rules → Rulesets** → the `main` ruleset (`require-test`). **Require status checks to pass**: keep **`test`**, and add **`claude-review`**. Leave Supabase Preview and Vercel off that list.
+
+Do step 4 after a pull request that does not change this workflow file shows a green `claude-review`. Until the secret exists, and on any PR that changes the workflow file, the check is red. Requiring it before that blocks every merge.
+
 ## Local UI
 
 No build. From `plentry/`, `python3 -m http.server 8766` or open `index.html`. Edge functions are the **deployed** ones unless you `supabase functions serve`.
