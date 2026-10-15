@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-15 — main no longer auto-deploys static
+
+- **Git.** `vercel.json` `git.deploymentEnabled` is `{ "main": false }`. `github.enabled` is the deprecated key; this uses the current one. Any branch left out stays enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch.
+- **Why.** From 13 Oct 2026 a merge to `main` auto-deployed static while `pay` was a separate step. The 13 Oct ship was mismatched for about 37 seconds. The default ship is now: merge on GO, build the merge SHA with `vercel deploy --prod --yes --skip-domain` and confirm READY, deploy `pay` (Supabase `deploy_edge_function`, `verify_jwt` true, `index.ts` plus `_shared/ratelimit.ts`, `_shared/orders.ts`, `_shared/portions.ts`) and confirm the version, then `vercel promote` and confirm getplentry.com and www. Static-only changes build and promote. Docs-only merges do nothing.
+- **Not deployed.** This commit turns the Git hook off once it is on `main`. It does not alias getplentry.com. Production static is still the 13 Oct deployment.
+
 ## 2026-10-13 14:09 BST — production ship (PR #10)
 
 - **Merged:** squash commit `711f059d9087e65406d3004c7d29aa1d3efd0e9c` on `main`. PR #10.

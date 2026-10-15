@@ -10,7 +10,7 @@ Runs Node’s test runner on `test/app.test.mjs`, `test/contracts.test.mjs` and 
 
 **Merge gate:** GitHub Actions job **test** (`.github/workflows/test.yml`) runs this same command on every pull request and on push to `main`. Do not merge if CI is red.
 
-**Production gate:** exit 0 is required before **any** production ship. Merging to `main` auto-deploys static to production (13 Oct 2026), so a red suite means do not merge. The same gate applies to `supabase functions deploy` and to a manual `vercel deploy --prod`. This is not optional for UI, money, orders, XSS, or “small” copy changes that sit in `index.html`. When the change touches `_shared/portions.ts` or the basket block, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together) — do not assume static waits for a hand deploy.
+**Production gate:** exit 0 is required before **any** production ship. From 13 Oct 2026 until this change, merging to `main` auto-deployed static to production, so a red suite meant do not merge. A merge does not deploy `main` (`git.deploymentEnabled.main` is false), and a red suite means do not merge and do not ship. The same gate applies to the `pay` deploy and to `vercel deploy --prod --skip-domain` / `vercel promote`. This is not optional for UI, money, orders, XSS, or “small” copy changes that sit in `index.html`. When the change touches `_shared/portions.ts` or the basket block, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together). Static does not go live on merge.
 
 Invariant IDs: [INVARIANTS.md](INVARIANTS.md). Automated rules are covered; `I-A01` / `I-A02` stay playbook (no React, no secrets).
 

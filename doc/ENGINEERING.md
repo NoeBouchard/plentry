@@ -2,7 +2,7 @@
 
 How a small team (founder + agents) ships Plentry. Product contract: [REQUIREMENTS.md](REQUIREMENTS.md), [INVARIANTS.md](INVARIANTS.md), [FLOWS.md](FLOWS.md). How to edit code: [AGENT-PLAYBOOK.md](AGENT-PLAYBOOK.md).
 
-Git repo is **`plentry/`** → [github.com/NoeBouchard/plentry](https://github.com/NoeBouchard/plentry). As of 13 Oct 2026, merging to `main` auto-deploys static to production through Vercel’s Git integration. `pay` is still a separate Supabase deploy. See [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
+Git repo is **`plentry/`** → [github.com/NoeBouchard/plentry](https://github.com/NoeBouchard/plentry). From 13 Oct 2026 until this change, merging to `main` auto-deployed static to production through Vercel’s Git integration. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy `main`. Other branches still get preview deployments. `pay` is still a separate Supabase deploy. See [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
 
 ## Default path
 
@@ -14,17 +14,17 @@ Git repo is **`plentry/`** → [github.com/NoeBouchard/plentry](https://github.c
    - Always: read the PR against REQUIREMENTS / FLOWS.
    - Money, XSS, RLS, `pay/`, `stripe-webhook`, capture: `/review-bugbot` and `/review-security` in Cursor before merge.
 6. Merge when CI is green and the checklist is honest.
-7. **Merge ships static.** Merging to `main` auto-deploys the static site to production (13 Oct 2026). `pay` does not ride along. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together) before the merge — a manual `vercel deploy --prod` is not what puts static live while auto-deploy is on. Do not deploy from a PR branch. `npm test` has to be green before the merge, because the merge is the static ship.
+7. **Merge does not ship.** From 13 Oct 2026 until this change, merging to `main` auto-deployed static. `pay` did not ride along. `git.deploymentEnabled.main` is now false, so the merge does not deploy static. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together) after the merge: build the merge SHA with `--skip-domain`, deploy `pay`, then `vercel promote`. Do not deploy from a PR branch. `npm test` has to be green before the merge and again on the merge SHA before the ship.
 
 ```
-feature branch → PR → CI npm test → Bugbot/security if money/XSS → merge main → static auto-deploys; pay separately (RUNBOOK)
+feature branch → PR → CI npm test → Bugbot/security if money/XSS → merge main (no auto-deploy) → hand ship per RUNBOOK
 ```
 
 ## Agents
 
 - Do not push product changes straight to `main`.
 - Do not `vercel deploy` or `supabase functions deploy` from a PR, or while `npm test` is red.
-- A merge to `main` already auto-deploys static. Do not follow that with a manual `vercel deploy --prod` and call that the static ship. Shared basket changes: [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
+- A merge to `main` does not auto-deploy static. It did, from 13 Oct 2026 until `git.deploymentEnabled.main` was set false. Do not treat the merge as the static ship, and do not follow it with a one-shot `vercel deploy --prod` that aliases getplentry.com before `pay` is deployed. Shared basket changes: [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
 - Do not require a second GitHub human approval (solo founder).
 
 ## GitHub (founder, once)
@@ -34,4 +34,4 @@ Repo → **Settings → Rules → Rulesets → New branch ruleset** (not the old
 - Name: `require-test`. Enforcement: **Active**. Bypass list: empty.
 - Target: include default branch (`main`).
 - **Require a pull request before merging**, required approvals **0**.
-- **Require status checks to pass**, add only **`test`**. Leave Supabase Preview and Vercel off that list. Merging to `main` still auto-deploys static (13 Oct 2026). `pay` does not. See [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
+- **Require status checks to pass**, add only **`test`**. Leave Supabase Preview and Vercel off that list. Merging to `main` auto-deployed static from 13 Oct 2026 until this change. It does not now. `pay` does not ride along. See [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
