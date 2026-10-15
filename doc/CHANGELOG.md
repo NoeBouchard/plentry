@@ -8,6 +8,8 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Footer.** Under the cards: groceries + delivery + 5% = the total, the same split `pay` uses for the hold. One line says the card hold adds a 30% buffer and only the actual amount is captured. **This shop** shows that total to the penny.
 - **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change. Not deployed.
 
+- Temporary diagnostic: Claude review uses `--model sonnet` with no `--fallback-model`, because with the subscription token Opus fails instantly at $0.
+
 ## 2026-10-15 — Claude review uses the opus alias
 
 - **CI.** `.github/workflows/claude-review.yml` sets `--model opus` and `--fallback-model sonnet`. On PR #15, run 38736528055, `--model claude-opus-5-5` errored in 297ms with 0 cost and empty `modelUsage`, so that id is most likely invalid or not available to the subscription token. Sonnet stays the only fallback. `opus` is not repeated on that list.
