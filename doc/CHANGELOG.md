@@ -2,10 +2,10 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
-## 2026-10-15 — Claude review reads the vault on Opus
+## 2026-10-15 — Claude review reads the whole app on Opus 5.5
 
-- **CI.** `.github/workflows/claude-review.yml` sets `--model opus` (Opus 5.5, `claude-opus-5-5`, on a Claude subscription OAuth token), `--fallback-model sonnet`, and `--max-turns 50`. The prompt reads AGENTS.md, `doc/ARCHITECTURE.md`, `doc/INVARIANTS.md`, `doc/CURRENT-STATE.md`, and `doc/REQUIREMENTS.md` first, then the diff and its callers. It checks the ×1.30 hold, the 5% fee, capture, the byte-identical `/* portions:start */`…`/* portions:end */` basket block, RLS and admin rules, XSS, and drift between those docs and the tests. Tools stay Read, Grep, Glob, and `gh pr comment` / `diff` / `view`. The structured `APPROVE` gate is unchanged. Job timeout is 40 minutes.
-- **Why.** A short default review can miss the money path and the shared basket. The `opus` alias is the strongest Opus a subscription token runs; Sonnet is the documented fallback when Opus is overloaded or unavailable. See [RUNBOOK.md](RUNBOOK.md).
+- **CI.** `.github/workflows/claude-review.yml` sets `--model claude-opus-5-5` (Opus 5.5 on a Claude subscription OAuth token), `--fallback-model opus,sonnet`, and `--max-turns 100`. Before the diff, the prompt reads AGENTS.md, `doc/ARCHITECTURE.md`, `doc/INVARIANTS.md`, `doc/CURRENT-STATE.md`, `doc/REQUIREMENTS.md`, all of `index.html`, every file under `supabase/functions/`, every SQL file under `supabase/`, and the tests. It judges the change against every feature it could affect. It checks the ×1.30 hold, the 5% fee, capture, the byte-identical `/* portions:start */`…`/* portions:end */` basket block, RLS and admin rules, XSS, and drift between those docs and the tests. The comment lists the features checked. Read, Grep, and Glob may run on the whole repo. Bash stays `gh pr comment` / `diff` / `view`. The structured `APPROVE` gate is unchanged. Job timeout is 120 minutes.
+- **Why.** A short diff-only review can miss a feature the change still reaches. `claude-opus-5-5` is the Opus 5.5 id the `opus` alias resolves to on a subscription. The `opus` alias, then Sonnet, is the documented fallback when that id is overloaded or unavailable. The CLI sets no turn limit unless `--max-turns` is passed; 100 covers a whole-app read. See [RUNBOOK.md](RUNBOOK.md).
 - **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
 
 ## 2026-10-15 — REST ship path for the team Vercel token
