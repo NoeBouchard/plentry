@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-15 — Claude review reads the vault on Opus
+
+- **CI.** `.github/workflows/claude-review.yml` sets `--model opus` (Opus 5.5, `claude-opus-5-5`, on a Claude subscription OAuth token), `--fallback-model sonnet`, and `--max-turns 50`. The prompt reads AGENTS.md, `doc/ARCHITECTURE.md`, `doc/INVARIANTS.md`, `doc/CURRENT-STATE.md`, and `doc/REQUIREMENTS.md` first, then the diff and its callers. It checks the ×1.30 hold, the 5% fee, capture, the byte-identical `/* portions:start */`…`/* portions:end */` basket block, RLS and admin rules, XSS, and drift between those docs and the tests. Tools stay Read, Grep, Glob, and `gh pr comment` / `diff` / `view`. The structured `APPROVE` gate is unchanged. Job timeout is 40 minutes.
+- **Why.** A short default review can miss the money path and the shared basket. The `opus` alias is the strongest Opus a subscription token runs; Sonnet is the documented fallback when Opus is overloaded or unavailable. See [RUNBOOK.md](RUNBOOK.md).
+- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+
 ## 2026-10-15 — REST ship path for the team Vercel token
 
 - **Runbook.** `VERCEL_TOKEN` is a team `noebouchards-projects` token, stored as a box secret for the Plentry Engineering bot, created 15 Oct 2026, 90-day expiry (about 13 Jan 2027). The value is not in git. CLI 63.1.0 returns `User not found (404)` on that token. [RUNBOOK.md](RUNBOOK.md) gives the REST create (`POST /v13/deployments`, `autoAssignCustomDomains: false`, `gitSource.sha` the merge SHA), promote (`POST /v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/{deploymentId}`), and read-prod (`GET /v13/deployments/getplentry.com`), all with `teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj`.

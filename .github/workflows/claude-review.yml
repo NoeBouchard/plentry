@@ -11,7 +11,7 @@ jobs:
   claude-review:
     name: claude-review
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
       pull-requests: write
@@ -29,8 +29,25 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review this pull request diff for bugs, security issues, and violations of AGENTS.md.
-            Read AGENTS.md. Use `gh pr diff` and `gh pr view` for this PR. The PR branch is checked out.
+            Review this pull request. The PR branch is checked out. Stay inside the allowed tools: Read, Grep, Glob, and Bash only for `gh pr comment`, `gh pr diff`, and `gh pr view`.
+
+            Read these files first, in this order, before you review the diff:
+            1. AGENTS.md
+            2. doc/ARCHITECTURE.md
+            3. doc/INVARIANTS.md
+            4. doc/CURRENT-STATE.md
+            5. doc/REQUIREMENTS.md
+
+            Then read every file the diff touches. Where a changed function has callers that can change behaviour, read those callers too.
+
+            Use `gh pr diff` and `gh pr view` for this PR.
+
+            On this diff, check each of the following and say what you found:
+            - Money paths. The card hold is the shop total times 1.05 times 1.30. The 5% fee stays in both index.html and supabase/functions/pay/index.ts. Capture adds that 5% on the server and stays within the hold.
+            - The basket block between `/* portions:start */` and `/* portions:end */` (both markers included) is byte-identical in index.html and supabase/functions/_shared/portions.ts. If the diff touches either copy, compare the two blocks.
+            - RLS and admin rules: who can read or write orders, meals, and admin actions, including the founder aal2 gate.
+            - XSS: unescaped HTML or markdown from meals, orders, chat, or other user content.
+            - Drift between the docs above and the tests. Report a contradiction this diff introduces, or a rule this diff changes in one of those docs without the matching test (or the reverse).
 
             Post exactly one pull-request comment with `gh pr comment` (a review comment, not a formal GitHub review approval).
             The comment must end with exactly one line, and that line must be either:
@@ -43,7 +60,10 @@ jobs:
 
             Set structured output `verdict` to the same choice, without the `VERDICT:` prefix: APPROVE or CHANGES_REQUESTED.
           claude_args: |
-            --allowedTools "Read,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --model opus
+            --fallback-model sonnet
+            --max-turns 50
+            --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["APPROVE","CHANGES_REQUESTED"]}},"required":["verdict"]}'
 
       - name: Fail unless verdict is APPROVE
