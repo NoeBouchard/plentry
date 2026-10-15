@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-15 — Claude review gate
+
+- **CI.** `.github/workflows/claude-review.yml` runs `anthropics/claude-code-action@v1` on pull_request opened, synchronize, and reopened. The job `claude-review` reviews the diff for bugs, security, and AGENTS.md, posts a comment ending in `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED`, and fails unless the action's `structured_output.verdict` is `APPROVE`.
+- **Why.** `npm test` does not read a diff for security or AGENTS.md. The verdict is a required check once Noé installs the Claude GitHub app, runs `claude setup-token`, sets `CLAUDE_CODE_OAUTH_TOKEN`, and adds `claude-review` next to `test` on the main ruleset. See [RUNBOOK.md](RUNBOOK.md).
+- **Not deployed.** Workflow and docs only. The action does not review a PR whose workflow file differs from `main`, so this change cannot approve itself.
+
 ## 2026-10-15 — main no longer auto-deploys static
 
 - **Git.** `vercel.json` `git.deploymentEnabled` is `{ "main": false }`. `github.enabled` is the deprecated key; this uses the current one. Any branch left out stays enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch.
