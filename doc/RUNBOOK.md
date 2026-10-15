@@ -14,6 +14,8 @@ The prompt reads these first, in order: [AGENTS.md](../AGENTS.md), [ARCHITECTURE
 
 The comment ends with exactly one line, `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED`. The next step reads the action output `structured_output` (JSON from `--json-schema`) and **fails the job unless `verdict` is `APPROVE`**.
 
+`allowed_bots` is `cursor`. The input on `anthropics/claude-code-action@v1` is named `allowed_bots`: a comma-separated list of bot usernames, empty by default (no bots), or `*` for every bot ([action.yml](https://github.com/anthropics/claude-code-action/blob/v1/action.yml)). Cursor cloud-agent pull requests are pushed by the `cursor` bot. On PR #15 the action failed with `Workflow initiated by non-human actor: cursor (type: Bot). Add bot to allowed_bots list`. The list is only `cursor`. `*` is not set. Matching lowercases the name and strips a trailing `[bot]` ([actor.ts](https://github.com/anthropics/claude-code-action/blob/v1/src/github/validation/actor.ts)), so `cursor` and `cursor[bot]` are the same entry. Other bots stay blocked.
+
 The action skips the review when this workflow file is missing from the default branch or its bytes differ from that branch. It logs that the file must match the default branch, and this job then fails for lack of `APPROVE`. The pull request that adds or edits the workflow cannot review itself. After that change is on `main`, a later PR is reviewed, and each push to the PR (`synchronize`) runs the review again.
 
 **Noé, once:**
