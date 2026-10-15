@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-15 — REST ship path for the team Vercel token
+
+- **Runbook.** `VERCEL_TOKEN` is a team `noebouchards-projects` token, stored as a box secret for the Plentry Engineering bot, created 15 Oct 2026, 90-day expiry (about 13 Jan 2027). The value is not in git. CLI 63.1.0 returns `User not found (404)` on that token. [RUNBOOK.md](RUNBOOK.md) gives the REST create (`POST /v13/deployments`, `autoAssignCustomDomains: false`, `gitSource.sha` the merge SHA), promote (`POST /v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/{deploymentId}`), and read-prod (`GET /v13/deployments/getplentry.com`), all with `teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj`.
+- **Claude review gate.** The repo is public, so fork PRs do not receive `CLAUDE_CODE_OAUTH_TOKEN` and `claude-review` fails. That is intended. `claude-review` becomes a required check only after it has gone green on a real pull request.
+- **Not deployed.** Docs only.
+
 ## 2026-10-15 — Claude review gate
 
 - **CI.** `.github/workflows/claude-review.yml` runs `anthropics/claude-code-action@v1` on pull_request opened, synchronize, and reopened. The job `claude-review` reviews the diff for bugs, security, and AGENTS.md, posts a comment ending in `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED`, and fails unless the action's `structured_output.verdict` is `APPROVE`.
