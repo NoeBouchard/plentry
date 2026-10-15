@@ -69,7 +69,8 @@ jobs:
 
             Set structured output `verdict` to the same choice, without the `VERDICT:` prefix: APPROVE or CHANGES_REQUESTED.
           claude_args: |
-            --model sonnet
+            --model opus
+            --fallback-model sonnet
             --max-turns 100
             --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["APPROVE","CHANGES_REQUESTED"]}},"required":["verdict"]}'
