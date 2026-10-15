@@ -2,6 +2,8 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+- Temporary diagnostic: Claude review uses `--model sonnet` with no `--fallback-model`, because with the subscription token Opus fails instantly at $0.
+
 ## 2026-10-15 — Claude review uses the opus alias
 
 - **CI.** `.github/workflows/claude-review.yml` sets `--model opus` and `--fallback-model sonnet`. On PR #15, run 38736528055, `--model claude-opus-5-5` errored in 297ms with 0 cost and empty `modelUsage`, so that id is most likely invalid or not available to the subscription token. Sonnet stays the only fallback. `opus` is not repeated on that list.
