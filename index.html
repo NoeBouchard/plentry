@@ -86,6 +86,7 @@
   input[type=range]{accent-color:var(--green-d);width:100%}
   .budget-val{font-size:2.4rem;font-weight:800;color:var(--green-d);text-align:center}
   .week-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .week-sum{font-size:.84rem;font-weight:700;line-height:1.45;margin:12px 0 4px}
   .week-card{background:#fff;border-radius:16px;padding:14px;border:1px solid var(--line)}
   .week-card .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .week-card .v{font-size:1.35rem;font-weight:800;margin-top:2px}
@@ -2830,16 +2831,112 @@ async function loadCatalogMeals(){
   const seen=new Set(dbMeals.map(m=>m.name));
   return dbMeals.concat(seed.filter(m=>!seen.has(m.name)));
 }
+function itemUnitPrice(key, store){
+  const r=store?shelfRow(key, store):null;
+  const shelf=r?Number(r.price_gbp):NaN;
+  if(Number.isFinite(shelf))return shelf;
+  return ingInfo(key).price*((store&&store.mult)||1);
+}
+// One meal's claim on a basket line. Outside the shared portions block.
+// Seasonings, missing portions, and a bad unit are an even share. A matching portion is the scaled quantity.
+function mealLineUse(meal, key, servings){
+  const cat=INGREDIENTS[key];
+  if(!cat)return null;
+  const ing=Array.isArray(meal&&meal.ing)?meal.ing:[];
+  if(SEASONINGS.indexOf(key)>=0)return ing.indexOf(key)>=0?{even:1}:null;
+  if(!(cat.pack>0))return null;
+  const raw=meal&&meal.portions&&typeof meal.portions==="object"&&!Array.isArray(meal.portions)?meal.portions:null;
+  const groceryKeys=raw?Object.keys(raw).filter(k=>SEASONINGS.indexOf(k)<0&&INGREDIENTS[k]&&INGREDIENTS[k].pack>0):[];
+  if(!groceryKeys.length)return ing.indexOf(key)>=0?{even:1}:null;
+  if(groceryKeys.indexOf(key)<0)return null;
+  const spec=raw[key];
+  const bad=!Array.isArray(spec)||spec.length<2||String(spec[1])!==String(cat.pu||"");
+  if(bad)return {even:1};
+  const qty=scalePortion(+spec[0], String(spec[1]), key, servings);
+  return qty>0?{qty:qty}:null;
+}
+function lineWeightInts(meals, key, servings){
+  const uses=meals.map(m=>mealLineUse(m, key, servings));
+  const qtyN=uses.reduce((t,u)=>t+(u&&u.qty>0?1:0),0);
+  if(!qtyN)return uses.map(u=>u&&u.even?1:0);
+  if(!uses.some(u=>u&&u.even))return uses.map(u=>u&&u.qty>0?Math.round(u.qty*1000):0);
+  // Mixed line: a portion-less meal counts as one average portion, so it shares the pack.
+  const avg=uses.reduce((t,u)=>t+(u&&u.qty>0?u.qty:0),0)/qtyN;
+  return uses.map(u=>{
+    if(!u)return 0;
+    if(u.qty>0)return Math.round(u.qty*1000);
+    return Math.max(1, Math.round(avg*1000));
+  });
+}
+function basketGroceryPence(packs, store){
+  let raw=0;
+  Object.keys(packs||{}).forEach(key=>{
+    const q=+packs[key]||0;
+    if(q>0)raw+=q*itemUnitPrice(key, store);
+  });
+  return Math.round(raw*100);
+}
+function weekPacks(meals, servings, ticks, store){
+  const sv=servings==null?weekServings():normServings(servings);
+  const have=Array.isArray(ticks)?ticks:cupboardTicks();
+  return basketFor(Array.isArray(meals)?meals:[], sv, have, INGREDIENTS, false, storePackMap(store&&store.id));
+}
+// Penny shares of the week basket. Sum equals the grocery total. Leftover pennies sit on the last meal.
+// A cupboard tick is absent from the basket, so that line costs 0.
+function splitMealPence(meals, servings, ticks, store){
+  const list=Array.isArray(meals)?meals:[];
+  const sv=servings==null?weekServings():normServings(servings);
+  const have=Array.isArray(ticks)?ticks:cupboardTicks();
+  const packs=basketFor(list, sv, have, INGREDIENTS, false, storePackMap(store&&store.id));
+  const out=list.map(()=>0);
+  Object.keys(packs).forEach(key=>{
+    const q=+packs[key]||0;
+    if(!(q>0))return;
+    const line=Math.round(q*itemUnitPrice(key, store)*100);
+    if(!line)return;
+    const weights=lineWeightInts(list, key, sv);
+    let sumW=0;
+    weights.forEach(w=>{if(w>0)sumW+=w;});
+    if(!(sumW>0)){
+      if(out.length)out[out.length-1]+=line;
+      return;
+    }
+    let given=0;
+    weights.forEach((w,i)=>{
+      if(!(w>0))return;
+      const part=Math.floor(line*w/sumW);
+      out[i]+=part;
+      given+=part;
+    });
+    if(out.length)out[out.length-1]+=line-given;
+  });
+  const total=basketGroceryPence(packs, store);
+  if(out.length){
+    out[out.length-1]+=total-out.reduce((a,b)=>a+b,0);
+    if(out[out.length-1]<0){
+      let need=-out[out.length-1];
+      out[out.length-1]=0;
+      for(let i=out.length-2;i>=0&&need>0;i--){
+        const take=Math.min(out[i], need);
+        out[i]-=take;
+        need-=take;
+      }
+    }
+  }
+  return out;
+}
+function weekPriceQuote(meals, store){
+  const pence=splitMealPence(meals, weekServings(), cupboardTicks(), store);
+  const groceries=pence.reduce((a,b)=>a+b,0)/100;
+  const delivery=store?gbp(store.fee||0):0;
+  const est=gbp(groceries+delivery);
+  return {pence, groceries, delivery, est, fee:plentryFee(est), total:customerTotal(est), hold:holdAmount(est)};
+}
 function mealNeedCost(m,s){
   const meal=m&&m.name?(mealByName(m.name)||m):m;
   if(!meal)return 0;
   const packs=basketFor([meal],weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(s&&s.id));
-  return Object.entries(packs).reduce((t,[i,q])=>{
-    const r=s?shelfRow(i,s):null;
-    const pence=r?Number(r.price_gbp):NaN;
-    const price=Number.isFinite(pence)?pence:ingInfo(i).price*((s&&s.mult)||1);
-    return t+q*price;
-  },0);
+  return Object.entries(packs).reduce((t,[i,q])=>t+q*itemUnitPrice(i,s),0);
 }
 function mealTag(m){
   const ing=Array.isArray(m&&m.ing)?m.ing:[];
@@ -2942,39 +3039,43 @@ function renderMenu(){
     const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
     const s=preferredStoreObj();
     const {buy,pantryValue}=needList();
-    const cost=s?storeTotalForItems(buy,s):Object.entries(buy).reduce((t,[i,q])=>t+q*ingInfo(i).price,0);
-    const pay=customerTotal(cost);
+    const quote=weekPriceQuote(meals, s);
+    const pay=quote.total;
     const under=(S.prefs.budget||0)-pay;
     const mk=s?STORE_MARK[s.id]:null;
+    const priceFooter=meals.length
+      ?`<p class="week-sum" id="week-price-sum">Groceries £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}</p>
+      <p class="sub" id="week-hold">The card hold is £${quote.hold.toFixed(2)} — a 30% buffer. Only the actual amount is captured, and the rest is released.</p>`
+      :"";
     wrap.innerHTML=`<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
         <h1 style="margin:0;font-size:1.7rem">Your week<br><em>is ready.</em></h1>
         <button class="btn ghost sm" onclick="loadMenuOptions(true)">↻ New week</button>
       </div>
       <p class="sub">Tap Modify to swap a dinner. Your week stays ${esc(S.prefs.meals)} meals.</p>
       <div class="week-head">
-        <div class="week-card"><div class="k">This shop</div><div class="v">${cost?"£"+pay.toFixed(0):"—"}</div></div>
+        <div class="week-card"><div class="k">This shop</div><div class="v">${quote.est?"£"+pay.toFixed(2):"—"}</div></div>
         <div class="week-card"><div class="k">${basket.length||Object.keys(buy).length} items</div><div class="v">${s?esc(s.name):"Pick a shop"}</div></div>
       </div>
       ${s?`<div class="store-chip"><span class="mark" style="width:18px;height:18px;border-radius:6px;background:${(mk&&mk.c)||"var(--green-d)"};display:inline-block"></span> Planned for ${esc(s.name)}</div>`:""}
       <div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${esc(S.prefs.budget)} budget`:`£${Math.abs(under).toFixed(0)} over your £${esc(S.prefs.budget)} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>
       ${meals.length?meals.map((m,i)=>{
         const idx=S.menuOptions.findIndex(x=>x.name===m.name);
-        const mc=mealNeedCost(m,s);
+        const mc=(quote.pence[i]||0)/100;
         const det=idx>=0?idx:0;
         return `<div class="day-card">
           <div class="day-photo" onclick="showMealDetails(${det})">${mealThumbHtml(m)}<span class="day-badge">${days[i]||("D"+(i+1))}</span></div>
           <div style="flex:1;min-width:0;cursor:pointer" onclick="showMealDetails(${det})"><div class="nm">${esc(m.name)}</div><div class="meta">${cookMinutes(m)} min · serves ${weekServings()}</div><div class="tag-row">${mealTagHtml(m)}</div></div>
           <div class="day-side">
-            <div class="mp">${mc?`£${Number(mc).toFixed(2)}`:"pantry"}</div>
+            <div class="mp">${mc?`£${mc.toFixed(2)}`:"pantry"}</div>
             <button type="button" class="btn ghost sm" onclick="openModify(${i})">Modify</button>
           </div>
         </div>`;
-      }).join(""):`<div class="card"><p class="sub" style="margin:0">No dinners yet — generate a week from onboarding or tap New week.</p><button class="btn" style="width:100%;margin-top:10px" onclick="loadMenuOptions(true)">Generate my week</button></div>`}
+      }).join("")+priceFooter:`<div class="card"><p class="sub" style="margin:0">No dinners yet — generate a week from onboarding or tap New week.</p><button class="btn" style="width:100%;margin-top:10px" onclick="loadMenuOptions(true)">Generate my week</button></div>`}
       <p class="sub" style="text-align:center"><a href="#" style="color:var(--green)" onclick="openAdvisor();return false">Ask the meal advisor</a></p>`;
     const sticky=document.getElementById("sticky-order");
     if(sticky){
       sticky.disabled=!meals.length;
-      sticky.textContent=meals.length?(cost?`Order this week · £${customerTotal(cost).toFixed(2)}`:"Order this week"):"Pick dinners first";
+      sticky.textContent=meals.length?(quote.est?`Order this week · £${pay.toFixed(2)}`:"Order this week"):"Pick dinners first";
     }
     const menu=document.getElementById("scr-menu");
     showSticky(!!(menu&&menu.classList.contains("active")&&meals.length));
@@ -4261,6 +4362,7 @@ if(typeof window!=="undefined"){
     setAdvisor(proposed,idxs){advisorProposed=Array.isArray(proposed)?proposed:[];advisorPicked=new Set(idxs||[]);},
     STAPLES,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
     tagsFor,mealTags,MEAL_TAGS,USER_MEAL_TAGS,wantedTags,clampMeals,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,deliveryFrom,orderDeliverTo,captureChargePence,
+    splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,
   };
 }
 </script>
