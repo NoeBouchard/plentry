@@ -106,7 +106,7 @@ curl -sS \
   -H "Authorization: Bearer $VERCEL_TOKEN"
 ```
 
-Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. A one-shot `vercel deploy --prod` without `--skip-domain` aliases getplentry.com as soon as the upload finishes. Do not use it when `pay` also changes. From 13 Oct 2026 until this change, a merge to `main` auto-deployed static to production through Vercel's Git integration. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy `main`. Other branches still get preview deployments. `pay` stays a separate Supabase deploy. Shared-basket, static-only, and docs-only merges are in [Shipping pay and static together](#shipping-pay-and-static-together). `--skip-domain` is the current flag (it must be used with `--prod`). It builds the production deployment and leaves the domains on the previous one until `vercel promote`.
+Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. A one-shot `vercel deploy --prod` without `--skip-domain` aliases getplentry.com as soon as the upload finishes. Do not use it when `pay` also changes. From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), a merge to `main` auto-deployed static to production through Vercel's Git integration. Production ships after that are the REST create and promote in this section. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy `main`. Other branches still get preview deployments. `pay` stays a separate Supabase deploy. Shared-basket, static-only, and docs-only merges are in [Shipping pay and static together](#shipping-pay-and-static-together). `--skip-domain` is the current flag (it must be used with `--prod`). It builds the production deployment and leaves the domains on the previous one until `vercel promote`.
 
 **Logged out?** Vercel CLI 59 keeps its session in `~/Library/Application Support/com.vercel.cli/auth.json`; when it is missing, `vercel whoami` prints *Logged out* and the scoped deploy fails with *You do not have access to the specified account*. Fix: `vercel login` (device flow — opens vercel.com, approve, back to the terminal), confirm `vercel whoami` → `noebouchard`, re-run the deploy. Never run `vercel teams list` / `vercel login` from an unattended agent: it blocks on the browser step.
 
@@ -153,7 +153,7 @@ Then `supabase functions list --project-ref ucciqthwxnlkjalwlhvh` (versions bump
 
 Use the full sequence when a change edits the shared basket: `supabase/functions/_shared/portions.ts`, or the basket block in `index.html` (the region between the portion markers, kept byte-identical with `portions.ts`). `pay` is the function that imports `portions.ts`. It rebuilds the basket and holds `round(shop × 1.05 × 1.30)`. The Confirm screen uses the same formula on the client's basket. Those two copies have to be the same code, or the figure on the screen and the Stripe hold diverge.
 
-From 13 Oct 2026 until this change, a merge to `main` auto-deployed static immediately through Vercel's Git integration, and `pay` was a separate `supabase functions deploy pay`. The new static was already on https://getplentry.com while `pay` was still the previous version. On 13 Oct 2026 that gap was about 37 seconds. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`. A merge does not deploy `main`. Branches left out of that object stay enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch. `github.enabled` is the deprecated switch; do not use it.
+From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), a merge to `main` auto-deployed static immediately through Vercel's Git integration, and `pay` was a separate `supabase functions deploy pay`. The new static was already on https://getplentry.com while `pay` was still the previous version. On 13 Oct 2026 that gap was about 37 seconds. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`. A merge does not deploy `main`. Branches left out of that object stay enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch. `github.enabled` is the deprecated switch; do not use it.
 
 The default ship is below. Merge on GO, then build static from the merge SHA without moving the domains, deploy `pay`, and promote straight away. The customer-facing gap is the time between that `pay` deploy and the promote. Promote straight away and the gap is seconds.
 
@@ -227,7 +227,7 @@ Then the smoke checks below. Until the promote, the live site is the previous st
 
 ### Static-only
 
-The change is `index.html` outside the shared basket block, `sw.js`, `manifest.json`, `icons/`, `vendor/`, or the security headers in `vercel.json`, and `pay` and `_shared` did not change. Merge on GO. From the merge SHA: `npm test`, `vercel deploy --prod --yes --skip-domain`, confirm READY with `vercel inspect`, then `vercel promote` and confirm the aliases. With `VERCEL_TOKEN`, use the same REST create, READY poll, promote, and `GET /v13/deployments/getplentry.com` from [Production static](#production-static). Do not deploy `pay`. There is no pay/static mismatch.
+The change is `index.html` outside the shared basket block, `sw.js`, `manifest.json`, `icons/`, `vendor/`, or the security headers in `vercel.json`, and `pay` and `_shared` did not change. Merge on GO. From the merge SHA: `npm test`, then the REST create (`autoAssignCustomDomains: false`) or the founder CLI `vercel deploy --prod --yes --skip-domain`, confirm READY, then promote and confirm the aliases. With `VERCEL_TOKEN`, use the REST create, READY poll, promote, and `GET /v13/deployments/getplentry.com` from [Production static](#production-static). Do not deploy `pay`. There is no pay/static mismatch. The 15 Oct 2026 PR #15 ship is that REST path. See [Ship log](#ship-log).
 
 ### Docs-only
 
@@ -276,6 +276,28 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 ```
 
 `www` 308s to the apex. `curl -fsSL` follows that redirect, so matching bodies means both names end on the deployment you just aliased. `vercel inspect` is the check that the deployment id carries both aliases.
+
+## Ship log
+
+Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
+
+### 2026-10-19 — PR #19, no deploy
+
+Squash `1599a417fc564fe5368fad53c96da77eeab2cd5f`. `claude-review` uses the repository secret `ANTHROPIC_API_KEY`, `--model opus`, `--fallback-model sonnet`. CI and docs only. No static build and no `pay` deploy.
+
+### 2026-10-15 15:52 BST — PR #15, static only
+
+Squash `e35b087b6a7f64e6cb50e0cc8dfde10ade247ca9`. Per-meal price split on the day cards. `pay` unchanged, so `pay` was not redeployed. A merge to `main` does not auto-deploy production since PR #12 (`4699353a689e861491c056517a823a39cc15b7fe`, 15 Oct 2026). This ship was the REST create (`POST /v13/deployments`, `autoAssignCustomDomains: false`, `gitSource.sha` the merge SHA) and the promote (`POST /v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/{id}`), `teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj`.
+
+- Production deployment `dpl_ByazVmgr1eDffUFhqEwwWRDdTVea`, promoted 15:52 BST on 15 Oct.
+- The apex and www `index.html` sha256 begins `f529f335`.
+- Rollback target: `dpl_5sz1cse98dHJ5op3sx4JH6Nino8E` (SHA `ad12a33c63d841ee8cbeaa1e6e28603038dfd8ec`).
+- Verified totals: 2 servings £32.93 groceries / £37.73 total; 4 servings £43.53 / £48.86; 6 servings £54.89 / £60.78.
+- The headline price is based on the meal basket, not a basket the user has edited.
+
+### 2026-10-13 14:09 BST — PR #10, static + pay
+
+Squash `711f059d9087e65406d3004c7d29aa1d3efd0e9c`. Git auto-deploy `dpl_FjLuhYS8QSV28DcxmqnPzdGWjdWL` at 14:09:28 BST. `pay` v33 at 14:10:05 BST. Static and `pay` were mismatched for about 37 seconds. That was the last ship while auto-deploy for `main` was on.
 
 ## Live schema check (after any project reset or before trusting the rate limits)
 

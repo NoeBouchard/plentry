@@ -4,14 +4,26 @@ Vault history of **functional** product changes. Newest first. Agents append her
 
 ## 2026-10-19 — Claude review uses a pay-per-use API key
 
+- **Merged:** squash commit `1599a417fc564fe5368fad53c96da77eeab2cd5f` on `main`. PR #19.
 - **CI.** `.github/workflows/claude-review.yml` sets `anthropic_api_key` to the `ANTHROPIC_API_KEY` secret. `--model opus` and `--fallback-model sonnet` stay. `CLAUDE_CODE_OAUTH_TOKEN` failed with a known 401 ([issue 1613](https://github.com/anthropics/claude-code-action/issues/1613), [issue 1614](https://github.com/anthropics/claude-code-action/issues/1614)). Fork pull requests still do not receive the secret, so `claude-review` fails on them by design. See [RUNBOOK.md](RUNBOOK.md).
-- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+- **Not deployed.** CI and docs only. No static build and no `pay` deploy. This pull request changed the workflow file, so `claude-review` could not approve it.
+
+## 2026-10-15 15:52 BST — production ship (PR #15)
+
+- **Merged:** squash commit `e35b087b6a7f64e6cb50e0cc8dfde10ade247ca9` on `main`. PR #15.
+- **Live:** a day card is that dinner’s penny share of the week basket (per-meal price split). The footer is groceries + delivery + 5%.
+- **Static:** static only. `pay` did not change and was not redeployed. Since PR #12 (`4699353a689e861491c056517a823a39cc15b7fe`, 15 Oct 2026) a merge to `main` does not auto-deploy production. This ship used the Vercel REST API: create with `autoAssignCustomDomains: false` and `gitSource.sha` that merge SHA, then promote. Production deployment `dpl_ByazVmgr1eDffUFhqEwwWRDdTVea`, promoted 15:52 BST on 15 Oct. The apex and www `index.html` sha256 begins `f529f335`.
+- **Rollback:** `dpl_5sz1cse98dHJ5op3sx4JH6Nino8E` (SHA `ad12a33c63d841ee8cbeaa1e6e28603038dfd8ec`).
+- **Verified totals:** 2 servings £32.93 groceries / £37.73 total; 4 servings £43.53 / £48.86; 6 servings £54.89 / £60.78.
+- **Known:** the headline price is based on the meal basket, not a basket the user has edited.
+- **Vault only.** This entry records the ship. It does not deploy.
 
 ## 2026-10-15 — Day cards share the week basket
 
 - **Prices.** A day card is that dinner’s penny share of the real week basket (selected meals, locked servings, shop, cupboard ticks). Shared packs split by the quantity each dinner uses. Seasonings and portion-less items split evenly across the dinners that use them. A cupboard tick costs 0. The cards add up to the groceries total; leftover pennies sit on the last dinner. Pricing each dinner with its own `basketFor([meal])` had been charging a full bottle of oil, a net of onions, and a seasoning jar on every card.
 - **Footer.** Under the cards: groceries + delivery + 5% = the total, the same split `pay` uses for the hold. One line says the card hold adds a 30% buffer and only the actual amount is captured. **This shop** shows that total to the penny.
-- **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change. Not deployed.
+- **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change.
+- **Shipped** 15 Oct 2026 at 15:52 BST in the production-ship entry above. Static only, through the REST create and promote. `pay` was not redeployed.
 
 ## 2026-10-15 — Claude review config is valid; Opus is restored
 
@@ -46,8 +58,8 @@ Vault history of **functional** product changes. Newest first. Agents append her
 ## 2026-10-15 — main no longer auto-deploys static
 
 - **Git.** `vercel.json` `git.deploymentEnabled` is `{ "main": false }`. `github.enabled` is the deprecated key; this uses the current one. Any branch left out stays enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch.
-- **Why.** From 13 Oct 2026 a merge to `main` auto-deployed static while `pay` was a separate step. The 13 Oct ship was mismatched for about 37 seconds. The default ship is now: merge on GO, build the merge SHA with `vercel deploy --prod --yes --skip-domain` and confirm READY, deploy `pay` (Supabase `deploy_edge_function`, `verify_jwt` true, `index.ts` plus `_shared/ratelimit.ts`, `_shared/orders.ts`, `_shared/portions.ts`) and confirm the version, then `vercel promote` and confirm getplentry.com and www. Static-only changes build and promote. Docs-only merges do nothing.
-- **Not deployed.** This commit turns the Git hook off once it is on `main`. It does not alias getplentry.com. Production static is still the 13 Oct deployment.
+- **Why.** From 13 Oct 2026 a merge to `main` auto-deployed static while `pay` was a separate step. The 13 Oct ship was mismatched for about 37 seconds. The default ship is now: merge on GO, build the merge SHA with the REST create (`autoAssignCustomDomains: false`; a logged-in founder CLI is `vercel deploy --prod --yes --skip-domain`) and confirm READY, deploy `pay` (Supabase `deploy_edge_function`, `verify_jwt` true, `index.ts` plus `_shared/ratelimit.ts`, `_shared/orders.ts`, `_shared/portions.ts`) and confirm the version, then promote and confirm getplentry.com and www. Static-only changes build and promote. Docs-only merges do nothing.
+- **Not deployed.** This commit turns the Git hook off once it is on `main`. It does not alias getplentry.com. Production static at that moment was still the 13 Oct deployment. The PR #15 ship the same day (entry above) is the later static. Production ships after this commit are the REST create (`autoAssignCustomDomains: false`) and a promote.
 
 ## 2026-10-13 14:09 BST — production ship (PR #10)
 
