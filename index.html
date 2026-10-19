@@ -4176,15 +4176,20 @@ function saveProfile(){
   S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("pr-size").value;
   S.prefs.servings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));
-  S.prefs.budget=normBudget(document.getElementById("pr-budget").value,S.prefs.budget);
+  const budgetEl=document.getElementById("pr-budget");
+  const budgetRaw=String(budgetEl.value==null?"":budgetEl.value).trim();
+  const budgetBad=budgetEl.validity&&budgetEl.validity.badInput;
+  S.prefs.budget=budgetRaw?normBudget(budgetRaw,S.prefs.budget):(budgetBad?S.prefs.budget:null);
   S.prefs.meals=clampMeals(document.getElementById("pr-meals").value);
   S.prefs.preferredStore=document.getElementById("pr-store").value;
   const dietEl=document.getElementById("pr-diet");
   S.prefs.diet=dietEl?dietEl.value:dietPref();
   if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
   const del=readDeliveryForm("pr-del-");
-  const anyDel=["name","phone","line1","line2","city","postcode"].some(k=>{const n=document.getElementById("pr-del-"+k);return n&&n.value.trim();});
-  if(anyDel){
+  const delFilled=["name","phone","line1","line2","city","postcode"].filter(k=>{const n=document.getElementById("pr-del-"+k);return n&&n.value.trim();});
+  // The delivery postcode box is prefilled with the household postcode. That alone is not an address.
+  const echoedPostcode=delFilled.length===1&&delFilled[0]==="postcode"&&!deliveryFrom(S.prefs.delivery);
+  if(delFilled.length&&!echoedPostcode){
     if(!del){el.style.color="var(--red)";el.textContent="Delivery needs name, UK phone, line 1, city and a UK postcode.";return;}
     persistDelivery(del);
   }

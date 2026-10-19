@@ -2,10 +2,16 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-19 — Clearing the Profile budget turns it off
+
+- **Clear.** An empty or whitespace-only weekly budget on Profile saves `prefs.budget` as null. New week then has no ×1.2 cap, and the week screen has no under/over line. The household postcode shown in the delivery postcode box does not block that save. A real delivery edit still has to be complete.
+- **Junk.** A non-numeric value, or a number below 1, is not stored. The saved budget stays as it was. A number above 500 is still clamped to 500.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-19 — New accounts have no default budget
 
 - **Unset.** `prefs.budget` is null for a new account. Loading local or cloud state does not fill £60 when the blob has no number. A stored number, including a previously saved £60, stays. Junk in the blob becomes null and is not rendered.
-- **No budget.** New week fills without the ×1.2 first-pass cap. The week screen omits the under/over line, so it never shows £0 or NaN. Profile shows an empty field. Saving that empty field leaves the budget unset.
+- **No budget.** New week fills without the ×1.2 first-pass cap. The week screen omits the under/over line, so it never shows £0 or NaN. Profile shows an empty field.
 - **Set later.** Typing a whole-pound budget on Profile (1–500) stores it. The cap and the line then apply.
 - **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
 

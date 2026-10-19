@@ -334,6 +334,53 @@ describe("unset budget", () => {
     assert.equal(week.innerHTML.includes("NaN"), false);
     assert.equal(document.getElementById("pr-budget").value, String(open));
   });
+
+  it("emptying the Profile budget clears it, so the cap and the line turn off", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const meals = budgetMeals();
+    const S = arm(window, meals);
+    const open = tightBudget(window, meals);
+    S.prefs.budget = open;
+    window.renderProfile();
+    const field = document.getElementById("pr-budget");
+    assert.equal(field.value, String(open));
+
+    field.value = "";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, null);
+    assert.match(document.getElementById("pr-saved").textContent, /Saved/);
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected), ["Cheap meat", "Dear fish"]);
+    window.renderMenu();
+    assertNoBudgetLine(document);
+
+    S.prefs.budget = open;
+    window.renderProfile();
+    field.type = "text";
+    field.value = "   ";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, null, "whitespace-only clears the budget");
+
+    S.prefs.budget = open;
+    window.renderProfile();
+    field.type = "text";
+    field.value = "nope";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, open, "non-numeric input keeps the saved budget");
+    field.value = "0";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, open, "below £1 keeps the saved budget");
+    field.value = "9999";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, 500, "above £500 still clamps to 500");
+
+    S.prefs.budget = open;
+    window.renderProfile();
+    field.value = "";
+    Object.defineProperty(field, "validity", { configurable: true, get() { return { badInput: true }; } });
+    window.saveProfile();
+    assert.equal(S.prefs.budget, open, "a number field that rejected typed junk keeps the saved budget");
+  });
 });
 
 describe("week and modify", () => {
