@@ -2,12 +2,19 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-19 — New accounts have no default budget
+
+- **Unset.** `prefs.budget` is null for a new account. Loading local or cloud state does not fill £60 when the blob has no number. A stored number, including a previously saved £60, stays. Junk in the blob becomes null and is not rendered.
+- **No budget.** New week fills without the ×1.2 first-pass cap. The week screen omits the under/over line, so it never shows £0 or NaN. Profile shows an empty field. Saving that empty field leaves the budget unset.
+- **Set later.** Typing a whole-pound budget on Profile (1–500) stores it. The cap and the line then apply.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-19 — Onboarding drops goals and budget
 
 - **Steps.** Onboarding is shop → what you eat (everything / vegetarian / vegan / pescatarian, stored as `prefs.diet`) → dinner tags → household and UK postcode → dinners per week → cupboard. The goals step and the budget slider are gone. The postcode field moved onto household; that was the only place it was collected.
 - **Diet.** Vegetarian, vegan, and pescatarian filter New week and Modify. Vegetarian keeps vegetarian and vegan. Vegan keeps vegan. Pescatarian drops meat. Omnivore still prefers meat and fish and does not hide meals.
 - **Tags.** Meal prep is not offered as a new chip on onboarding or Profile. A saved `meal_prep` tag still shows, so it can be turned off, and it still weights the week until then.
-- **Legacy prefs.** `prefs.goals` and `prefs.budget` stay on the profile blob. No schema change. New accounts have `goals: []`, so goal weighting adds nothing. If dinner tags are empty, saved goals still map (`decide` / `shop` / `waste` → quick / meal_prep). The budget goal still does not map to a tag. The saved budget (default £60) still soft-caps the first New week pass and the under/over line, and Profile can still edit it. `pay` does not read either field.
+- **Legacy prefs.** `prefs.goals` and `prefs.budget` stay on the profile blob. No schema change. New accounts have `goals: []`, so goal weighting adds nothing. If dinner tags are empty, saved goals still map (`decide` / `shop` / `waste` → quick / meal_prep). The budget goal still does not map to a tag. A stored numeric budget still soft-caps the first New week pass and the under/over line. New accounts have no budget until Profile sets one. `pay` does not read either field.
 - **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
 
 ## 2026-10-19 — Claude review uses a pay-per-use API key

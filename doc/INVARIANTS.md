@@ -69,7 +69,7 @@ Coverage: **covered** = `npm test` already guards it. **ops** = founder/manual (
 |---|---|---|
 | I-X01 | Untrusted strings through `esc`. URLs through `safeUrl` (http/https only). Meal onclick uses indexes, not names. | covered |
 | I-X02 | Redirects are exact-origin: `checkout` bag `redirect_url` must have origin `https://getplentry.com` (`appRedirect`); the client assigns `location.href` only to a `https://checkout.stripe.com` URL (`stripeCheckoutUrl`). No other `location.href=` sites. | covered — jsdom + contracts |
-| I-X03 | Cloud `profiles.state` is untrusted JSON: `prefs.budget` normalised in `loadCloudState`, `esc()` at render. | covered — jsdom |
+| I-X03 | Cloud `profiles.state` is untrusted JSON: `prefs.budget` normalised in `loadCloudState` (missing or junk becomes null, not £60), `esc()` at render when a number is shown. | covered — jsdom |
 | I-A01 | No React/Next/bundler. App is `index.html` + Edge Functions. | ops + playbook (do not add a test that loads Next) |
 | I-A02 | No secrets in `index.html` or `doc/`. Publishable Supabase key only. | ops |
 | I-A03 | `cd plentry && npm test` must exit 0 before any production deploy. GitHub Actions **test** must be green before merge. Merge is not production. | ops — playbook / Cursor rule / ENGINEERING.md |

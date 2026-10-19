@@ -554,7 +554,9 @@ function normPostcode(v){
   const p=String(v||"").trim().toUpperCase().replace(/\s+/g," ");
   return /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/.test(p)?(p.includes(" ")?p:p.slice(0,-3)+" "+p.slice(-3)):null;
 }
-// Budgets: whole pounds, 1–500. Server clamps too — this is just good UX.
+// Budgets: whole pounds, 1–500, or null when unset. Junk is not a number.
+// A missing budget stays null — do not invent £60. A stored number (including a
+// previously saved 60) is clamped and kept.
 function normBudget(v,fallback){const n=Math.round(Number(v));return Number.isFinite(n)&&n>=1?Math.min(500,n):fallback;}
 
 // ---------- AI ----------
@@ -1242,7 +1244,7 @@ function mealThumbHtml(m){
 // ---------- STATE ----------
 const DEFAULTS={
   user:null,
-  prefs:{meals:5,size:"2",servings:2,budget:60,postcode:"E2 8AA",preferredStore:"",goals:[],tags:[],diet:"omnivore",delivery:null},
+  prefs:{meals:5,size:"2",servings:2,budget:null,postcode:"E2 8AA",preferredStore:"",goals:[],tags:[],diet:"omnivore",delivery:null},
   weekServings:null,
   pantry:{},
   menuOptions:[],   // AI-suggested meals for the week
@@ -1256,6 +1258,7 @@ if(!S.prefs.preferredStore)S.prefs.preferredStore="";
 if(!Array.isArray(S.prefs.goals))S.prefs.goals=[];
 if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
 if(!S.prefs.diet)S.prefs.diet="omnivore";
+S.prefs.budget=normBudget(S.prefs.budget,null); // local blob is untrusted too; never fill £60 for a missing budget
 S.prefs.meals=clampMeals(S.prefs.meals);
 S.prefs.servings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));
 if(S.weekServings==null)S.weekServings=S.prefs.servings;
@@ -1305,7 +1308,7 @@ async function loadCloudState(user){
   if(!Array.isArray(S.prefs.goals))S.prefs.goals=[];
   if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
   S.prefs.tags=normalizePrefTags(S.prefs.tags);
-  S.prefs.budget=normBudget(S.prefs.budget,60); // cloud blob is user-writable JSON, never trust its shape (S-12)
+  S.prefs.budget=normBudget(S.prefs.budget,null); // cloud blob is user-writable JSON, never trust its shape (S-12)
   S.prefs.meals=clampMeals(S.prefs.meals);
   S.prefs.delivery=deliveryFrom(S.prefs.delivery);
   save();
@@ -1604,7 +1607,7 @@ function saveHousehold(){
   S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("ob-size").value;
   S.prefs.servings=servingsFromHousehold(S.prefs.size);
-  S.prefs.budget=normBudget(S.prefs.budget,60);
+  S.prefs.budget=normBudget(S.prefs.budget,null);
   S.prefs.meals=clampMeals(document.getElementById("ob-meals").value);
   save();
   return true;
@@ -1866,7 +1869,8 @@ function autoPickWeek(){
     if(picked.length>=n)break;
     if(!consider(m,false))continue;
     const c=mealNeedCost(m,s);
-    if(picked.length&&spend+c>S.prefs.budget*1.2)continue;
+    const cap=normBudget(S.prefs.budget,null);
+    if(cap!=null&&picked.length&&spend+c>cap*1.2)continue;
     picked.push(m.name);
     spend+=c;
     if(isVeg(m))veg++;
@@ -3000,7 +3004,9 @@ function renderMenu(){
     const {buy,pantryValue}=needList();
     const quote=weekPriceQuote(meals, s);
     const pay=quote.total;
-    const under=(S.prefs.budget||0)-pay;
+    const budget=normBudget(S.prefs.budget,null);
+    const under=budget==null?0:budget-pay;
+    const budgetLine=budget==null?"":`<div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${esc(budget)} budget`:`£${Math.abs(under).toFixed(0)} over your £${esc(budget)} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>`;
     const mk=s?STORE_MARK[s.id]:null;
     const priceFooter=meals.length
       ?`<p class="week-sum" id="week-price-sum">Groceries £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}</p>
@@ -3016,7 +3022,7 @@ function renderMenu(){
         <div class="week-card"><div class="k">${basket.length||Object.keys(buy).length} items</div><div class="v">${s?esc(s.name):"Pick a shop"}</div></div>
       </div>
       ${s?`<div class="store-chip"><span class="mark" style="width:18px;height:18px;border-radius:6px;background:${(mk&&mk.c)||"var(--green-d)"};display:inline-block"></span> Planned for ${esc(s.name)}</div>`:""}
-      <div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${esc(S.prefs.budget)} budget`:`£${Math.abs(under).toFixed(0)} over your £${esc(S.prefs.budget)} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>
+      ${budgetLine}
       ${meals.length?meals.map((m,i)=>{
         const idx=S.menuOptions.findIndex(x=>x.name===m.name);
         const mc=(quote.pence[i]||0)/100;
@@ -4145,7 +4151,7 @@ function renderProfile(){
   renderServingsControl("pr-servings");
   const prNote=document.getElementById("pr-servings-note");
   if(prNote)prNote.textContent="Next week you build cooks for "+normServings(S.prefs.servings)+". This week stays serves "+weekServings()+".";
-  document.getElementById("pr-budget").value=S.prefs.budget;
+  document.getElementById("pr-budget").value=S.prefs.budget==null?"":S.prefs.budget;
   renderPrMealBar();
   const sel=document.getElementById("pr-store");
   if(sel){
