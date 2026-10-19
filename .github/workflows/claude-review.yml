@@ -23,7 +23,7 @@ jobs:
         id: review
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           use_sticky_comment: "true"
           allowed_bots: "cursor"
           prompt: |
@@ -69,7 +69,8 @@ jobs:
 
             Set structured output `verdict` to the same choice, without the `VERDICT:` prefix: APPROVE or CHANGES_REQUESTED.
           claude_args: |
-            --model sonnet
+            --model opus
+            --fallback-model sonnet
             --max-turns 100
             --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["APPROVE","CHANGES_REQUESTED"]}},"required":["verdict"]}'

@@ -2,13 +2,22 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-19 — Claude review uses a pay-per-use API key
+
+- **CI.** `.github/workflows/claude-review.yml` sets `anthropic_api_key` to the `ANTHROPIC_API_KEY` secret. `--model opus` and `--fallback-model sonnet` stay. `CLAUDE_CODE_OAUTH_TOKEN` failed with a known 401 ([issue 1613](https://github.com/anthropics/claude-code-action/issues/1613), [issue 1614](https://github.com/anthropics/claude-code-action/issues/1614)). Fork pull requests still do not receive the secret, so `claude-review` fails on them by design. See [RUNBOOK.md](RUNBOOK.md).
+- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+
 ## 2026-10-15 — Day cards share the week basket
 
 - **Prices.** A day card is that dinner’s penny share of the real week basket (selected meals, locked servings, shop, cupboard ticks). Shared packs split by the quantity each dinner uses. Seasonings and portion-less items split evenly across the dinners that use them. A cupboard tick costs 0. The cards add up to the groceries total; leftover pennies sit on the last dinner. Pricing each dinner with its own `basketFor([meal])` had been charging a full bottle of oil, a net of onions, and a seasoning jar on every card.
 - **Footer.** Under the cards: groceries + delivery + 5% = the total, the same split `pay` uses for the hold. One line says the card hold adds a 30% buffer and only the actual amount is captured. **This shop** shows that total to the penny.
 - **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change. Not deployed.
 
-- Temporary diagnostic: Claude review uses `--model sonnet` with no `--fallback-model`, because with the subscription token Opus fails instantly at $0.
+## 2026-10-15 — Claude review config is valid; Opus is restored
+
+- **CI.** `.github/workflows/claude-review.yml` sets `--model opus` and `--fallback-model sonnet` again. The Sonnet-only diagnostic reached the same instant `$0` `is_error` result, so the model flag was not the failure. Read, Grep, Glob, the `Bash(gh pr comment:*)` / `diff` / `view` rules, `allowed_bots: cursor`, and the `APPROVE` gate stay as they are.
+- **Why.** Claude Code 2.1.300 (the version `anthropics/claude-code-action@v1` installs) accepts this prompt, `--json-schema`, `--allowedTools`, and `--max-turns`. With a dummy `ANTHROPIC_API_KEY` the first error is API auth (`authentication_failed`, HTTP 401), not an args, schema, or tool-spec error. An invalid `--json-schema` fails earlier, on stderr, with `--json-schema is not valid JSON`. The action then reports `--json-schema was provided but Claude did not return structured_output` and hides the result text unless `show_full_output` is on. This public repo does not turn that on. See [RUNBOOK.md](RUNBOOK.md).
+- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
 
 ## 2026-10-15 — Claude review uses the opus alias
 
