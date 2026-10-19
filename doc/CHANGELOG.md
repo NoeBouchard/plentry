@@ -2,6 +2,11 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-19 — Claude review uses a pay-per-use API key
+
+- **CI.** `.github/workflows/claude-review.yml` sets `anthropic_api_key` to the `ANTHROPIC_API_KEY` secret. `--model opus` and `--fallback-model sonnet` stay. `CLAUDE_CODE_OAUTH_TOKEN` failed with a known 401 ([issue 1613](https://github.com/anthropics/claude-code-action/issues/1613), [issue 1614](https://github.com/anthropics/claude-code-action/issues/1614)). Fork pull requests still do not receive the secret, so `claude-review` fails on them by design. See [RUNBOOK.md](RUNBOOK.md).
+- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+
 ## 2026-10-15 — Day cards share the week basket
 
 - **Prices.** A day card is that dinner’s penny share of the real week basket (selected meals, locked servings, shop, cupboard ticks). Shared packs split by the quantity each dinner uses. Seasonings and portion-less items split evenly across the dinners that use them. A cupboard tick costs 0. The cards add up to the groceries total; leftover pennies sit on the last dinner. Pricing each dinner with its own `basketFor([meal])` had been charging a full bottle of oil, a net of onions, and a seasoning jar on every card.
