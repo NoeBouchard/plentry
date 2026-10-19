@@ -45,12 +45,13 @@ In the Kitchen planner workspace, edit root `doc/` then `npm run vault` so this 
 
 ## Deploy (only if the user asks)
 
-Vercel is **not** git-connected. `git push` does not update production.
+Since PR #12 (`4699353a`, 15 Oct 2026) a merge to `main` does not auto-deploy production. `git.deploymentEnabled.main` is false. Other branches still get preview deployments. Production static is a Vercel REST create with `autoAssignCustomDomains: false`, then a promote. See [`doc/RUNBOOK.md`](doc/RUNBOOK.md). `git push` is not production.
 
-Always run tests first. Do not run `vercel deploy` or `supabase functions deploy` if `npm test` failed.
+Always run tests first. Do not run a Vercel or functions deploy if `npm test` failed.
 
 ```bash
-npm test && vercel deploy --prod --yes --scope team_QHpJBQejbrxZ2PhEZQlmbuhj
+npm test
+# static: REST create + promote in doc/RUNBOOK.md
 # if functions changed:
 supabase functions deploy pay ai newcoming
 ```
