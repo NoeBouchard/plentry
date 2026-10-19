@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-15 — Day cards share the week basket
+
+- **Prices.** A day card is that dinner’s penny share of the real week basket (selected meals, locked servings, shop, cupboard ticks). Shared packs split by the quantity each dinner uses. Seasonings and portion-less items split evenly across the dinners that use them. A cupboard tick costs 0. The cards add up to the groceries total; leftover pennies sit on the last dinner. Pricing each dinner with its own `basketFor([meal])` had been charging a full bottle of oil, a net of onions, and a seasoning jar on every card.
+- **Footer.** Under the cards: groceries + delivery + 5% = the total, the same split `pay` uses for the hold. One line says the card hold adds a 30% buffer and only the actual amount is captured. **This shop** shows that total to the penny.
+- **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change. Not deployed.
+
 ## 2026-10-15 — Claude review config is valid; Opus is restored
 
 - **CI.** `.github/workflows/claude-review.yml` sets `--model opus` and `--fallback-model sonnet` again. The Sonnet-only diagnostic reached the same instant `$0` `is_error` result, so the model flag was not the failure. Read, Grep, Glob, the `Bash(gh pr comment:*)` / `diff` / `view` rules, `allowed_bots: cursor`, and the `APPROVE` gate stay as they are.

@@ -2213,4 +2213,88 @@ describe("shop switch uses that shop's packs", () => {
     assert.equal(Number(onions.pack_qty), 6);
     assert.equal(onions.product_name, "first");
   });
+
+  it("I-P06 day-card prices sum to Tesco groceries at 2, 4 and 6, with and without cupboard ticks", async () => {
+    const { window, document, S } = await loadWeek();
+    const store = window.preferredStoreObj();
+    const meals = () => S.selected.map(window.mealByName);
+    const modes = [
+      { servings: 2, ticks: [] },
+      { servings: 4, ticks: [] },
+      { servings: 6, ticks: [] },
+      { servings: 2, ticks: ["olive oil", "garlic", "onions", "salt"] },
+      { servings: 4, ticks: ["olive oil", "garlic", "onions", "salt"] },
+      { servings: 6, ticks: ["olive oil", "garlic", "onions", "salt"] },
+    ];
+    for (const mode of modes) {
+      S.weekServings = mode.servings;
+      S.pantry = {};
+      mode.ticks.forEach((k) => { S.pantry[k] = 1; });
+      const list = meals();
+      const packs = window.__plentry.weekPacks(list, mode.servings, mode.ticks, store);
+      const groceries = window.__plentry.basketGroceryPence(packs, store);
+      const pence = window.__plentry.splitMealPence(list, mode.servings, mode.ticks, store);
+      const label = `servings ${mode.servings} ticks ${mode.ticks.length}`;
+      assert.equal(pence.reduce((a, b) => a + b, 0), groceries, label);
+      assert.ok(pence.every((p) => p >= 0 && Number.isInteger(p)), label);
+      window.renderMenu();
+      const shown = [...document.querySelectorAll("#menu-week .day-side .mp")].map((el) => el.textContent);
+      assert.deepEqual(shown, pence.map((p) => (p ? `£${(p / 100).toFixed(2)}` : "pantry")), label);
+      const quote = window.__plentry.weekPriceQuote(list, store);
+      assert.equal(Math.round(quote.groceries * 100), groceries, label);
+      assert.equal(quote.delivery, store.fee, label);
+      assert.equal(quote.est, window.gbp(quote.groceries + quote.delivery), label);
+      assert.equal(quote.fee, window.plentryFee(quote.est), label);
+      assert.equal(quote.total, window.customerTotal(quote.est), label);
+      assert.equal(quote.hold, window.holdAmount(quote.est), label);
+      assert.equal(Math.round(quote.hold * 100), Math.round(quote.est * 1.05 * 1.30 * 100), label);
+      const sumText = `Groceries £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}`;
+      assert.equal(document.getElementById("week-price-sum").textContent, sumText, label);
+      assert.equal(
+        document.getElementById("week-hold").textContent,
+        `The card hold is £${quote.hold.toFixed(2)} — a 30% buffer. Only the actual amount is captured, and the rest is released.`,
+        label,
+      );
+      const shop = document.querySelector("#menu-week .week-card .v").textContent;
+      assert.equal(shop, `£${quote.total.toFixed(2)}`, label);
+      assert.match(shop, /^£\d+\.\d{2}$/);
+      if (!mode.ticks.length) {
+        const solo = list.reduce((t, m) => t + window.mealNeedCost(m, store), 0);
+        assert.ok(solo > quote.groceries + 0.5, `${label}: solo £${solo.toFixed(2)} vs groceries £${quote.groceries.toFixed(2)}`);
+      }
+    }
+  });
+});
+
+describe("per-meal price split (I-P06)", () => {
+  it("splits shared packs by quantity, seasonings and portion-less items evenly, remainder on the last meal", async () => {
+    const { window } = await loadApp();
+    const saltRice = { name: "Rice", ing: ["salt", "rice"], portions: { rice: [100, "g"], salt: [0.5, "tsp"] } };
+    const saltPasta = { name: "Pasta", ing: ["salt", "spaghetti"], portions: { spaghetti: [100, "g"], salt: [0.5, "tsp"] } };
+    const open = window.__plentry.splitMealPence([saltRice, saltPasta], 2, [], null);
+    assert.deepEqual(open, [177, 128]);
+    assert.equal(open[0] + open[1], 65 + 145 + 95);
+    const ticked = window.__plentry.splitMealPence([saltRice, saltPasta], 2, ["salt"], null);
+    assert.deepEqual(ticked, [145, 95]);
+    const onionA = { name: "One", ing: ["onions"], portions: { onions: [1, "pc"] } };
+    const onionB = { name: "Two", ing: ["onions"], portions: { onions: [2, "pc"] } };
+    const onions = window.__plentry.splitMealPence([onionA, onionB], 2, [], null);
+    assert.deepEqual(onions, [28, 57]);
+    assert.equal(onions[0] + onions[1], 85);
+    const eggsA = { name: "A", ing: ["eggs", "onions"] };
+    const eggsB = { name: "B", ing: ["eggs"] };
+    const eggs = window.__plentry.splitMealPence([eggsA, eggsB], 2, [], null);
+    assert.deepEqual(eggs, [162, 78]);
+    assert.equal(eggs[0] + eggs[1], 155 + 85);
+    for (const servings of [2, 4, 6]) {
+      const list = [saltRice, saltPasta, onionA];
+      for (const ticks of [[], ["salt"]]) {
+        const packs = window.__plentry.weekPacks(list, servings, ticks, null);
+        const groceries = window.__plentry.basketGroceryPence(packs, null);
+        const pence = window.__plentry.splitMealPence(list, servings, ticks, null);
+        assert.equal(pence.reduce((a, b) => a + b, 0), groceries, `servings ${servings} ticks ${ticks.join(",")}`);
+        assert.ok(pence.every((n) => n >= 0 && Number.isInteger(n)));
+      }
+    }
+  });
 });
