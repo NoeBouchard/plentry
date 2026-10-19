@@ -252,6 +252,98 @@ describe("week and modify", () => {
     assert.ok(S.selected.includes(extras[0].name));
   });
 
+  it("I-W07 vegetarian, vegan and pescatarian filter New week and Modify", async () => {
+    const veganA = { name: "Vegan one", emoji: "🥗", time: 20, ing: ["chickpeas", "rice", "spinach", "onions", "garlic"], tags: ["dinner", "vegan", "vegetarian"], id: 1, reviewed_at: "2026-09-01" };
+    const veganB = { name: "Vegan two", emoji: "🥗", time: 25, ing: ["chickpeas", "tomatoes", "rice", "onions"], tags: ["dinner", "vegan", "vegetarian"], id: 2, reviewed_at: "2026-09-01" };
+    const veg = { name: "Veg eggs", emoji: "🍳", time: 20, ing: ["eggs", "passata", "onions", "feta"], tags: ["dinner", "vegetarian"], id: 3, reviewed_at: "2026-09-01" };
+    const fish = { name: "Fish supper", emoji: "🐟", time: 25, ing: ["salmon fillet", "potatoes", "lemons"], tags: ["dinner", "fish"], id: 4, reviewed_at: "2026-09-01" };
+    const meat = { name: "Meat supper", emoji: "🍝", time: 30, ing: ["minced beef", "spaghetti", "onions", "garlic"], tags: ["dinner", "meat"], id: 5, reviewed_at: "2026-09-01" };
+    const pool = [veganA, veganB, veg, fish, meat];
+    const { window } = await loadApp({
+      localState: weekState(),
+      tables: { meals: pool, orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.menuOptions = pool;
+    S.prefs.budget = 500;
+    S.prefs.tags = [];
+    S.prefs.goals = [];
+
+    S.prefs.diet = "vegetarian";
+    S.prefs.meals = 3;
+    window.autoPickWeek();
+    assert.equal(S.selected.length, 3);
+    S.selected.forEach((n) => {
+      const d = window.__plentry.mealDiet(window.mealByName(n));
+      assert.ok(d === "vegetarian" || d === "vegan", `${n} ${d}`);
+    });
+
+    S.prefs.diet = "vegan";
+    S.prefs.meals = 2;
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected).sort(), ["Vegan one", "Vegan two"]);
+
+    S.prefs.diet = "pescatarian";
+    S.prefs.meals = 4;
+    window.autoPickWeek();
+    assert.equal(S.selected.length, 4);
+    assert.equal(S.selected.includes("Meat supper"), false);
+    assert.ok(S.selected.includes("Fish supper"));
+
+    S.prefs.diet = "vegetarian";
+    S.selected = ["Veg eggs"];
+    await window.openModify(0);
+    window.__plentry.modifyPicks().forEach((m) => {
+      const d = window.__plentry.mealDiet(m);
+      assert.ok(d === "vegetarian" || d === "vegan", m.name);
+    });
+
+    S.prefs.diet = "vegan";
+    S.selected = ["Vegan one"];
+    await window.openModify(0);
+    const veganPicks = window.__plentry.modifyPicks();
+    assert.ok(veganPicks.length >= 1);
+    veganPicks.forEach((m) => assert.equal(window.__plentry.mealDiet(m), "vegan", m.name));
+
+    S.prefs.diet = "pescatarian";
+    S.selected = ["Fish supper"];
+    await window.openModify(0);
+    const fishPicks = window.__plentry.modifyPicks();
+    assert.ok(fishPicks.some((m) => window.__plentry.mealDiet(m) === "fish" || window.__plentry.mealDiet(m) === "vegetarian" || window.__plentry.mealDiet(m) === "vegan"));
+    fishPicks.forEach((m) => assert.notEqual(window.__plentry.mealDiet(m), "meat", m.name));
+  });
+
+  it("saved goals and budget still apply, and missing goals add no weight", async () => {
+    const { window } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    const quick = { name: "Quick bowl", time: 20, ing: ["chickpeas", "rice", "onions"], tags: ["dinner", "vegan", "vegetarian", "quick"] };
+    const plain = { name: "Plain bowl", time: 40, ing: ["chickpeas", "rice", "onions"], tags: ["dinner", "vegan", "vegetarian"] };
+    S.prefs.diet = "vegan";
+    S.prefs.tags = [];
+    S.prefs.goals = ["decide", "budget", "variety"];
+    S.prefs.budget = 80;
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), ["quick"]);
+    assert.ok(window.__plentry.scoreMeal(quick) > window.__plentry.scoreMeal(plain));
+    S.prefs.goals = [];
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), []);
+    assert.equal(window.__plentry.scoreMeal(quick), window.__plentry.scoreMeal(plain));
+    S.prefs.goals = ["shop", "waste"];
+    S.prefs.tags = ["meal_prep"];
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), ["meal_prep"]);
+    S.menuOptions = [quick, plain, { name: "Meat supper", time: 30, ing: ["minced beef", "onions", "garlic"], tags: ["dinner", "meat"] }];
+    S.prefs.meals = 2;
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected).sort(), ["Plain bowl", "Quick bowl"]);
+    assert.equal(S.prefs.budget, 80);
+    assert.deepEqual(Array.from(S.prefs.goals), ["shop", "waste"]);
+    S.prefs.tags = [];
+    S.prefs.goals = null;
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), []);
+    window.autoPickWeek();
+    assert.equal(S.selected.length, 2);
+    assert.equal(S.prefs.budget, 80);
+  });
+
   it("openModify offers 5 catalog dinners and does not call the AI", async () => {
     const dbMeals = extraMeals().concat([
       { name: "Lemon chicken & parmesan rice", emoji: "🍋", time: 30, ing: ["chicken thighs", "rice", "lemons", "garlic", "parmesan"] },
@@ -328,7 +420,7 @@ describe("week and modify", () => {
 
   it("meal count bar covers 1–7 dinners on onboarding and Profile", async () => {
     const { window, document } = await loadApp({ localState: weekState() });
-    window.showObStep(6);
+    window.showObStep(5);
     window.pickMealCount(1);
     assert.equal(window.__plentry.state().prefs.meals, 1);
     assert.equal(window.__plentry.clampMeals(0), 5);
@@ -349,11 +441,97 @@ describe("week and modify", () => {
     assert.equal(window.__plentry.wantedTags().join(","), "quick");
     window.toggleUserTag("high_protein");
     assert.equal(window.__plentry.wantedTags().join(","), "high_protein");
-    window.showObStep(2);
+    window.showObStep(3);
     assert.ok(document.getElementById("ob-tags").textContent.includes("High protein"));
+    assert.ok(!document.getElementById("ob-tags").textContent.includes("Meal prep"));
+    window.showObStep(2);
     assert.ok(document.getElementById("ob-diet").textContent.includes("Everything"));
     window.nav("profile");
     assert.ok(document.getElementById("pr-tags").textContent.includes("High protein"));
+    assert.ok(!document.getElementById("pr-tags").textContent.includes("Meal prep"));
+  });
+});
+
+describe("onboarding order", () => {
+  function shown(document) {
+    return ["ob-1", "ob-2", "ob-3", "ob-4", "ob-5", "ob-6"].filter((id) => {
+      const el = document.getElementById(id);
+      return el && el.style.display !== "none";
+    });
+  }
+
+  it("steps are shop, what you eat, dinner tags, household, dinners, cupboard", async () => {
+    const { window, document } = await loadApp();
+    assert.deepEqual(shown(document), ["ob-1"]);
+    assert.ok(document.getElementById("ob-1").textContent.includes("Choose your shop"));
+    assert.equal(document.getElementById("ob-7"), null);
+    assert.equal(document.getElementById("ob-goals"), null);
+    assert.equal(document.getElementById("ob-budget"), null);
+    const onboard = document.getElementById("scr-onboard").textContent;
+    assert.ok(!onboard.includes("What's your budget"));
+    assert.ok(!onboard.includes("What do you need help with"));
+    assert.equal(document.querySelectorAll("#scr-onboard .steps i").length, 6);
+
+    window.obNext(2);
+    assert.deepEqual(shown(document), ["ob-1"]);
+    assert.ok(document.getElementById("ob-store-err").textContent.includes("supermarket"));
+    window.pickPreferredStore("tesco");
+    window.obNext(2);
+    assert.deepEqual(shown(document), ["ob-2"]);
+    const diet = document.getElementById("ob-diet").textContent;
+    assert.ok(diet.includes("Everything"));
+    assert.ok(diet.includes("Vegetarian"));
+    assert.ok(diet.includes("Vegan"));
+    assert.ok(diet.includes("Pescatarian"));
+    const buttons = [...document.querySelectorAll("#ob-diet .choice.sel")];
+    assert.equal(buttons.length, 1);
+    assert.equal(window.__plentry.state().prefs.diet, "omnivore");
+    window.pickDiet("vegan");
+    window.pickDiet("vegetarian");
+    assert.equal(window.__plentry.state().prefs.diet, "vegetarian");
+    assert.equal(document.querySelectorAll("#ob-diet .choice.sel").length, 1);
+
+    window.obNext(3);
+    assert.deepEqual(shown(document), ["ob-3"]);
+    const tags = document.getElementById("ob-tags").textContent;
+    assert.ok(tags.includes("Quick"));
+    assert.ok(tags.includes("Comfort"));
+    assert.ok(!tags.includes("Meal prep"));
+
+    window.obNext(4);
+    assert.deepEqual(shown(document), ["ob-4"]);
+    assert.ok(document.getElementById("ob-servings-note").textContent.includes("Cooking for"));
+    document.getElementById("ob-postcode").value = "e28aa";
+    window.obNext(5);
+    assert.deepEqual(shown(document), ["ob-5"]);
+    assert.equal(window.__plentry.state().prefs.postcode, "E2 8AA");
+    assert.equal(window.__plentry.state().prefs.servings, 2);
+    assert.equal(window.__plentry.state().prefs.budget, 60);
+    assert.equal(document.querySelectorAll("#ob-meals-picks .meal-seg").length, 7);
+
+    window.pickMealCount(4);
+    window.obNext(6);
+    assert.deepEqual(shown(document), ["ob-6"]);
+    assert.equal(window.__plentry.state().prefs.meals, 4);
+    assert.ok(document.getElementById("ob-have-list").textContent.includes("olive oil"));
+    assert.ok(!document.getElementById("ob-have-list").textContent.includes("rice"));
+  });
+
+  it("dinner tag chips never offer meal_prep, and a saved meal_prep tag still weights", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.prefs.tags = [];
+    S.prefs.goals = ["decide"];
+    window.showObStep(3);
+    assert.ok(!document.getElementById("ob-tags").textContent.includes("Meal prep"));
+    S.prefs.tags = ["meal_prep", "quick"];
+    window.showObStep(3);
+    assert.ok(document.getElementById("ob-tags").textContent.includes("Meal prep"));
+    assert.ok(document.getElementById("ob-tags").textContent.includes("Quick"));
+    assert.deepEqual(Array.from(S.prefs.tags), ["meal_prep", "quick"]);
+    assert.equal(window.__plentry.wantedTags().join(","), "meal_prep,quick");
+    window.nav("profile");
+    assert.ok(document.getElementById("pr-tags").textContent.includes("Meal prep"));
   });
 });
 
@@ -541,7 +719,7 @@ describe("pantry have-list", () => {
     assert.ok(!window.__plentry.getBasket().some((b) => b.i === "onions"));
     window.nav("pantry");
     assert.ok(document.getElementById("pantry-list").textContent.includes("skipped on the shop"));
-    window.showObStep(7);
+    window.showObStep(6);
     assert.ok(document.getElementById("ob-have-list").textContent.includes("onions"));
     assert.ok(!document.getElementById("ob-have-list").textContent.includes("rice"));
   });

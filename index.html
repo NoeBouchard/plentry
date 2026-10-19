@@ -276,34 +276,30 @@
 
   <!-- ONBOARDING -->
   <div class="screen active" id="scr-onboard">
-    <div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="ob-back" onclick="obBack()">←</button><div class="steps" style="flex:1;margin:0"><i class="done"></i><i id="st2"></i><i id="st3"></i><i id="st4"></i><i id="st5"></i><i id="st6"></i><i id="st7"></i></div></div>
+    <div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="ob-back" onclick="obBack()">←</button><div class="steps" style="flex:1;margin:0"><i class="done"></i><i id="st2"></i><i id="st3"></i><i id="st4"></i><i id="st5"></i><i id="st6"></i></div></div>
     <div id="ob-1">
-      <h1>What do you need help with?</h1>
-      <p class="sub">Pick everything that's true. We'll shape the week around it.</p>
-      <div id="ob-goals"></div>
-      <div style="margin-top:16px"><button class="btn" style="width:100%" id="ob-goal-btn" onclick="obNext(2)" disabled>Continue</button></div>
-    </div>
-    <div id="ob-2" style="display:none">
-      <h1>How should dinners feel?</h1>
-      <p class="sub">Diet plus a few tags. We'll prefer matching meals — you can change this anytime in Profile.</p>
-      <h3>What we eat</h3>
-      <div id="ob-diet" class="me-ing" style="margin-bottom:14px"></div>
-      <h3>Dinner tags</h3>
-      <p class="sub" style="margin-bottom:6px">Optional. Skip if you want a mixed week.</p>
-      <div id="ob-tags"></div>
-      <div style="margin-top:16px"><button class="btn" style="width:100%" onclick="obNext(3)">Continue</button></div>
-    </div>
-    <div id="ob-3" style="display:none">
       <h1>Choose your shop</h1>
       <p class="sub" id="ob-stores-sub">Same 5-dinner week, priced at each supermarket. You can change this later.</p>
       <div class="store-grid" id="ob-stores"></div>
       <div class="hint" id="ob-savings">We'll adapt ingredients and prices to your store.</div>
       <div class="err" id="ob-store-err"></div>
-      <div style="margin-top:8px"><button class="btn" style="width:100%" id="ob-store-btn" onclick="obNext(4)" disabled>Continue</button></div>
+      <div style="margin-top:8px"><button class="btn" style="width:100%" id="ob-store-btn" onclick="obNext(2)" disabled>Continue</button></div>
+    </div>
+    <div id="ob-2" style="display:none">
+      <h1>What you eat</h1>
+      <p class="sub">One choice. We'll only plan dinners that fit. You can change this in Profile.</p>
+      <div id="ob-diet" class="me-ing"></div>
+      <div style="margin-top:16px"><button class="btn" style="width:100%" onclick="obNext(3)">Continue</button></div>
+    </div>
+    <div id="ob-3" style="display:none">
+      <h1>Dinner tags</h1>
+      <p class="sub">Optional. We'll prefer these when we pick the week. Skip if you want a mixed week.</p>
+      <div id="ob-tags"></div>
+      <div style="margin-top:16px"><button class="btn" style="width:100%" onclick="obNext(4)">Continue</button></div>
     </div>
     <div id="ob-4" style="display:none">
       <h1>How many of you?</h1>
-      <p class="sub">We scale portions and the shop.</p>
+      <p class="sub">We scale portions and the shop. Cooking for is 2, 4, or 6.</p>
       <div class="counter">
         <div class="n" id="ob-size-n">2</div>
         <div class="k">people</div>
@@ -311,28 +307,19 @@
       </div>
       <select id="ob-size" style="display:none"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
       <p class="sub" id="ob-servings-note" style="text-align:center">Cooking for 2.</p>
+      <label for="ob-postcode">Postcode</label>
+      <input id="ob-postcode" value="E2 8AA" placeholder="Postcode" maxlength="8" style="margin:8px 0">
+      <div class="err" id="ob-err"></div>
       <button class="btn" style="width:100%" onclick="obNext(5)">Continue</button>
     </div>
     <div id="ob-5" style="display:none">
-      <h1>What's your budget?</h1>
-      <p class="sub">We'll fit dinners to it — groceries at store price, plus a 5% Plentry fee.</p>
-      <div class="budget-val">£<span id="ob-budget-n">60</span></div>
-      <p class="sub" style="text-align:center">per week</p>
-      <input id="ob-budget" type="range" min="25" max="150" step="5" value="60" oninput="syncBudgetLabel()">
-      <div class="row" style="justify-content:space-between"><span class="sub" style="margin:0">£25 tight</span><span class="sub" style="margin:0">£150 comfort</span></div>
-      <div class="hint">Same basket compared across Tesco, Sainsbury's, Asda and Waitrose.</div>
-      <input id="ob-postcode" value="E2 8AA" placeholder="Postcode" maxlength="8" style="margin:8px 0">
-      <div class="err" id="ob-err"></div>
-      <button class="btn" style="width:100%;margin-top:8px" onclick="obNext(6)">Continue</button>
-    </div>
-    <div id="ob-6" style="display:none">
       <h1>How many dinners?</h1>
       <p class="sub">Tap how many nights you want us to plan. You can change this in Profile.</p>
       <div id="ob-meals-picks"></div>
       <select id="ob-meals" style="display:none"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option></select>
-      <button class="btn" style="width:100%;margin-top:12px" onclick="obNext(7)">Continue</button>
+      <button class="btn" style="width:100%;margin-top:12px" onclick="obNext(6)">Continue</button>
     </div>
-    <div id="ob-7" style="display:none">
+    <div id="ob-6" style="display:none">
       <h1>What's in the cupboard?</h1>
       <p class="sub">Tick oils and spices you already cook with. We'll skip them on the shop. Groceries you don't need can be removed from the basket later.</p>
       <input id="ob-have-q" placeholder="Search salt, oil, paprika…" oninput="renderObHave()" style="margin-bottom:10px">
@@ -346,7 +333,7 @@
       <h1>Preparing your week…</h1>
       <p class="sub">Picking dinners and building the shopping list for your shop.</p>
       <div class="card" style="text-align:left">
-        <div class="gen-step" id="gs1"><span>Reading your shop and budget</span><span id="gs1s">…</span></div>
+        <div class="gen-step" id="gs1"><span>Reading your shop</span><span id="gs1s">…</span></div>
         <div class="gen-step" id="gs2"><span>Choosing dinners you'll cook</span><span id="gs2s">waiting</span></div>
         <div class="gen-step" id="gs3"><span>Building the shopping list</span><span id="gs3s">waiting</span></div>
       </div>
@@ -1086,6 +1073,8 @@ function wantedTags(){
   const allowed=USER_MEAL_TAGS.map(t=>t.id);
   const direct=(Array.isArray(S.prefs.tags)?S.prefs.tags:[]).filter(t=>allowed.indexOf(t)>=0);
   if(direct.length)return direct.filter((x,i,a)=>a.indexOf(x)===i);
+  // Saved goals still map when dinner tags are empty. A new account has goals [],
+  // so this adds nothing. The budget goal does not map to a tag.
   const g=Array.isArray(S.prefs.goals)?S.prefs.goals:[];
   const t=[];
   if(g.indexOf("decide")>=0)t.push("quick");
@@ -1181,8 +1170,8 @@ async function loadShelfPrices(){
     }
     SHELF_READY=Object.keys(SHELF).length>0;
     if(basket.length)renderShop();
-    const ob2=document.getElementById("ob-2");
-    if(ob2&&ob2.style.display==="block")renderObStores();
+    const obShop=document.getElementById("ob-1");
+    if(obShop&&obShop.style.display==="block")renderObStores();
     renderBasketFab();
     if(basketOpen)renderBasketDrawer();
   }catch(e){}
@@ -1264,7 +1253,7 @@ const DEFAULTS={
 let S=load();
 if(!S.prefs)S.prefs=JSON.parse(JSON.stringify(DEFAULTS.prefs));
 if(!S.prefs.preferredStore)S.prefs.preferredStore="";
-if(!S.prefs.goals)S.prefs.goals=[];
+if(!Array.isArray(S.prefs.goals))S.prefs.goals=[];
 if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
 if(!S.prefs.diet)S.prefs.diet="omnivore";
 S.prefs.meals=clampMeals(S.prefs.meals);
@@ -1313,6 +1302,7 @@ async function loadCloudState(user){
   }catch(e){}
   if(S.prefs.preferredStore)chosenStore=STORES.find(s=>s.id===S.prefs.preferredStore)||chosenStore;
   if(!S.prefs.diet)S.prefs.diet="omnivore";
+  if(!Array.isArray(S.prefs.goals))S.prefs.goals=[];
   if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
   S.prefs.tags=normalizePrefTags(S.prefs.tags);
   S.prefs.budget=normBudget(S.prefs.budget,60); // cloud blob is user-writable JSON, never trust its shape (S-12)
@@ -1596,89 +1586,62 @@ async function signOut(){
 }
 
 // ---------- ONBOARDING ----------
-const OB_GOALS=[
-  {id:"decide",ico:"🤔",t:"I never know what to cook",d:"That 6pm question, every night"},
-  {id:"shop",ico:"🛒",t:"Shopping takes too long",d:"I want the list done for me"},
-  {id:"waste",ico:"🥬",t:"I waste food",d:"We buy more than we cook"},
-  {id:"budget",ico:"💷",t:"Stay on a budget",d:"Know the week's grocery spend"},
-  {id:"variety",ico:"🍽️",t:"Same meals on repeat",d:"A mixed week without thinking"},
-];
+// Shop → what you eat → dinner tags → household → dinners → cupboard.
+// Goals and the budget slider are not steps. Saved prefs.goals and prefs.budget stay on the blob.
 function startOnboarding(){
   activateScreen("scr-onboard");
   document.getElementById("main-nav").classList.remove("show");
   showSticky(false);
-  renderObGoals();
-  renderObDiet();
-  renderUserTags("ob-tags");
-  renderObMealPicks();
-  syncSizeLabel();
-  syncBudgetLabel();
   showObStep(1);
   syncHeader();
 }
 function saveHousehold(){
   const err=document.getElementById("ob-err");
-  const pc=normPostcode(document.getElementById("ob-postcode").value);
+  const pcEl=document.getElementById("ob-postcode");
+  const pc=normPostcode(pcEl?pcEl.value:(S.prefs.postcode||""));
   if(!pc){if(err)err.textContent="Enter a valid UK postcode (e.g. E2 8AA).";return false;}
   if(err)err.textContent="";
   S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("ob-size").value;
   S.prefs.servings=servingsFromHousehold(S.prefs.size);
-  S.prefs.budget=normBudget(document.getElementById("ob-budget").value,60);
+  S.prefs.budget=normBudget(S.prefs.budget,60);
   S.prefs.meals=clampMeals(document.getElementById("ob-meals").value);
   save();
   return true;
 }
 function showObStep(step){
   obStep=step;
-  ["ob-1","ob-2","ob-3","ob-4","ob-5","ob-6","ob-7"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.style.display=step===i+1?"block":"none";});
-  ["st2","st3","st4","st5","st6","st7"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.className=step>=i+2?"done":"";});
-  if(step===2){renderObDiet();renderUserTags("ob-tags");}
-  if(step===3){renderObStores();fetchSampleQuote();}
-  if(step===4)syncSizeLabel();
-  if(step===5){
-    const b=document.getElementById("ob-budget");if(b)b.value=S.prefs.budget||60;
+  ["ob-1","ob-2","ob-3","ob-4","ob-5","ob-6"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.style.display=step===i+1?"block":"none";});
+  ["st2","st3","st4","st5","st6"].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.className=step>=i+2?"done":"";});
+  if(step===1){renderObStores();fetchSampleQuote();}
+  if(step===2)renderObDiet();
+  if(step===3)renderUserTags("ob-tags");
+  if(step===4){
+    syncSizeLabel();
     const pc=document.getElementById("ob-postcode");if(pc&&S.prefs.postcode)pc.value=S.prefs.postcode;
-    syncBudgetLabel();
   }
-  if(step===6)renderObMealPicks();
-  if(step===7)renderObHave();
+  if(step===5)renderObMealPicks();
+  if(step===6)renderObHave();
 }
 function obBack(){
   if(obStep<=1)return;
   showObStep(obStep-1);
 }
 function obNext(step){
-  if(step===2&&!(S.prefs.goals&&S.prefs.goals.length))return;
-  if(step===4&&!S.prefs.preferredStore){
+  if(step>1&&!S.prefs.preferredStore){
     const e=document.getElementById("ob-store-err");
     if(e)e.textContent="Tap the supermarket you want us to order from.";
+    showObStep(1);
     return;
   }
-  if(step>=6&&!saveHousehold())return;
+  if(step>=5&&!saveHousehold())return;
   showObStep(step);
-}
-function renderObGoals(){
-  if(!S.prefs.goals)S.prefs.goals=[];
-  const el=document.getElementById("ob-goals");if(!el)return;
-  el.innerHTML=OB_GOALS.map(g=>
-    `<button type="button" class="choice ${S.prefs.goals.includes(g.id)?"sel":""}" onclick="toggleGoal('${g.id}')">
-      <div class="c-ico">${g.ico}</div><div><b>${esc(g.t)}</b><p>${esc(g.d)}</p></div>
-    </button>`).join("");
-  const btn=document.getElementById("ob-goal-btn");
-  if(btn)btn.disabled=!S.prefs.goals.length;
-}
-function toggleGoal(id){
-  S.prefs.goals=S.prefs.goals||[];
-  const i=S.prefs.goals.indexOf(id);
-  i>=0?S.prefs.goals.splice(i,1):S.prefs.goals.push(id);
-  save();renderObGoals();
 }
 const OB_DIETS=[
   {id:"omnivore",t:"Everything",d:"Meat and fish are fine"},
-  {id:"pescatarian",t:"Fish, no meat",d:"No red meat or chicken"},
   {id:"vegetarian",t:"Vegetarian",d:"No meat or fish"},
   {id:"vegan",t:"Vegan",d:"No animal products"},
+  {id:"pescatarian",t:"Pescatarian",d:"Fish, no meat"},
 ];
 function renderObDiet(){
   const el=document.getElementById("ob-diet");if(!el)return;
@@ -1700,6 +1663,7 @@ function renderUserTags(elId){
   const lowCarbCount=pool.filter(m=>(m.tags||[]).indexOf("low_carb")>=0).length;
   const lowCalCount=pool.filter(m=>(m.tags||[]).indexOf("low_calorie")>=0).length;
   el.innerHTML=USER_MEAL_TAGS.filter(t=>{
+    if(t.id==="meal_prep"&&cur.indexOf("meal_prep")<0)return false;
     if(t.id==="low_carb"&&lowCarbCount<8&&cur.indexOf("low_carb")<0)return false;
     if(t.id==="low_calorie"&&lowCalCount<8&&cur.indexOf("low_calorie")<0)return false;
     return true;
@@ -1735,11 +1699,6 @@ function adjSize(d){
   S.prefs.servings=servingsFromHousehold(S.prefs.size);
   const sel=document.getElementById("ob-size");if(sel)sel.value=S.prefs.size;
   save();syncSizeLabel();
-}
-function syncBudgetLabel(){
-  const el=document.getElementById("ob-budget");
-  const n=el?+el.value:S.prefs.budget;
-  const lab=document.getElementById("ob-budget-n");if(lab)lab.textContent=n;
 }
 function renderObMealPicks(){
   const el=document.getElementById("ob-meals-picks");if(!el)return;
@@ -1866,8 +1825,8 @@ function setGen(id,label,done){
   if(s)s.textContent=done?"✓":label;
 }
 async function beginGenerate(){
-  if(!S.prefs.preferredStore){activateScreen("scr-onboard");showObStep(3);return;}
-  if(!saveHousehold()){showObStep(5);activateScreen("scr-onboard");return;}
+  if(!S.prefs.preferredStore){activateScreen("scr-onboard");showObStep(1);return;}
+  if(!saveHousehold()){showObStep(4);activateScreen("scr-onboard");return;}
   activateScreen("scr-generating");
   document.getElementById("main-nav").classList.remove("show");
   showSticky(false);
@@ -3115,7 +3074,7 @@ async function openModify(selI){
   try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
   if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
   catalog.forEach(m=>{if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.push(m);});
-  const pool=catalog.filter(m=>m.name!==current.name&&!S.selected.includes(m.name)&&isPublished(m));
+  const pool=catalog.filter(m=>m.name!==current.name&&!S.selected.includes(m.name)&&isPublished(m)&&mealFitsDiet(m));
   modifyPicks=rankCatalog(pool).slice(0,5);
   const s=preferredStoreObj();
   openModal(`<h2>Replace ${esc(current.name)}</h2>
@@ -3178,7 +3137,7 @@ async function sendAdvisor(){
   if(!text)return;
   advisorMsgs.push({role:"user",content:text});
   renderAdvisor(true);
-  const res=await ai("advisor",{messages:advisorMsgs,goals:S.prefs.goals||[]});
+  const res=await ai("advisor",{messages:advisorMsgs,goals:Array.isArray(S.prefs.goals)?S.prefs.goals:[]});
   if(!res||!res.message){
     advisorMsgs.push({role:"assistant",content:"Hmm, I lost my train of thought — try again in a moment?"});
   }else{

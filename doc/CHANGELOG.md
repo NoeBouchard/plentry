@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-19 — Onboarding drops goals and budget
+
+- **Steps.** Onboarding is shop → what you eat (everything / vegetarian / vegan / pescatarian, stored as `prefs.diet`) → dinner tags → household and UK postcode → dinners per week → cupboard. The goals step and the budget slider are gone. The postcode field moved onto household; that was the only place it was collected.
+- **Diet.** Vegetarian, vegan, and pescatarian filter New week and Modify. Vegetarian keeps vegetarian and vegan. Vegan keeps vegan. Pescatarian drops meat. Omnivore still prefers meat and fish and does not hide meals.
+- **Tags.** Meal prep is not offered as a new chip on onboarding or Profile. A saved `meal_prep` tag still shows, so it can be turned off, and it still weights the week until then.
+- **Legacy prefs.** `prefs.goals` and `prefs.budget` stay on the profile blob. No schema change. New accounts have `goals: []`, so goal weighting adds nothing. If dinner tags are empty, saved goals still map (`decide` / `shop` / `waste` → quick / meal_prep). The budget goal still does not map to a tag. The saved budget (default £60) still soft-caps the first New week pass and the under/over line, and Profile can still edit it. `pay` does not read either field.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-19 — Claude review uses a pay-per-use API key
 
 - **Merged:** squash commit `1599a417fc564fe5368fad53c96da77eeab2cd5f` on `main`. PR #19.

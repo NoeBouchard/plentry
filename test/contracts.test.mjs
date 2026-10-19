@@ -423,7 +423,12 @@ describe("source contracts", () => {
     assert.match(html, /Do NOT keep spices you already have/);
     assert.match(html, /I already have — skip/);
     assert.match(html, /class="meal-bar"/);
-    assert.match(html, /id="ob-7"/);
+    assert.match(html, /id="ob-6"/);
+    assert.doesNotMatch(html, /id="ob-7"/);
+    assert.doesNotMatch(html, /What's your budget/);
+    assert.doesNotMatch(html, /What do you need help with/);
+    assert.match(html, /What you eat/);
+    assert.match(html, /mealFitsDiet\(m\)/);
     assert.match(html, /id="pr-tags"/);
     assert.match(html, /const USER_MEAL_TAGS=/);
     assert.match(html, /function toggleUserTag/);
