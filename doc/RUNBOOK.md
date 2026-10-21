@@ -415,6 +415,8 @@ Secrets apply on the next function invoke; redeploy `pay` / `stripe-webhook` onl
 
 ## Meals catalog
 
+New week asks for N dinners (`prefs.meals`, 1–7) and stops when no more **published** meals fit the diet, so the week can be shorter than N. On 21 Oct 2026 the reviewed catalog is 52 of 77 rows: 21 meat, 8 fish, 17 vegetarian, 6 vegan. Vegan can fill at most 6. Vegetarian includes those 6 vegan dinners (23). Pescatarian drops the 21 meat dinners (31). Omnivore can use all 52. Unpublished rows stay off New week and Modify.
+
 After changing the catalog, apply `catalog_review_2026_09_08.sql` (or an equivalent name-keyed update) so `ing`, `time`, and `recipe` match the review file. `meals_full_ingredients.sql` only adds missing salt/pepper — it does not invent dish spices. Deploy **static + `ai`** together when catalog keys change, or meals using new keys disappear from the client.
 
 Meal **tags** and the unverified queue: apply `meals_tags.sql` (SAFE TO RE-RUN). It backfills empty tags, marks pre-2026-09-09 rows reviewed, and enables the fortnight cron. Founder add/verify/delete: `admin_meals_write.sql`. Closed tag list: [TAGS.md](TAGS.md). Queue: [NEWCOMING-MEALS.md](NEWCOMING-MEALS.md). Deploy `ai` and `newcoming` with the static app.

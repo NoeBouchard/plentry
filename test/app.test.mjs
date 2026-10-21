@@ -139,6 +139,54 @@ describe("xss and urls", () => {
 });
 
 describe("postcode and budget", () => {
+  it("starts with an empty postcode, blocks a blank one, and keeps a saved one", async () => {
+    const { window, document } = await loadApp();
+    const field = document.getElementById("ob-postcode");
+    const profile = document.getElementById("pr-postcode");
+    assert.equal(field.value, "");
+    assert.equal(field.placeholder, "e.g. E2 8AA");
+    assert.equal(profile.placeholder, "e.g. E2 8AA");
+    assert.equal(window.__plentry.state().prefs.postcode, "");
+    window.renderProfile();
+    assert.equal(profile.value, "");
+
+    window.pickPreferredStore("tesco");
+    window.obNext(2);
+    window.obNext(3);
+    window.obNext(4);
+    assert.equal(document.getElementById("ob-4").style.display, "block");
+    assert.equal(field.value, "");
+    window.obNext(5);
+    assert.equal(document.getElementById("ob-4").style.display, "block");
+    assert.equal(document.getElementById("ob-5").style.display, "none");
+    assert.match(document.getElementById("ob-err").textContent, /postcode/i);
+    assert.equal(window.__plentry.state().prefs.postcode, "");
+
+    const saved = weekState();
+    saved.prefs.postcode = "SW1A 1AA";
+    const kept = await loadApp({ localState: saved });
+    assert.equal(kept.window.__plentry.state().prefs.postcode, "SW1A 1AA");
+    kept.window.showObStep(4);
+    assert.equal(kept.document.getElementById("ob-postcode").value, "SW1A 1AA");
+    kept.window.renderProfile();
+    assert.equal(kept.document.getElementById("pr-postcode").value, "SW1A 1AA");
+
+    const legacy = weekState();
+    legacy.prefs.postcode = "E2 8AA";
+    const still = await loadApp({ localState: legacy });
+    assert.equal(still.window.__plentry.state().prefs.postcode, "E2 8AA");
+    still.window.renderProfile();
+    assert.equal(still.document.getElementById("pr-postcode").value, "E2 8AA");
+
+    const cloud = weekState();
+    delete cloud.prefs.postcode;
+    const blank = await loadApp({
+      session: { id: "u-pc", email: "pc@example.com" },
+      tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u-pc", state: cloud }] },
+    });
+    assert.equal(blank.window.__plentry.state().prefs.postcode, "");
+  });
+
   it("normalises UK postcodes and rejects junk", async () => {
     const { window } = await loadApp();
     assert.equal(window.normPostcode("e28aa"), "E2 8AA");

@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-21 — Household postcode starts empty
+
+- **Postcode.** Onboarding and Profile start with an empty postcode and the placeholder `e.g. E2 8AA`. Continue and Save still require a valid UK postcode. A postcode already stored on the profile, including a previously saved `E2 8AA`, still shows. Load does not fill one in.
+- **Short week.** New week asks for N dinners and stops when no more published meals fit the diet. On 21 Oct 2026 the reviewed catalog is 52 of 77 rows: 21 meat, 8 fish, 17 vegetarian, 6 vegan. Vegan can fill at most 6, so a 7-dinner week is 6 dinners. Vegetarian can use those 6 as well (23). Pescatarian drops the 21 meat dinners (31). Omnivore can use all 52. The other 25 rows are unpublished and stay off New week.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-19 — Clearing the Profile budget turns it off
 
 - **Clear.** An empty or whitespace-only weekly budget on Profile saves `prefs.budget` as null. New week then has no ×1.2 cap, and the week screen has no under/over line. The household postcode shown in the delivery postcode box does not block that save. A real delivery edit still has to be complete.
