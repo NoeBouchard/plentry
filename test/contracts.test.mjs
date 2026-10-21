@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -438,6 +438,50 @@ describe("source contracts", () => {
     assert.match(html, /function deliveryFrom/);
     assert.match(html, /Deliver to this address/);
     assert.match(html, /id="pr-del-line1"/);
+  });
+
+  it("I-C04 every cupboard item maps to a same-origin SVG or the fallback", () => {
+    const mapMatch = html.match(/const CUPBOARD_ICONS=\{([^}]+)\}/);
+    assert.ok(mapMatch, "CUPBOARD_ICONS");
+    const map = {};
+    for (const m of mapMatch[1].matchAll(/"([^"]+)":"([^"]+)"/g)) map[m[1]] = m[2];
+    const staples = [...html.match(/const STAPLES=\[([^\]]+)\]/)[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    const seasonings = [...html.match(/const SEASONINGS=\[([^\]]+)\]/)[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    const dir = path.join(ROOT, "vendor/cupboard");
+    const fallback = "fallback.svg";
+    assert.equal(html.match(/const CUPBOARD_ICON_FALLBACK="([^"]+)"/)[1], fallback);
+    assert.match(html, /const CUPBOARD_ICON_DIR="\/vendor\/cupboard\/"/);
+    assert.ok(existsSync(path.join(dir, fallback)), fallback);
+    const names = [...new Set([...staples, ...seasonings])];
+    assert.ok(names.length >= 15, "staples plus garam masala");
+    const used = new Set([fallback]);
+    for (const name of names) {
+      const file = map[name];
+      assert.ok(file, `${name} has a picture`);
+      assert.match(file, /^[a-z0-9-]+\.svg$/, file);
+      assert.notEqual(file, fallback, `${name} is not the generic jar`);
+      const svg = readFileSync(path.join(dir, file), "utf8");
+      assert.match(svg, /<svg\b/);
+      assert.doesNotMatch(svg.replaceAll("http://www.w3.org/2000/svg", ""), /https?:\/\//, file);
+      assert.doesNotMatch(svg, /url\s*\(\s*['"]?https?:/i, file);
+      used.add(file);
+    }
+    assert.equal(map.rice, undefined, "a grocery with no picture is not in the map");
+    const onDisk = readdirSync(dir).filter((f) => f.endsWith(".svg"));
+    assert.deepEqual(onDisk.slice().sort(), [...used].sort());
+    let bytes = 0;
+    for (const file of onDisk) {
+      const svg = readFileSync(path.join(dir, file), "utf8");
+      assert.doesNotMatch(svg.replaceAll("http://www.w3.org/2000/svg", ""), /https?:\/\//, file);
+      bytes += statSync(path.join(dir, file)).size;
+    }
+    assert.ok(bytes < 32 * 1024, `cupboard SVGs are ${bytes} bytes`);
+    const helper = html.slice(html.indexOf("function cupboardIconSrc"), html.indexOf("function cupboardIconHtml"));
+    assert.match(helper, /CUPBOARD_ICON_DIR\+cupboardIconFile\(name\)/);
+    assert.doesNotMatch(helper, /https?:\/\//);
+    assert.match(html, /alt="" aria-hidden="true"/);
+    assert.match(html, /cupboardIconHtml\(n,40\)/);
+    assert.match(html, /width="\$\{n\}" height="\$\{n\}"/);
   });
 
   it("pantry is a cupboard have-list of oils and spices, not groceries or AI", () => {

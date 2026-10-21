@@ -58,9 +58,15 @@
   .err{color:var(--red);font-size:.8rem;margin-top:6px;min-height:1em}
   .choice{display:flex;gap:12px;align-items:center;padding:14px;background:#fff;border:1.5px solid var(--line);border-radius:16px;margin-bottom:8px;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
   .choice.sel{background:var(--sage);border-color:var(--green)}
-  .choice .c-ico{width:40px;height:40px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.15rem}
+  .choice .c-ico{position:relative;width:40px;height:40px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.15rem}
+  .choice .c-ico .cupboard-ico{width:40px;height:40px;border-radius:50%;display:block;object-fit:cover;background:var(--sage)}
+  .choice .c-tick{position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:50%;background:var(--green-d);color:#fff;font-size:.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid #fff;box-sizing:border-box}
   .choice b{display:block;font-size:.92rem}
   .choice p{color:var(--muted);font-size:.78rem;margin:0}
+  .bk-line .cupboard-ico{width:28px;height:28px;border-radius:8px;flex-shrink:0;display:block;object-fit:cover;background:var(--sage)}
+  .bk-line.staple{flex-wrap:wrap}
+  .bk-line.staple .nm{flex:1 1 120px}
+  .bk-line.staple .btn.warn{flex:1 0 100%;margin-top:6px}
   .store-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
   .store-tile{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:14px 10px 12px;cursor:pointer;text-align:center;min-height:118px}
   .store-tile.picked,.store-tile.best.picked{border-color:var(--green-d);background:var(--sage)}
@@ -915,6 +921,36 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePac
 /* portions:end */
 const STAPLES=["olive oil","butter","garlic","onions","lemons","curry paste","salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
 function isStaple(i){return STAPLES.indexOf(i)>=0;}
+// In-house SVGs. Served from /vendor/cupboard/ (same origin, immutable cache). A name with no picture uses the fallback jar.
+const CUPBOARD_ICON_DIR="/vendor/cupboard/";
+const CUPBOARD_ICON_FALLBACK="fallback.svg";
+const CUPBOARD_ICONS={
+  "olive oil":"olive-oil.svg",
+  "butter":"butter.svg",
+  "garlic":"garlic.svg",
+  "onions":"onions.svg",
+  "lemons":"lemons.svg",
+  "curry paste":"curry-paste.svg",
+  "salt":"salt.svg",
+  "black pepper":"black-pepper.svg",
+  "paprika":"paprika.svg",
+  "cumin":"cumin.svg",
+  "chilli flakes":"chilli-flakes.svg",
+  "mixed herbs":"mixed-herbs.svg",
+  "soy sauce":"soy-sauce.svg",
+  "stock cubes":"stock-cubes.svg",
+  "garam masala":"garam-masala.svg"
+};
+function cupboardIconFile(name){
+  return CUPBOARD_ICONS[String(name||"").trim().toLowerCase()]||CUPBOARD_ICON_FALLBACK;
+}
+function cupboardIconSrc(name){
+  return CUPBOARD_ICON_DIR+cupboardIconFile(name);
+}
+function cupboardIconHtml(name,px){
+  const n=px===28?28:40;
+  return `<img class="cupboard-ico" src="${cupboardIconSrc(name)}" width="${n}" height="${n}" alt="" aria-hidden="true">`;
+}
 function weekServings(){return normServings(S.weekServings==null?S.prefs.servings:S.weekServings);}
 function lockWeekServings(){S.weekServings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));}
 function cookMinutes(m,servings){
@@ -1811,7 +1847,7 @@ function haveListHtml(q){
     const i=STAPLES.indexOf(n);
     const have=haveItem(n);
     return `<button type="button" class="choice ${have?"sel":""}" onclick="toggleHaveAt(${i})">
-      <div class="c-ico">${have?"✓":""}</div>
+      <div class="c-ico">${cupboardIconHtml(n,40)}${have?'<span class="c-tick" aria-hidden="true">✓</span>':""}</div>
       <div><b>${esc(n)}</b><p>${esc(ingInfo(n).unit||"")}${have?" · skipped on the shop":""}</p></div>
     </button>`;
   }).join("");
@@ -3366,7 +3402,8 @@ function basketLineHtml(idx,staple){
   const s=preferredStoreObj();
   const r=s?shelfRow(b.i,s):null;
   const price=b.q*(r?Number(r.price_gbp):ingInfo(b.i).price);
-  return `<div class="bk-line">
+  return `<div class="bk-line${staple?" staple":""}">
+    ${staple?cupboardIconHtml(b.i,28):""}
     <div class="nm">${esc(b.i)}<div class="meta">${esc(packBuyLabel(b.i,b.q))}${r&&r.product_name?` · ${esc(r.product_name)}`:""}</div></div>
     <div class="qty">
       <button type="button" onclick="basketQtyAt(${idx},-1)">−</button>
@@ -4332,7 +4369,7 @@ if(typeof window!=="undefined"){
     setModifyPicks(a){modifyPicks=Array.isArray(a)?a:[];},
     modifyPicks:()=>modifyPicks,
     setAdvisor(proposed,idxs){advisorProposed=Array.isArray(proposed)?proposed:[];advisorPicked=new Set(idxs||[]);},
-    STAPLES,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
+    STAPLES,CUPBOARD_ICONS,CUPBOARD_ICON_FALLBACK,cupboardIconSrc,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
     tagsFor,mealTags,MEAL_TAGS,USER_MEAL_TAGS,wantedTags,clampMeals,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,deliveryFrom,orderDeliverTo,captureChargePence,
     splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,
   };

@@ -989,6 +989,65 @@ describe("pantry have-list", () => {
     assert.ok(!document.getElementById("ob-have-list").textContent.includes("rice"));
   });
 
+  it("I-C04 cupboard rows use a same-origin picture, and unknown names use the fallback", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const staples = window.__plentry.STAPLES;
+    window.nav("pantry");
+    const pantryImgs = [...document.querySelectorAll("#pantry-list img.cupboard-ico")];
+    assert.equal(pantryImgs.length, staples.length);
+    const srcs = new Set();
+    for (const img of pantryImgs) {
+      const src = img.getAttribute("src");
+      assert.match(src, /^\/vendor\/cupboard\/[a-z0-9-]+\.svg$/);
+      assert.doesNotMatch(src, /^https?:/);
+      assert.equal(img.getAttribute("width"), "40");
+      assert.equal(img.getAttribute("height"), "40");
+      assert.equal(img.getAttribute("alt"), "");
+      assert.equal(img.getAttribute("aria-hidden"), "true");
+      srcs.add(src);
+    }
+    assert.equal(srcs.size, staples.length);
+    assert.doesNotMatch(document.getElementById("pantry-list").innerHTML, /https?:\/\//);
+    const q = document.getElementById("pantry-q");
+    q.value = "paprika";
+    window.renderPantry();
+    const filtered = [...document.querySelectorAll("#pantry-list img.cupboard-ico")];
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].getAttribute("src"), "/vendor/cupboard/paprika.svg");
+    window.showObStep(6);
+    const ob = [...document.querySelectorAll("#ob-have-list img.cupboard-ico")];
+    assert.equal(ob.length, staples.length);
+    assert.doesNotMatch(document.getElementById("ob-have-list").innerHTML, /https?:\/\//);
+    window.toggleHaveAt(staples.indexOf("olive oil"));
+    const oil = [...document.querySelectorAll("#ob-have-list .choice")].find((b) => b.querySelector("b")?.textContent === "olive oil");
+    assert.ok(oil);
+    assert.equal(oil.querySelector("img.cupboard-ico").getAttribute("src"), "/vendor/cupboard/olive-oil.svg");
+    assert.equal(oil.querySelector("img.cupboard-ico").getAttribute("width"), "40");
+    assert.ok(oil.querySelector(".c-tick"));
+    assert.equal(window.cupboardIconSrc("garam masala"), "/vendor/cupboard/garam-masala.svg");
+    assert.equal(window.cupboardIconSrc("  Olive Oil "), "/vendor/cupboard/olive-oil.svg");
+    assert.equal(window.cupboardIconSrc("rice"), "/vendor/cupboard/fallback.svg");
+    assert.equal(window.cupboardIconSrc("not a spice yet"), "/vendor/cupboard/fallback.svg");
+    assert.equal(window.__plentry.CUPBOARD_ICON_FALLBACK, "fallback.svg");
+    window.syncBasketFromMeals();
+    window.openBasket();
+    const basketImgs = [...document.querySelectorAll("#basket-panel .bk-line.staple img.cupboard-ico")];
+    assert.ok(basketImgs.length > 0);
+    for (const img of basketImgs) {
+      assert.match(img.getAttribute("src"), /^\/vendor\/cupboard\/[a-z0-9-]+\.svg$/);
+      assert.doesNotMatch(img.getAttribute("src"), /^https?:/);
+      assert.equal(img.getAttribute("width"), "28");
+      assert.equal(img.getAttribute("height"), "28");
+      assert.equal(img.getAttribute("alt"), "");
+      assert.equal(img.getAttribute("aria-hidden"), "true");
+    }
+    const oilLine = [...document.querySelectorAll("#basket-panel .bk-line.staple")].find((row) => row.textContent.includes("olive oil"));
+    assert.equal(oilLine, undefined);
+    const saltLine = [...document.querySelectorAll("#basket-panel .bk-line.staple")].find((row) => row.textContent.includes("salt"));
+    assert.ok(saltLine);
+    assert.equal(saltLine.querySelector("img.cupboard-ico").getAttribute("src"), "/vendor/cupboard/salt.svg");
+  });
+
   it("completeIng fills spices on stale lists and keeps a complete list intact", async () => {
     const { window } = await loadApp({ localState: weekState() });
     const curry = window.completeIng({
