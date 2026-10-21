@@ -23,6 +23,12 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Legacy prefs.** `prefs.goals` and `prefs.budget` stay on the profile blob. No schema change. New accounts have `goals: []`, so goal weighting adds nothing. If dinner tags are empty, saved goals still map (`decide` / `shop` / `waste` → quick / meal_prep). The budget goal still does not map to a tag. A stored numeric budget still soft-caps the first New week pass and the under/over line. New accounts have no budget until Profile sets one. `pay` does not read either field.
 - **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
 
+## 2026-10-19 — Claude review runs only when asked
+
+- **CI.** `.github/workflows/claude-review.yml` no longer runs on pull_request opened, synchronize, or reopened. It runs on `pull_request` `labeled`, and the job runs only when the label name is `claude-review`. Adding that label reviews the pull request's current head once. Remove the label and add it again to run another review. The prompt, `claude_args` (`--model opus`, `--fallback-model sonnet`, `--max-turns 100`, `--json-schema`, allowed tools), `allowed_bots`, the `ANTHROPIC_API_KEY` secret, and the `APPROVE` step are unchanged. A pull request that never gets the label has no `claude-review` check. Another label skips the job. It is not a required check.
+- **Why.** A run costs about $0.50, which is too much to pay on every push. The plan is to run it once as a full check after onboarding, cupboard pictures, and Modify are done. See [RUNBOOK.md](RUNBOOK.md).
+- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+
 ## 2026-10-19 — Claude review uses a pay-per-use API key
 
 - **Merged:** squash commit `1599a417fc564fe5368fad53c96da77eeab2cd5f` on `main`. PR #19.
