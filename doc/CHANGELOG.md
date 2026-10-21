@@ -2,6 +2,27 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-19 — Clearing the Profile budget turns it off
+
+- **Clear.** An empty or whitespace-only weekly budget on Profile saves `prefs.budget` as null. New week then has no ×1.2 cap, and the week screen has no under/over line. The household postcode shown in the delivery postcode box does not block that save. A real delivery edit still has to be complete.
+- **Junk.** A non-numeric value, or a number below 1, is not stored. The saved budget stays as it was. A number above 500 is still clamped to 500.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
+## 2026-10-19 — New accounts have no default budget
+
+- **Unset.** `prefs.budget` is null for a new account. Loading local or cloud state does not fill £60 when the blob has no number. A stored number, including a previously saved £60, stays. Junk in the blob becomes null and is not rendered.
+- **No budget.** New week fills without the ×1.2 first-pass cap. The week screen omits the under/over line, so it never shows £0 or NaN. Profile shows an empty field.
+- **Set later.** Typing a whole-pound budget on Profile (1–500) stores it. The cap and the line then apply.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
+## 2026-10-19 — Onboarding drops goals and budget
+
+- **Steps.** Onboarding is shop → what you eat (everything / vegetarian / vegan / pescatarian, stored as `prefs.diet`) → dinner tags → household and UK postcode → dinners per week → cupboard. The goals step and the budget slider are gone. The postcode field moved onto household; that was the only place it was collected.
+- **Diet.** Vegetarian, vegan, and pescatarian filter New week and Modify. Vegetarian keeps vegetarian and vegan. Vegan keeps vegan. Pescatarian drops meat. Omnivore still prefers meat and fish and does not hide meals.
+- **Tags.** Meal prep is not offered as a new chip on onboarding or Profile. A saved `meal_prep` tag still shows, so it can be turned off, and it still weights the week until then.
+- **Legacy prefs.** `prefs.goals` and `prefs.budget` stay on the profile blob. No schema change. New accounts have `goals: []`, so goal weighting adds nothing. If dinner tags are empty, saved goals still map (`decide` / `shop` / `waste` → quick / meal_prep). The budget goal still does not map to a tag. A stored numeric budget still soft-caps the first New week pass and the under/over line. New accounts have no budget until Profile sets one. `pay` does not read either field.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-19 — Claude review runs only when asked
 
 - **CI.** `.github/workflows/claude-review.yml` no longer runs on pull_request opened, synchronize, or reopened. It runs on `pull_request` `labeled`, and the job runs only when the label name is `claude-review`. Adding that label reviews the pull request's current head once. Remove the label and add it again to run another review. The prompt, `claude_args` (`--model opus`, `--fallback-model sonnet`, `--max-turns 100`, `--json-schema`, allowed tools), `allowed_bots`, the `ANTHROPIC_API_KEY` secret, and the `APPROVE` step are unchanged. A pull request that never gets the label has no `claude-review` check. Another label skips the job. It is not a required check.

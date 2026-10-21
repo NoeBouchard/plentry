@@ -49,6 +49,7 @@ Coverage: **covered** = `npm test` already guards it. **ops** = founder/manual (
 | I-W01 | Week length is exactly `prefs.meals` (1–7). Modify and advisor cannot grow it. | covered |
 | I-W02 | New week / Modify pick **verified** meals only when a live pool exists. Not `ai("meal_options")`. | covered |
 | I-W03 | Default diet **omnivore**: meat/fish first, at most one vegetarian/vegan dinner. | covered |
+| I-W07 | `prefs.diet` vegetarian / vegan / pescatarian is a hard filter on New week (`autoPickWeek`) and Modify. Vegetarian keeps vegetarian and vegan. Vegan keeps vegan. Pescatarian drops meat. Omnivore does not hide meals. | covered — jsdom |
 | I-W04 | `validMeal`: every `ing` key is in `INGREDIENTS`. Unknown keys drop the meal. | covered |
 | I-W05 | Closed tag set (11 tags: diet, dinner, quick, meal_prep, comfort_food, high_protein, low_calorie, low_carb); AI new rows `reviewed_at` null until Meals **Verify**. Tags are stored data; the DB only derives diet/quick/dinner via `meal_tags_for` + trigger. Vegan dishes carry BOTH `vegan` AND `vegetarian`. `MEAL_TAGS` identical in `index.html`, `ai/index.ts`, and `meals_tags_shape` CHECK. | covered — contracts |
 | I-W06 | Every verified meal has exactly one category from 7 values (`pasta`, `rice_bowl`, `oven_bake`, `tacos_wraps`, `curry_stew`, `eggs`, `salad`); CHECK constraint. Category allowed null when `reviewed_at` is null. Meals admin UI requires category to Verify & publish. `MEAL_CATEGORIES` identical in `index.html`, `ai/index.ts`, and `meals_category_check` CHECK. | covered — contracts + admin verify test |
@@ -68,7 +69,7 @@ Coverage: **covered** = `npm test` already guards it. **ops** = founder/manual (
 |---|---|---|
 | I-X01 | Untrusted strings through `esc`. URLs through `safeUrl` (http/https only). Meal onclick uses indexes, not names. | covered |
 | I-X02 | Redirects are exact-origin: `checkout` bag `redirect_url` must have origin `https://getplentry.com` (`appRedirect`); the client assigns `location.href` only to a `https://checkout.stripe.com` URL (`stripeCheckoutUrl`). No other `location.href=` sites. | covered — jsdom + contracts |
-| I-X03 | Cloud `profiles.state` is untrusted JSON: `prefs.budget` normalised in `loadCloudState`, `esc()` at render. | covered — jsdom |
+| I-X03 | Cloud `profiles.state` is untrusted JSON: `prefs.budget` normalised in `loadCloudState` (missing or junk becomes null, not £60), `esc()` at render when a number is shown. | covered — jsdom |
 | I-A01 | No React/Next/bundler. App is `index.html` + Edge Functions. | ops + playbook (do not add a test that loads Next) |
 | I-A02 | No secrets in `index.html` or `doc/`. Publishable Supabase key only. | ops |
 | I-A03 | `cd plentry && npm test` must exit 0 before any production deploy. GitHub Actions **test** must be green before merge. Merge is not production. | ops — playbook / Cursor rule / ENGINEERING.md |

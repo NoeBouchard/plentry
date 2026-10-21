@@ -383,8 +383,10 @@ describe("source contracts", () => {
   });
 
   it("I-X03 cloud prefs.budget is normalised on load and escaped at render (S-12)", () => {
-    assert.match(html, /S\.prefs\.budget=normBudget\(S\.prefs\.budget,60\);/);
-    assert.match(html, /under your £\$\{esc\(S\.prefs\.budget\)\} budget/);
+    assert.match(html, /S\.prefs\.budget=normBudget\(S\.prefs\.budget,null\);/);
+    assert.doesNotMatch(html, /normBudget\(S\.prefs\.budget,60\)/);
+    assert.match(html, /budget==null\?"":/);
+    assert.match(html, /under your £\$\{esc\(budget\)\} budget/);
   });
 
   it("I-A07 password minimum is 8 in the client (S-14; mirror in Supabase Auth settings)", () => {
@@ -423,7 +425,12 @@ describe("source contracts", () => {
     assert.match(html, /Do NOT keep spices you already have/);
     assert.match(html, /I already have — skip/);
     assert.match(html, /class="meal-bar"/);
-    assert.match(html, /id="ob-7"/);
+    assert.match(html, /id="ob-6"/);
+    assert.doesNotMatch(html, /id="ob-7"/);
+    assert.doesNotMatch(html, /What's your budget/);
+    assert.doesNotMatch(html, /What do you need help with/);
+    assert.match(html, /What you eat/);
+    assert.match(html, /mealFitsDiet\(m\)/);
     assert.match(html, /id="pr-tags"/);
     assert.match(html, /const USER_MEAL_TAGS=/);
     assert.match(html, /function toggleUserTag/);

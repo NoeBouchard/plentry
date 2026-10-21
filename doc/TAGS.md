@@ -55,7 +55,7 @@ Stored in `meals.category` (CHECK constraint). Category is allowed to be null wh
 
 ## User prefs (`prefs.tags`)
 
-Onboarding step 2 and Profile → Dinner tags store a subset of the use-case/nutrition tags (`quick`, `meal_prep`, `high_protein`, `low_calorie`, `low_carb`, `comfort_food`). Diet stays `prefs.diet`. New week / Modify prefer meals matching `prefs.tags` when that list is non-empty; otherwise they map onboarding **goals** (`decide`/`shop`/`waste`) to `quick` / `meal_prep`. `budget` goal no longer steers to `low_calorie`.
+Onboarding dinner tags and Profile → Dinner tags store a subset of the use-case/nutrition tags (`quick`, `high_protein`, `low_calorie`, `low_carb`, `comfort_food`). `meal_prep` is not offered unless it is already saved, so a legacy selection can be turned off and still weights until then. Diet stays `prefs.diet` (`omnivore` / `vegetarian` / `vegan` / `pescatarian`), chosen on the What you eat step. New week / Modify prefer meals matching `prefs.tags` when that list is non-empty; otherwise they map saved onboarding **goals** (`decide`/`shop`/`waste`) to `quick` / `meal_prep`. A new account has `goals: []`, so that map adds nothing. `budget` goal does not steer to `low_calorie`. Vegetarian, vegan, and pescatarian filter New week and Modify; omnivore does not.
 
 **Migration:** Users' saved `gym` pref was migrated to `high_protein`. Old `breakfast`, `lunch`, and `snack` tags were dropped.
 

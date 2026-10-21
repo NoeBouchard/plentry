@@ -96,7 +96,7 @@ describe("xss and urls", () => {
     assert.equal(window.stripeCheckoutUrl(null), null);
   });
 
-  it("I-X03 a hostile cloud prefs.budget is coerced to a number before it reaches renderMenu", async () => {
+  it("I-X03 a hostile cloud prefs.budget becomes null and is not rendered", async () => {
     const st = weekState();
     st.prefs.budget = `<img src=x onerror="alert(1)">`;
     const { window, document } = await loadApp({
@@ -104,10 +104,15 @@ describe("xss and urls", () => {
       tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u1", state: st }] },
     });
     const S = window.__plentry.state();
-    assert.equal(S.prefs.budget, 60, "normBudget fallback replaces junk from the profiles blob");
+    assert.equal(S.prefs.budget, null, "junk from the profiles blob is unset, not replaced with £60");
     window.renderMenu();
-    assert.equal(document.getElementById("menu-week").querySelector('img[src="x"]'), null);
-    assert.ok(document.body.innerHTML.includes("your £60 budget"));
+    const week = document.getElementById("menu-week");
+    assert.equal(week.querySelector('img[src="x"]'), null);
+    assert.equal(week.querySelector(".week-under"), null);
+    assert.equal(week.innerHTML.includes("NaN"), false);
+    assert.equal(week.innerHTML.includes("£0 budget"), false);
+    assert.equal(week.innerHTML.includes("under your"), false);
+    assert.equal(week.innerHTML.includes("over your"), false);
   });
 
   it("renderMenu does not execute meal-name markup", async () => {
@@ -142,11 +147,16 @@ describe("postcode and budget", () => {
     assert.equal(window.normPostcode(""), null);
   });
 
-  it("clamps budget to 1–500", async () => {
+  it("clamps budget to 1–500 and leaves an unset budget null", async () => {
     const { window } = await loadApp();
     assert.equal(window.normBudget(60, 40), 60);
     assert.equal(window.normBudget(9999, 40), 500);
     assert.equal(window.normBudget("nope", 40), 40);
+    assert.equal(window.normBudget(null, null), null);
+    assert.equal(window.normBudget(undefined, null), null);
+    assert.equal(window.normBudget("", null), null);
+    assert.equal(window.normBudget("80", null), 80);
+    assert.equal(window.normBudget(0, null), null);
   });
 
   it("I-A07 submitAuth rejects passwords under 8 characters before calling Supabase", async () => {
@@ -163,6 +173,213 @@ describe("postcode and budget", () => {
     document.getElementById("su-pass").value = "12345678";
     await window.submitAuth();
     assert.equal(called, 1, "8 characters reaches signUp");
+  });
+});
+
+describe("unset budget", () => {
+  function budgetMeals() {
+    return [
+      { name: "Cheap meat", emoji: "🥩", time: 30, ing: ["chickpeas", "onions", "garlic"], tags: ["dinner", "meat"] },
+      { name: "Dear fish", emoji: "🐟", time: 30, ing: ["salmon fillet", "olive oil", "parmesan", "potatoes", "lemons"], tags: ["dinner", "fish"] },
+      { name: "Cheap veg", emoji: "🥗", time: 30, ing: ["chickpeas", "rice", "onions"], tags: ["dinner", "vegetarian"] },
+    ];
+  }
+
+  function arm(window, meals) {
+    const S = window.__plentry.state();
+    S.prefs.preferredStore = "tesco";
+    S.prefs.diet = "omnivore";
+    S.prefs.tags = [];
+    S.prefs.goals = [];
+    S.prefs.meals = 2;
+    S.prefs.servings = 2;
+    S.weekServings = 2;
+    S.menuOptions = meals;
+    S.selected = [];
+    return S;
+  }
+
+  function tightBudget(window, meals) {
+    const store = window.preferredStoreObj();
+    const cost = (name) => window.mealNeedCost(meals.find((m) => m.name === name), store);
+    const first = cost("Cheap meat");
+    const skip = cost("Dear fish");
+    const fit = cost("Cheap veg");
+    const lo = (store.fee + first + fit) / 1.2;
+    const hi = (store.fee + first + skip) / 1.2;
+    assert.ok(skip > fit, `fish ${skip} should cost more than veg ${fit}`);
+    assert.ok(hi - lo > 1, `no whole-pound gap between ${lo} and ${hi}`);
+    const budget = Math.ceil(lo);
+    assert.ok(budget * 1.2 >= store.fee + first + fit, String(budget));
+    assert.ok(budget * 1.2 < store.fee + first + skip, String(budget));
+    return budget;
+  }
+
+  function assertNoBudgetLine(document) {
+    const week = document.getElementById("menu-week");
+    assert.equal(week.querySelector(".week-under"), null);
+    assert.equal(week.innerHTML.includes("NaN"), false);
+    assert.equal(week.innerHTML.includes("£0 budget"), false);
+    assert.equal(week.innerHTML.includes("under your"), false);
+    assert.equal(week.innerHTML.includes("over your"), false);
+  }
+
+  it("a new account has no budget, so New week has no cap and the week has no line", async () => {
+    const fresh = await loadApp();
+    assert.equal(fresh.window.__plentry.state().prefs.budget, null);
+
+    const local = weekState();
+    delete local.prefs.budget;
+    const missingLocal = await loadApp({ localState: local });
+    assert.equal(missingLocal.window.__plentry.state().prefs.budget, null);
+
+    const cloud = weekState();
+    delete cloud.prefs.budget;
+    cloud.menuOptions = budgetMeals();
+    cloud.selected = [];
+    cloud.prefs.meals = 2;
+    const { window, document } = await loadApp({
+      session: { id: "u-new", email: "new@example.com" },
+      tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u-new", state: cloud }] },
+    });
+    const S = arm(window, budgetMeals());
+    assert.equal(S.prefs.budget, null);
+    const open = tightBudget(window, S.menuOptions);
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected), ["Cheap meat", "Dear fish"]);
+    window.renderMenu();
+    assertNoBudgetLine(document);
+
+    S.prefs.budget = open;
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected), ["Cheap meat", "Cheap veg"], "the same pool is capped once a number is set");
+    S.prefs.budget = null;
+  });
+
+  it("a stored numeric budget still caps New week and shows the line", async () => {
+    const probe = await loadApp({ localState: weekState() });
+    const meals = budgetMeals();
+    arm(probe.window, meals);
+    const open = tightBudget(probe.window, meals);
+
+    const saved = weekState();
+    saved.prefs.budget = open;
+    saved.prefs.meals = 2;
+    saved.menuOptions = meals;
+    saved.selected = [];
+    const { window, document } = await loadApp({
+      session: { id: "u-old", email: "old@example.com" },
+      tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u-old", state: saved }] },
+    });
+    const S = window.__plentry.state();
+    assert.equal(S.prefs.budget, open);
+    S.menuOptions = meals;
+    S.prefs.meals = 2;
+    S.prefs.tags = [];
+    S.prefs.goals = [];
+    S.prefs.diet = "omnivore";
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected), ["Cheap meat", "Cheap veg"]);
+    window.renderMenu();
+    const week = document.getElementById("menu-week");
+    assert.ok(week.querySelector(".week-under"));
+    assert.ok(week.innerHTML.includes(`your £${open} budget`));
+    assert.equal(week.innerHTML.includes("NaN"), false);
+
+    const legacyDefault = weekState();
+    legacyDefault.prefs.budget = 60;
+    const kept = await loadApp({
+      session: { id: "u-60", email: "sixty@example.com" },
+      tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u-60", state: legacyDefault }] },
+    });
+    assert.equal(kept.window.__plentry.state().prefs.budget, 60);
+    kept.window.renderMenu();
+    assert.ok(kept.document.getElementById("menu-week").innerHTML.includes("your £60 budget"));
+
+    const asString = weekState();
+    asString.prefs.budget = "80";
+    const numeric = await loadApp({
+      session: { id: "u-80", email: "eighty@example.com" },
+      tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u-80", state: asString }] },
+    });
+    assert.equal(numeric.window.__plentry.state().prefs.budget, 80);
+    numeric.window.renderMenu();
+    assert.ok(numeric.document.getElementById("menu-week").innerHTML.includes("your £80 budget"));
+  });
+
+  it("Profile can set a budget, and then the cap and the line apply", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const meals = budgetMeals();
+    const S = arm(window, meals);
+    S.prefs.budget = null;
+    const open = tightBudget(window, meals);
+    window.renderProfile();
+    assert.equal(document.getElementById("pr-budget").value, "");
+    window.saveProfile();
+    assert.equal(S.prefs.budget, null);
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected), ["Cheap meat", "Dear fish"]);
+    window.renderMenu();
+    assertNoBudgetLine(document);
+
+    document.getElementById("pr-budget").value = String(open);
+    window.saveProfile();
+    assert.equal(S.prefs.budget, open);
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected), ["Cheap meat", "Cheap veg"]);
+    window.renderMenu();
+    const week = document.getElementById("menu-week");
+    assert.ok(week.querySelector(".week-under"));
+    assert.ok(week.innerHTML.includes(`your £${open} budget`));
+    assert.equal(week.innerHTML.includes("NaN"), false);
+    assert.equal(document.getElementById("pr-budget").value, String(open));
+  });
+
+  it("emptying the Profile budget clears it, so the cap and the line turn off", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const meals = budgetMeals();
+    const S = arm(window, meals);
+    const open = tightBudget(window, meals);
+    S.prefs.budget = open;
+    window.renderProfile();
+    const field = document.getElementById("pr-budget");
+    assert.equal(field.value, String(open));
+
+    field.value = "";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, null);
+    assert.match(document.getElementById("pr-saved").textContent, /Saved/);
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected), ["Cheap meat", "Dear fish"]);
+    window.renderMenu();
+    assertNoBudgetLine(document);
+
+    S.prefs.budget = open;
+    window.renderProfile();
+    field.type = "text";
+    field.value = "   ";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, null, "whitespace-only clears the budget");
+
+    S.prefs.budget = open;
+    window.renderProfile();
+    field.type = "text";
+    field.value = "nope";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, open, "non-numeric input keeps the saved budget");
+    field.value = "0";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, open, "below £1 keeps the saved budget");
+    field.value = "9999";
+    window.saveProfile();
+    assert.equal(S.prefs.budget, 500, "above £500 still clamps to 500");
+
+    S.prefs.budget = open;
+    window.renderProfile();
+    field.value = "";
+    Object.defineProperty(field, "validity", { configurable: true, get() { return { badInput: true }; } });
+    window.saveProfile();
+    assert.equal(S.prefs.budget, open, "a number field that rejected typed junk keeps the saved budget");
   });
 });
 
@@ -252,6 +469,98 @@ describe("week and modify", () => {
     assert.ok(S.selected.includes(extras[0].name));
   });
 
+  it("I-W07 vegetarian, vegan and pescatarian filter New week and Modify", async () => {
+    const veganA = { name: "Vegan one", emoji: "🥗", time: 20, ing: ["chickpeas", "rice", "spinach", "onions", "garlic"], tags: ["dinner", "vegan", "vegetarian"], id: 1, reviewed_at: "2026-09-01" };
+    const veganB = { name: "Vegan two", emoji: "🥗", time: 25, ing: ["chickpeas", "tomatoes", "rice", "onions"], tags: ["dinner", "vegan", "vegetarian"], id: 2, reviewed_at: "2026-09-01" };
+    const veg = { name: "Veg eggs", emoji: "🍳", time: 20, ing: ["eggs", "passata", "onions", "feta"], tags: ["dinner", "vegetarian"], id: 3, reviewed_at: "2026-09-01" };
+    const fish = { name: "Fish supper", emoji: "🐟", time: 25, ing: ["salmon fillet", "potatoes", "lemons"], tags: ["dinner", "fish"], id: 4, reviewed_at: "2026-09-01" };
+    const meat = { name: "Meat supper", emoji: "🍝", time: 30, ing: ["minced beef", "spaghetti", "onions", "garlic"], tags: ["dinner", "meat"], id: 5, reviewed_at: "2026-09-01" };
+    const pool = [veganA, veganB, veg, fish, meat];
+    const { window } = await loadApp({
+      localState: weekState(),
+      tables: { meals: pool, orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.menuOptions = pool;
+    S.prefs.budget = 500;
+    S.prefs.tags = [];
+    S.prefs.goals = [];
+
+    S.prefs.diet = "vegetarian";
+    S.prefs.meals = 3;
+    window.autoPickWeek();
+    assert.equal(S.selected.length, 3);
+    S.selected.forEach((n) => {
+      const d = window.__plentry.mealDiet(window.mealByName(n));
+      assert.ok(d === "vegetarian" || d === "vegan", `${n} ${d}`);
+    });
+
+    S.prefs.diet = "vegan";
+    S.prefs.meals = 2;
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected).sort(), ["Vegan one", "Vegan two"]);
+
+    S.prefs.diet = "pescatarian";
+    S.prefs.meals = 4;
+    window.autoPickWeek();
+    assert.equal(S.selected.length, 4);
+    assert.equal(S.selected.includes("Meat supper"), false);
+    assert.ok(S.selected.includes("Fish supper"));
+
+    S.prefs.diet = "vegetarian";
+    S.selected = ["Veg eggs"];
+    await window.openModify(0);
+    window.__plentry.modifyPicks().forEach((m) => {
+      const d = window.__plentry.mealDiet(m);
+      assert.ok(d === "vegetarian" || d === "vegan", m.name);
+    });
+
+    S.prefs.diet = "vegan";
+    S.selected = ["Vegan one"];
+    await window.openModify(0);
+    const veganPicks = window.__plentry.modifyPicks();
+    assert.ok(veganPicks.length >= 1);
+    veganPicks.forEach((m) => assert.equal(window.__plentry.mealDiet(m), "vegan", m.name));
+
+    S.prefs.diet = "pescatarian";
+    S.selected = ["Fish supper"];
+    await window.openModify(0);
+    const fishPicks = window.__plentry.modifyPicks();
+    assert.ok(fishPicks.some((m) => window.__plentry.mealDiet(m) === "fish" || window.__plentry.mealDiet(m) === "vegetarian" || window.__plentry.mealDiet(m) === "vegan"));
+    fishPicks.forEach((m) => assert.notEqual(window.__plentry.mealDiet(m), "meat", m.name));
+  });
+
+  it("saved goals and budget still apply, and missing goals add no weight", async () => {
+    const { window } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    const quick = { name: "Quick bowl", time: 20, ing: ["chickpeas", "rice", "onions"], tags: ["dinner", "vegan", "vegetarian", "quick"] };
+    const plain = { name: "Plain bowl", time: 40, ing: ["chickpeas", "rice", "onions"], tags: ["dinner", "vegan", "vegetarian"] };
+    S.prefs.diet = "vegan";
+    S.prefs.tags = [];
+    S.prefs.goals = ["decide", "budget", "variety"];
+    S.prefs.budget = 80;
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), ["quick"]);
+    assert.ok(window.__plentry.scoreMeal(quick) > window.__plentry.scoreMeal(plain));
+    S.prefs.goals = [];
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), []);
+    assert.equal(window.__plentry.scoreMeal(quick), window.__plentry.scoreMeal(plain));
+    S.prefs.goals = ["shop", "waste"];
+    S.prefs.tags = ["meal_prep"];
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), ["meal_prep"]);
+    S.menuOptions = [quick, plain, { name: "Meat supper", time: 30, ing: ["minced beef", "onions", "garlic"], tags: ["dinner", "meat"] }];
+    S.prefs.meals = 2;
+    window.autoPickWeek();
+    assert.deepEqual(Array.from(S.selected).sort(), ["Plain bowl", "Quick bowl"]);
+    assert.equal(S.prefs.budget, 80);
+    assert.deepEqual(Array.from(S.prefs.goals), ["shop", "waste"]);
+    S.prefs.tags = [];
+    S.prefs.goals = null;
+    assert.deepEqual(Array.from(window.__plentry.wantedTags()), []);
+    window.autoPickWeek();
+    assert.equal(S.selected.length, 2);
+    assert.equal(S.prefs.budget, 80);
+  });
+
   it("openModify offers 5 catalog dinners and does not call the AI", async () => {
     const dbMeals = extraMeals().concat([
       { name: "Lemon chicken & parmesan rice", emoji: "🍋", time: 30, ing: ["chicken thighs", "rice", "lemons", "garlic", "parmesan"] },
@@ -328,7 +637,7 @@ describe("week and modify", () => {
 
   it("meal count bar covers 1–7 dinners on onboarding and Profile", async () => {
     const { window, document } = await loadApp({ localState: weekState() });
-    window.showObStep(6);
+    window.showObStep(5);
     window.pickMealCount(1);
     assert.equal(window.__plentry.state().prefs.meals, 1);
     assert.equal(window.__plentry.clampMeals(0), 5);
@@ -349,11 +658,97 @@ describe("week and modify", () => {
     assert.equal(window.__plentry.wantedTags().join(","), "quick");
     window.toggleUserTag("high_protein");
     assert.equal(window.__plentry.wantedTags().join(","), "high_protein");
-    window.showObStep(2);
+    window.showObStep(3);
     assert.ok(document.getElementById("ob-tags").textContent.includes("High protein"));
+    assert.ok(!document.getElementById("ob-tags").textContent.includes("Meal prep"));
+    window.showObStep(2);
     assert.ok(document.getElementById("ob-diet").textContent.includes("Everything"));
     window.nav("profile");
     assert.ok(document.getElementById("pr-tags").textContent.includes("High protein"));
+    assert.ok(!document.getElementById("pr-tags").textContent.includes("Meal prep"));
+  });
+});
+
+describe("onboarding order", () => {
+  function shown(document) {
+    return ["ob-1", "ob-2", "ob-3", "ob-4", "ob-5", "ob-6"].filter((id) => {
+      const el = document.getElementById(id);
+      return el && el.style.display !== "none";
+    });
+  }
+
+  it("steps are shop, what you eat, dinner tags, household, dinners, cupboard", async () => {
+    const { window, document } = await loadApp();
+    assert.deepEqual(shown(document), ["ob-1"]);
+    assert.ok(document.getElementById("ob-1").textContent.includes("Choose your shop"));
+    assert.equal(document.getElementById("ob-7"), null);
+    assert.equal(document.getElementById("ob-goals"), null);
+    assert.equal(document.getElementById("ob-budget"), null);
+    const onboard = document.getElementById("scr-onboard").textContent;
+    assert.ok(!onboard.includes("What's your budget"));
+    assert.ok(!onboard.includes("What do you need help with"));
+    assert.equal(document.querySelectorAll("#scr-onboard .steps i").length, 6);
+
+    window.obNext(2);
+    assert.deepEqual(shown(document), ["ob-1"]);
+    assert.ok(document.getElementById("ob-store-err").textContent.includes("supermarket"));
+    window.pickPreferredStore("tesco");
+    window.obNext(2);
+    assert.deepEqual(shown(document), ["ob-2"]);
+    const diet = document.getElementById("ob-diet").textContent;
+    assert.ok(diet.includes("Everything"));
+    assert.ok(diet.includes("Vegetarian"));
+    assert.ok(diet.includes("Vegan"));
+    assert.ok(diet.includes("Pescatarian"));
+    const buttons = [...document.querySelectorAll("#ob-diet .choice.sel")];
+    assert.equal(buttons.length, 1);
+    assert.equal(window.__plentry.state().prefs.diet, "omnivore");
+    window.pickDiet("vegan");
+    window.pickDiet("vegetarian");
+    assert.equal(window.__plentry.state().prefs.diet, "vegetarian");
+    assert.equal(document.querySelectorAll("#ob-diet .choice.sel").length, 1);
+
+    window.obNext(3);
+    assert.deepEqual(shown(document), ["ob-3"]);
+    const tags = document.getElementById("ob-tags").textContent;
+    assert.ok(tags.includes("Quick"));
+    assert.ok(tags.includes("Comfort"));
+    assert.ok(!tags.includes("Meal prep"));
+
+    window.obNext(4);
+    assert.deepEqual(shown(document), ["ob-4"]);
+    assert.ok(document.getElementById("ob-servings-note").textContent.includes("Cooking for"));
+    document.getElementById("ob-postcode").value = "e28aa";
+    window.obNext(5);
+    assert.deepEqual(shown(document), ["ob-5"]);
+    assert.equal(window.__plentry.state().prefs.postcode, "E2 8AA");
+    assert.equal(window.__plentry.state().prefs.servings, 2);
+    assert.equal(window.__plentry.state().prefs.budget, null);
+    assert.equal(document.querySelectorAll("#ob-meals-picks .meal-seg").length, 7);
+
+    window.pickMealCount(4);
+    window.obNext(6);
+    assert.deepEqual(shown(document), ["ob-6"]);
+    assert.equal(window.__plentry.state().prefs.meals, 4);
+    assert.ok(document.getElementById("ob-have-list").textContent.includes("olive oil"));
+    assert.ok(!document.getElementById("ob-have-list").textContent.includes("rice"));
+  });
+
+  it("dinner tag chips never offer meal_prep, and a saved meal_prep tag still weights", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.prefs.tags = [];
+    S.prefs.goals = ["decide"];
+    window.showObStep(3);
+    assert.ok(!document.getElementById("ob-tags").textContent.includes("Meal prep"));
+    S.prefs.tags = ["meal_prep", "quick"];
+    window.showObStep(3);
+    assert.ok(document.getElementById("ob-tags").textContent.includes("Meal prep"));
+    assert.ok(document.getElementById("ob-tags").textContent.includes("Quick"));
+    assert.deepEqual(Array.from(S.prefs.tags), ["meal_prep", "quick"]);
+    assert.equal(window.__plentry.wantedTags().join(","), "meal_prep,quick");
+    window.nav("profile");
+    assert.ok(document.getElementById("pr-tags").textContent.includes("Meal prep"));
   });
 });
 
@@ -541,7 +936,7 @@ describe("pantry have-list", () => {
     assert.ok(!window.__plentry.getBasket().some((b) => b.i === "onions"));
     window.nav("pantry");
     assert.ok(document.getElementById("pantry-list").textContent.includes("skipped on the shop"));
-    window.showObStep(7);
+    window.showObStep(6);
     assert.ok(document.getElementById("ob-have-list").textContent.includes("onions"));
     assert.ok(!document.getElementById("ob-have-list").textContent.includes("rice"));
   });
