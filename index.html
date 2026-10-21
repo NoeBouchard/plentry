@@ -314,7 +314,7 @@
       <select id="ob-size" style="display:none"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
       <p class="sub" id="ob-servings-note" style="text-align:center">Cooking for 2.</p>
       <label for="ob-postcode">Postcode</label>
-      <input id="ob-postcode" value="E2 8AA" placeholder="Postcode" maxlength="8" style="margin:8px 0">
+      <input id="ob-postcode" placeholder="e.g. E2 8AA" maxlength="8" style="margin:8px 0">
       <div class="err" id="ob-err"></div>
       <button class="btn" style="width:100%" onclick="obNext(5)">Continue</button>
     </div>
@@ -390,7 +390,7 @@
       <h2 id="pr-hello">Profile</h2>
       <p class="sub" id="pr-email"></p>
       <div class="grid2">
-        <div><label>Postcode</label><input id="pr-postcode" maxlength="8"></div>
+        <div><label>Postcode</label><input id="pr-postcode" placeholder="e.g. E2 8AA" maxlength="8"></div>
         <div><label>Household size</label><select id="pr-size" onchange="onProfileSize()"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
         <div><label>Weekly budget (£)</label><input id="pr-budget" type="number" min="1" max="500" step="1"></div>
         <div><label>Preferred supermarket</label><select id="pr-store"><option value="">No preference</option></select></div>
@@ -1280,7 +1280,7 @@ function mealThumbHtml(m){
 // ---------- STATE ----------
 const DEFAULTS={
   user:null,
-  prefs:{meals:5,size:"2",servings:2,budget:null,postcode:"E2 8AA",preferredStore:"",goals:[],tags:[],diet:"omnivore",delivery:null},
+  prefs:{meals:5,size:"2",servings:2,budget:null,postcode:"",preferredStore:"",goals:[],tags:[],diet:"omnivore",delivery:null},
   weekServings:null,
   pantry:{},
   menuOptions:[],   // AI-suggested meals for the week
@@ -1295,6 +1295,7 @@ if(!Array.isArray(S.prefs.goals))S.prefs.goals=[];
 if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
 if(!S.prefs.diet)S.prefs.diet="omnivore";
 S.prefs.budget=normBudget(S.prefs.budget,null); // local blob is untrusted too; never fill £60 for a missing budget
+S.prefs.postcode=normPostcode(S.prefs.postcode)||""; // a missing postcode stays empty; a saved one is kept
 S.prefs.meals=clampMeals(S.prefs.meals);
 S.prefs.servings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));
 if(S.weekServings==null)S.weekServings=S.prefs.servings;
@@ -1345,6 +1346,7 @@ async function loadCloudState(user){
   if(!Array.isArray(S.prefs.tags))S.prefs.tags=[];
   S.prefs.tags=normalizePrefTags(S.prefs.tags);
   S.prefs.budget=normBudget(S.prefs.budget,null); // cloud blob is user-writable JSON, never trust its shape (S-12)
+  S.prefs.postcode=normPostcode(S.prefs.postcode)||"";
   S.prefs.meals=clampMeals(S.prefs.meals);
   S.prefs.delivery=deliveryFrom(S.prefs.delivery);
   save();
@@ -4183,7 +4185,7 @@ async function refreshInboxBadge(){
 function renderProfile(){
   document.getElementById("pr-hello").textContent=S.user?`Hey ${S.user.name} 👋`:"Your kitchen";
   document.getElementById("pr-email").textContent=S.user?S.user.email:"Log in to save this week across devices and check out.";
-  document.getElementById("pr-postcode").value=S.prefs.postcode;
+  document.getElementById("pr-postcode").value=S.prefs.postcode||"";
   document.getElementById("pr-size").value=S.prefs.size==="4+"?"4":String(sizeNum());
   renderServingsControl("pr-servings");
   const prNote=document.getElementById("pr-servings-note");

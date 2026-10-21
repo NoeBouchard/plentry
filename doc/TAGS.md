@@ -43,9 +43,9 @@ Every verified meal has exactly one category from:
 
 Stored in `meals.category` (CHECK constraint). Category is allowed to be null when `reviewed_at` is null (draft meals). The Meals admin UI requires a category to Verify & publish.
 
-## Live catalog (6 Oct 2026)
+## Live catalog (21 Oct 2026)
 
-77 dinners, all reviewed and categorized: **33 meat**, **11 fish**, **28 vegetarian**, **5 vegan**.
+77 rows. **52 reviewed:** **21 meat**, **8 fish**, **17 vegetarian**, **6 vegan**. The other 25 are unpublished and stay off New week. Vegetarian New week can also use the 6 vegan dinners (23). Pescatarian drops the 21 meat dinners (31). The 6 Oct 2026 backfill had all 77 reviewed (33 meat, 11 fish, 28 vegetarian, 5 vegan); some have since been unpublished.
 
 ## How they get set
 

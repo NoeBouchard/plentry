@@ -46,7 +46,7 @@ Coverage: **covered** = `npm test` already guards it. **ops** = founder/manual (
 
 | ID | Rule | Coverage |
 |---|---|---|
-| I-W01 | Week length is exactly `prefs.meals` (1–7). Modify and advisor cannot grow it. | covered |
+| I-W01 | Week length is at most `prefs.meals` (1–7), and exactly that many when enough published meals fit the diet. It is shorter when they do not. Modify and advisor cannot grow it past N. | covered |
 | I-W02 | New week / Modify pick **verified** meals only when a live pool exists. Not `ai("meal_options")`. | covered |
 | I-W03 | Default diet **omnivore**: meat/fish first, at most one vegetarian/vegan dinner. | covered |
 | I-W07 | `prefs.diet` vegetarian / vegan / pescatarian is a hard filter on New week (`autoPickWeek`) and Modify. Vegetarian keeps vegetarian and vegan. Vegan keeps vegan. Pescatarian drops meat. Omnivore does not hide meals. | covered — jsdom |
