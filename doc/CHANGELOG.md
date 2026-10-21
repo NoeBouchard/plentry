@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-21 — Cupboard pictures
+
+- **Pictures.** Every cupboard row on onboarding (“What’s in the cupboard?”) and the Pantry tab has an in-house SVG: olive oil, butter, garlic, onions, lemons, curry paste, salt, black pepper, paprika, cumin, chilli flakes, mixed herbs, soy sauce, stock cubes. Garam masala (a seasoning a cupboard tick can skip; still not on the checklist) has one too. A name with no picture, including one added later, uses `vendor/cupboard/fallback.svg`. The basket’s cupboard lines use the same pictures at 28×28. The label sits next to the image, so the image is `alt=""` and `aria-hidden`. Width and height are fixed.
+- **Files.** Sixteen SVGs under `/vendor/cupboard/`, 10,897 bytes together, served from our own domain. `/vendor/` already has an immutable cache. Drawn for this app. No third-party art and no hotlink.
+- **Why.** The cupboard step was names only. A picture makes each oil and spice easier to scan on a phone.
+- **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-19 — Clearing the Profile budget turns it off
 
 - **Clear.** An empty or whitespace-only weekly budget on Profile saves `prefs.budget` as null. New week then has no ×1.2 cap, and the week screen has no under/over line. The household postcode shown in the delivery postcode box does not block that save. A real delivery edit still has to be complete.
