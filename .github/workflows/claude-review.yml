@@ -1,15 +1,17 @@
-# Merge gate. Does not deploy. Fails unless Claude's structured verdict is APPROVE.
+# On-request review. Does not deploy. Fails unless Claude's structured verdict is APPROVE.
+# Runs when the claude-review label is added. Not a required check.
 # The action skips this job's review when this file differs from the default branch
-# (see doc/RUNBOOK.md, Claude review gate). That includes the PR that adds it.
+# (see doc/RUNBOOK.md, Claude review gate). That includes the PR that edits it.
 name: claude-review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [labeled]
 
 jobs:
   claude-review:
     name: claude-review
+    if: github.event.label.name == 'claude-review'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:

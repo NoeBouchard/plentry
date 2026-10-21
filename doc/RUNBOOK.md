@@ -2,7 +2,13 @@
 
 ## Claude review gate
 
-On `pull_request` `opened`, `synchronize`, and `reopened`, GitHub Actions job **claude-review** (`.github/workflows/claude-review.yml`) runs `anthropics/claude-code-action@v1`. The job posts one pull-request comment and **fails unless the structured verdict is `APPROVE`**. Production stays as it is. `npm test` stays a separate check.
+GitHub Actions job **claude-review** (`.github/workflows/claude-review.yml`) runs `anthropics/claude-code-action@v1` only when someone adds the `claude-review` label to a pull request. The trigger is `pull_request` with `types: [labeled]`. The job runs only when `github.event.label.name == 'claude-review'`. That run reviews the pull request's current head once. It does not run on `opened`, `synchronize`, or `reopened`. A pull request that never receives the label does not get a `claude-review` check. If some other label is added, the job is skipped, and a skip is not a failure. The job posts one pull-request comment and **fails unless the structured verdict is `APPROVE`**. Production stays as it is. `npm test` stays a separate check.
+
+**It is not a required check.** The `main` ruleset lists **`test` only**. Do not wait for `claude-review` after a push. A run costs about $0.50, which is why it stays off every pull request.
+
+**How to run it.** The repository label `claude-review` has to exist first (Issues → Labels → New label, name `claude-review`). On the pull request, add that label. To run it again after more commits, remove that label and add it again. The workflow leaves the label in place. Removing a label does not start a run.
+
+The plan is to run this once as a full check after onboarding, cupboard pictures, and Modify are done. Until that pass, leave it off the ruleset.
 
 The review model is `--model opus` in `claude_args`. [Model configuration](https://code.claude.com/docs/en/model-config) says the `opus` alias is the latest Opus, and on the Anthropic API that alias is Opus 5.5, full name `claude-opus-5-5`. The job authenticates with a pay-per-use API key: input `anthropic_api_key`, repository secret `ANTHROPIC_API_KEY` ([GitHub Actions](https://code.claude.com/docs/en/github-actions)). `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` failed with a known 401 ([issue 1613](https://github.com/anthropics/claude-code-action/issues/1613), [issue 1614](https://github.com/anthropics/claude-code-action/issues/1614)). On PR #15, run [38736528055](https://github.com/NoeBouchard/plentry/actions/runs/38736528055), the job requested `--model claude-opus-5-5`. The call errored in 297ms with 0 cost and empty `modelUsage`, so that full id is most likely invalid or not available to the subscription token. This gate names the `opus` alias. The action tag `v1` installs Claude Code 2.1.300 ([base-action/action.yml](https://github.com/anthropics/claude-code-action/blob/v1/base-action/action.yml)). Opus 5.5 needs Claude Code 2.1.280 or later, so this install can select it. `--model` and `--fallback-model` are [CLI flags](https://code.claude.com/docs/en/cli-reference). The action takes them through `claude_args`, and `v1` copies `--model` and `--max-turns` onto the SDK options ([configuration](https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md), [parse-sdk-options.ts](https://github.com/anthropics/claude-code-action/blob/v1/base-action/src/parse-sdk-options.ts)). Fable 5.1 is the most capable model in the model-configuration docs. It sits outside the plan default and can bill usage credits, including on a non-interactive run, so this gate stays on `opus`.
 
@@ -16,20 +22,18 @@ The comment ends with exactly one line, `VERDICT: APPROVE` or `VERDICT: CHANGES_
 
 `allowed_bots` is `cursor`. The input on `anthropics/claude-code-action@v1` is named `allowed_bots`: a comma-separated list of bot usernames, empty by default (no bots), or `*` for every bot ([action.yml](https://github.com/anthropics/claude-code-action/blob/v1/action.yml)). Cursor cloud-agent pull requests are pushed by the `cursor` bot. On PR #15 the action failed with `Workflow initiated by non-human actor: cursor (type: Bot). Add bot to allowed_bots list`. The list is only `cursor`. `*` is not set. Matching lowercases the name and strips a trailing `[bot]` ([actor.ts](https://github.com/anthropics/claude-code-action/blob/v1/src/github/validation/actor.ts)), so `cursor` and `cursor[bot]` are the same entry. Other bots stay blocked.
 
-The action skips the review when this workflow file is missing from the default branch or its bytes differ from that branch. It logs that the file must match the default branch, and this job then fails for lack of `APPROVE`. The pull request that adds or edits the workflow cannot review itself. After that change is on `main`, a later PR is reviewed, and each push to the PR (`synchronize`) runs the review again.
+The action skips the review when this workflow file is missing from the default branch or its bytes differ from that branch. It logs that the file must match the default branch, and this job then fails for lack of `APPROVE`. The pull request that adds or edits the workflow cannot review itself. After that change is on `main`, a later pull request is reviewed when the `claude-review` label is added. A later push does not run the review again.
 
 **Noé, once:**
 
-1. Install the [Claude GitHub app](https://github.com/apps/claude) on this repo (repository admin). In Claude Code, `/install-github-app` does the same install.
+1. Install the [Claude GitHub app](https://github.com/apps/claude) on this repo (repository admin). In Claude Code, `/install-github-app` does the same install. Create the repository label `claude-review` once (Issues → Labels). The review runs when that label is added to a pull request.
 2. In the Anthropic Console, create a pay-per-use API key. Do not use `claude setup-token`.
 3. Repo → **Settings → Secrets and variables → Actions → New repository secret**. Name: `ANTHROPIC_API_KEY`. Value: the key from step 2. Never commit it.
-4. **Settings → Rules → Rulesets** → the `main` ruleset (`require-test`). **Require status checks to pass**: keep **`test`**, and add **`claude-review`**. Leave Supabase Preview and Vercel off that list.
+4. Leave **`claude-review` off** the `main` ruleset (`require-test`). **Require status checks to pass** stays **`test` only**. Leave Supabase Preview and Vercel off that list. `claude-review` is not a required check.
 
-Do step 4 after a pull request that does not change this workflow file shows a green `claude-review`. Until the secret exists, and on any PR that changes the workflow file, the check is red. Requiring it before that blocks every merge.
+The plan is to run `claude-review` once as a full check after onboarding, cupboard pictures, and Modify are done, on a pull request that does not change this workflow file. Until then, do not require the check, and do not wait for it after every push.
 
 The repository is public. Pull requests from forks do not receive `ANTHROPIC_API_KEY`, so `claude-review` fails on them. That is by design.
-
-`claude-review` becomes a required check only after it has gone green on a real pull request.
 
 ## Local UI
 

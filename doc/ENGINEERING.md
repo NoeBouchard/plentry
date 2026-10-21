@@ -9,7 +9,7 @@ Git repo is **`plentry/`** → [github.com/NoeBouchard/plentry](https://github.c
 1. Branch off `main`: `feat/…` or `fix/…` (not product work on `main`).
 2. Implement the smallest diff. New behaviour gets a test with an invariant ID. Update the vault if behaviour changed (`npm run vault`).
 3. Open a pull request. Fill the template (GitHub: `.github/PULL_REQUEST_TEMPLATE.md`; workspace: `plentry/.github/PULL_REQUEST_TEMPLATE.md`).
-4. Wait for GitHub Actions **test** (`npm test`, Node 22) and, once the founder has finished [Claude review gate](RUNBOOK.md#claude-review-gate), **claude-review**. Red means do not merge.
+4. Wait for GitHub Actions **test** (`npm test`, Node 22). Red means do not merge. **claude-review** runs only when someone adds the `claude-review` label. It is not a required check, so a pull request does not wait on it. See [Claude review gate](RUNBOOK.md#claude-review-gate).
 5. Second look (you are the only human — this replaces a second reviewer):
    - Always: read the PR against REQUIREMENTS / FLOWS.
    - Money, XSS, RLS, `pay/`, `stripe-webhook`, capture: `/review-bugbot` and `/review-security` in Cursor before merge.
@@ -34,4 +34,4 @@ Repo → **Settings → Rules → Rulesets → New branch ruleset** (not the old
 - Name: `require-test`. Enforcement: **Active**. Bypass list: empty.
 - Target: include default branch (`main`).
 - **Require a pull request before merging**, required approvals **0**.
-- **Require status checks to pass.** The ruleset lists **`test`**. After [Claude review gate](RUNBOOK.md#claude-review-gate) (app installed, repository secret `ANTHROPIC_API_KEY`), also require **`claude-review`**. Leave Supabase Preview and Vercel off that list. Merging to `main` auto-deployed static from 13 Oct 2026 until PR #12. It does not now. Production static is the REST create and promote. `pay` does not ride along. See [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
+- **Require status checks to pass.** The ruleset lists **`test`**. **claude-review** stays off that list. It runs when the `claude-review` label is added. The plan is to run it once as a full check after onboarding, cupboard pictures, and Modify are done. See [Claude review gate](RUNBOOK.md#claude-review-gate). Leave Supabase Preview and Vercel off that list. Merging to `main` auto-deployed static from 13 Oct 2026 until PR #12. It does not now. Production static is the REST create and promote. `pay` does not ride along. See [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
