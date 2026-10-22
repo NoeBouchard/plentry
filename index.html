@@ -1179,6 +1179,14 @@ function rankCatalog(list){
 // Used for per-store totals + matched products on the manual path; Pepesto live quotes still win.
 const DB_STORE={tesco:"tesco",asda:"asda",sains:"sainsburys",wait:"waitrose"}; // app id -> db store id
 let SHELF={};let SHELF_ROWS=[];let SHELF_READY=false;
+let shelfStamp=0;
+const mealQuoteCache=new Map();
+const mealSplitCache=new Map();
+function clearShareCache(){
+  shelfStamp++;
+  mealQuoteCache.clear();
+  mealSplitCache.clear();
+}
 async function loadShelfPrices(){
   if(!sb)return;
   try{
@@ -1208,6 +1216,7 @@ async function loadShelfPrices(){
       }
     }
     SHELF_READY=Object.keys(SHELF).length>0;
+    clearShareCache();
     if(basket.length)renderShop();
     const obShop=document.getElementById("ob-1");
     if(obShop&&obShop.style.display==="block")renderObStores();
@@ -2859,18 +2868,78 @@ function mealLineUse(meal, key, servings){
   const qty=scalePortion(+spec[0], String(spec[1]), key, servings);
   return qty>0?{qty:qty}:null;
 }
-function lineWeightInts(meals, key, servings){
-  const uses=meals.map(m=>mealLineUse(m, key, servings));
-  const qtyN=uses.reduce((t,u)=>t+(u&&u.qty>0?1:0),0);
-  if(!qtyN)return uses.map(u=>u&&u.even?1:0);
-  if(!uses.some(u=>u&&u.even))return uses.map(u=>u&&u.qty>0?Math.round(u.qty*1000):0);
-  // Mixed line: a portion-less meal counts as one average portion, so it shares the pack.
-  const avg=uses.reduce((t,u)=>t+(u&&u.qty>0?u.qty:0),0)/qtyN;
-  return uses.map(u=>{
-    if(!u)return 0;
-    if(u.qty>0)return Math.round(u.qty*1000);
-    return Math.max(1, Math.round(avg*1000));
-  });
+// Largest remainder (Hamilton). Equal fractional parts go to the earlier index.
+function allocateByRemainder(total, weights){
+  const n=weights.length;
+  const out=new Array(n).fill(0);
+  const t=Math.round(+total)||0;
+  if(!(t>0)||!n)return out;
+  let sumW=0;
+  for(let i=0;i<n;i++){
+    const w=+weights[i]||0;
+    if(w>0)sumW+=w;
+  }
+  if(!(sumW>0))return allocateByRemainder(t, weights.map(function(){return 1;}));
+  const rank=[];
+  let given=0;
+  for(let i=0;i<n;i++){
+    const w=+weights[i]||0;
+    if(!(w>0)){rank.push({i:i,r:0,w:0});continue;}
+    const prod=t*w;
+    const floor=Math.floor(prod/sumW);
+    out[i]=floor;
+    given+=floor;
+    rank.push({i:i,r:prod%sumW,w:w});
+  }
+  let left=t-given;
+  rank.sort(function(a,b){return (b.r-a.r)||(a.i-b.i);});
+  for(let k=0;k<rank.length&&left>0;k++){
+    if(!(rank[k].w>0))continue;
+    out[rank[k].i]++;
+    left--;
+  }
+  return out;
+}
+function quoteCacheKey(meal, servings, store){
+  const id=meal&&meal.id!=null?meal.id:"";
+  const name=meal&&meal.name||"";
+  const shop=(store&&store.id)||"";
+  const mult=(store&&+store.mult)||1;
+  const ing=Array.isArray(meal&&meal.ing)?meal.ing.join("\u0001"):"";
+  const raw=meal&&meal.portions&&typeof meal.portions==="object"&&!Array.isArray(meal.portions)?meal.portions:null;
+  let sig="";
+  if(raw){
+    sig=Object.keys(raw).sort().map(function(k){
+      const v=raw[k];
+      return k+"="+(Array.isArray(v)?v.join(":"):"");
+    }).join(";");
+  }
+  return shelfStamp+"|"+shop+"|"+mult+"|"+(SHELF_READY?1:0)+"|"+servings+"|"+id+"|"+name+"|"+ing+"|"+sig;
+}
+function cachedMealQuote(meal, servings, store){
+  const key=quoteCacheKey(meal, servings, store);
+  const hit=mealQuoteCache.get(key);
+  if(hit)return hit;
+  const q=mealIngredientQuote(meal, servings, store);
+  if(mealQuoteCache.size>600)mealQuoteCache.clear();
+  mealQuoteCache.set(key, q);
+  return q;
+}
+// Ingredient-cost weight: the same portion ÷ pack × price sum as mealIngredientQuote.
+// A dinner with no usable cost (no portions, or a missing price) weighs 0.
+function mealCostWeight(meal, servings, store){
+  const q=cachedMealQuote(meal, servings, store);
+  if(!q||q.incomplete||!(q.pence>0))return 0;
+  return q.pence;
+}
+// Shared pack: dinners with a cost take their own weight. A dinner with none
+// counts as one average-cost dinner, so it still shares the jar.
+function sharedWeights(meals, users, servings, store){
+  const w=users.map(function(i){return mealCostWeight(meals[i], servings, store);});
+  const pos=w.filter(function(x){return x>0;});
+  if(!pos.length)return users.map(function(){return 1;});
+  const avg=Math.max(1, Math.round(pos.reduce(function(a,b){return a+b;},0)/pos.length));
+  return w.map(function(x){return x>0?x:avg;});
 }
 function basketGroceryPence(packs, store){
   let raw=0;
@@ -2885,49 +2954,64 @@ function weekPacks(meals, servings, ticks, store){
   const have=Array.isArray(ticks)?ticks:cupboardTicks();
   return basketFor(Array.isArray(meals)?meals:[], sv, have, INGREDIENTS, false, storePackMap(store&&store.id));
 }
-// Penny shares of the week basket. Sum equals the grocery total. Leftover pennies sit on the last meal.
-// A cupboard tick is absent from the basket, so that line costs 0.
+// Penny shares of the week basket. Sum equals the grocery total.
+// A pack only one dinner uses is that dinner's, including what is left in the pack.
+// A shared pack (oil, a seasoning, a pack more than one dinner draws from) is split
+// by ingredient-cost weight. Cupboard ticks are absent from the basket, so they cost 0.
+// Claims are turned into pennies once, by largest remainder, ties to the earlier day.
+const SHARE_SCALE=10000;
+function splitCacheKey(meals, servings, ticks, store){
+  const tick=ticks.slice().sort().join(",");
+  const body=meals.map(function(m){return quoteCacheKey(m, servings, store);}).join("||");
+  return servings+"#"+tick+"#"+body;
+}
+function addClaim(micro, mealI, line, w, sumW){
+  if(!(w>0)||!(line>0))return;
+  if(!(sumW>0))return;
+  let add=Math.round(line*SHARE_SCALE*w/sumW);
+  if(!(add>0))add=1;
+  micro[mealI]+=add;
+}
 function splitMealPence(meals, servings, ticks, store){
   const list=Array.isArray(meals)?meals:[];
   const sv=servings==null?weekServings():normServings(servings);
   const have=Array.isArray(ticks)?ticks:cupboardTicks();
+  const key=splitCacheKey(list, sv, have, store);
+  const hit=mealSplitCache.get(key);
+  if(hit)return hit.slice();
   const packs=basketFor(list, sv, have, INGREDIENTS, false, storePackMap(store&&store.id));
-  const out=list.map(()=>0);
-  Object.keys(packs).forEach(key=>{
-    const q=+packs[key]||0;
+  const n=list.length;
+  const micro=new Array(n).fill(0);
+  Object.keys(packs).forEach(function(item){
+    const q=+packs[item]||0;
     if(!(q>0))return;
-    const line=Math.round(q*itemUnitPrice(key, store)*100);
+    const line=Math.round(q*itemUnitPrice(item, store)*100);
     if(!line)return;
-    const weights=lineWeightInts(list, key, sv);
-    let sumW=0;
-    weights.forEach(w=>{if(w>0)sumW+=w;});
-    if(!(sumW>0)){
-      if(out.length)out[out.length-1]+=line;
+    const users=[];
+    for(let i=0;i<n;i++){
+      if(mealLineUse(list[i], item, sv))users.push(i);
+    }
+    if(!users.length){
+      if(!n)return;
+      for(let i=0;i<n;i++)addClaim(micro, i, line, 1, n);
       return;
     }
-    let given=0;
-    weights.forEach((w,i)=>{
-      if(!(w>0))return;
-      const part=Math.floor(line*w/sumW);
-      out[i]+=part;
-      given+=part;
-    });
-    if(out.length)out[out.length-1]+=line-given;
+    if(users.length===1){
+      micro[users[0]]+=line*SHARE_SCALE;
+      return;
+    }
+    const weights=sharedWeights(list, users, sv, store);
+    let sumW=0;
+    weights.forEach(function(w){if(w>0)sumW+=w;});
+    users.forEach(function(mealI, j){addClaim(micro, mealI, line, weights[j]||0, sumW);});
   });
   const total=basketGroceryPence(packs, store);
-  if(out.length){
-    out[out.length-1]+=total-out.reduce((a,b)=>a+b,0);
-    if(out[out.length-1]<0){
-      let need=-out[out.length-1];
-      out[out.length-1]=0;
-      for(let i=out.length-2;i>=0&&need>0;i--){
-        const take=Math.min(out[i], need);
-        out[i]-=take;
-        need-=take;
-      }
-    }
-  }
-  return out;
+  let sumW=0;
+  micro.forEach(function(w){if(w>0)sumW+=w;});
+  const out=sumW>0?allocateByRemainder(total, micro):(n?allocateByRemainder(total, list.map(function(){return 1;})):[]);
+  if(mealSplitCache.size>400)mealSplitCache.clear();
+  mealSplitCache.set(key, out.slice());
+  return out.slice();
 }
 function weekPriceQuote(meals, store){
   const pence=splitMealPence(meals, weekServings(), cupboardTicks(), store);
@@ -2942,11 +3026,12 @@ function mealNeedCost(m,s){
   const packs=basketFor([meal],weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(s&&s.id));
   return Object.entries(packs).reduce((t,[i,q])=>t+q*itemUnitPrice(i,s),0);
 }
-// Ingredient cost of one dinner. Same figure on the day card and in Modify.
+// Ingredient-cost weight of one dinner. Not the price on the card.
 // Scaled portion ÷ pack × that shop's pack price. Seasonings stay off this sum:
-// the basket still buys one jar. A grocery with no usable portion, or no shop
-// price once the shelf has loaded, is incomplete — no partial sum. Keep in step
-// with private.refresh_meal_ingredient_prices in supabase/meal_ingredient_prices.sql.
+// the basket still buys one jar, and the card share splits that jar by this weight.
+// A grocery with no usable portion, or no shop price once the shelf has loaded,
+// is incomplete — no partial sum, and the weight is 0. Keep in step with
+// private.refresh_meal_ingredient_prices in supabase/meal_ingredient_prices.sql.
 // The priced row is the lowest id whose price_gbp is not null, matching that SQL.
 // No shop, or a shelf that never loaded, uses the catalogue price the way the
 // basket does (catalogue price × the shop multiplier, or × 1 when no shop).
@@ -3025,19 +3110,42 @@ function mealPriceLabel(q){
   if(!q||q.incomplete||q.pence==null)return isAdmin()?"incomplete":"Price soon";
   return "~£"+(q.pence/100).toFixed(2);
 }
-function weekIngredientLabel(meals, store){
+// A loaded shelf with a usable portion and no priced row: no pound figure.
+// No portions still shows the basket share, so the cards can add up.
+function dinnerHidesPrice(meal, servings, store){
+  if(!shelfPricesReady(store))return false;
+  const q=cachedMealQuote(meal, servings, store);
+  if(!q||!q.incomplete||!q.missing||!q.missing.length)return false;
+  const raw=meal&&meal.portions&&typeof meal.portions==="object"&&!Array.isArray(meal.portions)?meal.portions:null;
+  if(!raw)return false;
+  for(let i=0;i<q.missing.length;i++){
+    const key=q.missing[i];
+    const code=INGREDIENTS[key];
+    if(!code||!(+code.pack>0)||SEASONINGS.indexOf(key)>=0)continue;
+    const spec=raw[key];
+    const bad=!Array.isArray(spec)||spec.length<2||String(spec[1])!==String(code.pu||"");
+    if(bad)continue;
+    if(!pricedShelfRow(key, store))return true;
+  }
+  return false;
+}
+function dinnerShownLabel(meals, index, servings, ticks, store){
   const list=Array.isArray(meals)?meals:[];
-  if(!list.length)return "";
-  let pence=0, bad=0;
-  list.forEach(function(m){
-    const q=mealIngredientQuote(m, weekServings(), store);
-    if(q.incomplete||q.pence==null)bad++;
-    else pence+=q.pence;
-  });
-  if(bad===list.length)return isAdmin()?"Ingredients incomplete":"Price soon";
-  const text="Ingredients ~£"+(pence/100).toFixed(2);
-  if(!bad)return text;
-  return text+" · "+(isAdmin()?bad+" incomplete":"Price soon");
+  const meal=list[index];
+  if(!meal)return "";
+  const sv=servings==null?weekServings():normServings(servings);
+  const have=Array.isArray(ticks)?ticks:cupboardTicks();
+  const shop=store===undefined?preferredStoreObj():store;
+  if(dinnerHidesPrice(meal, sv, shop))return isAdmin()?"incomplete":"Price soon";
+  const pence=splitMealPence(list, sv, have, shop)[index]||0;
+  return "£"+(pence/100).toFixed(2);
+}
+function modifyOptionLabel(m){
+  const week=selectedMeals().slice();
+  if(modifySlot<0||modifySlot>=week.length||!m)return "";
+  const next=week.slice();
+  next[modifySlot]=m;
+  return dinnerShownLabel(next, modifySlot, weekServings(), cupboardTicks(), preferredStoreObj());
 }
 function mealTag(m){
   const ing=Array.isArray(m&&m.ing)?m.ing:[];
@@ -3147,9 +3255,7 @@ function renderMenu(){
     const budgetLine=budget==null?"":`<div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${esc(budget)} budget`:`£${Math.abs(under).toFixed(0)} over your £${esc(budget)} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>`;
     const mk=s?STORE_MARK[s.id]:null;
     const priceFooter=meals.length
-      ?`<p class="sub" id="week-price-note">Dinner prices are the ingredients used; the basket buys whole packs.</p>
-      <p class="week-sum" id="week-ingredients">${weekIngredientLabel(meals, s)}</p>
-      <p class="week-sum" id="week-price-sum">Basket £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}</p>
+      ?`<p class="week-sum" id="week-price-sum">Basket £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}</p>
       <p class="sub" id="week-hold">The card hold is £${quote.hold.toFixed(2)} — a 30% buffer. Only the actual amount is captured, and the rest is released.</p>`
       :"";
     wrap.innerHTML=`<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
@@ -3165,7 +3271,7 @@ function renderMenu(){
       ${budgetLine}
       ${meals.length?meals.map((m,i)=>{
         const idx=S.menuOptions.findIndex(x=>x.name===m.name);
-        const label=mealPriceLabel(mealIngredientQuote(m, weekServings(), s));
+        const label=dinnerShownLabel(meals, i, weekServings(), cupboardTicks(), s);
         const det=idx>=0?idx:0;
         return `<div class="day-card">
           <div class="day-photo" onclick="showMealDetails(${det})">${mealThumbHtml(m)}<span class="day-badge">${days[i]||("D"+(i+1))}</span></div>
@@ -3248,7 +3354,7 @@ function takeModifyPage(first){
 function modifySheetHtml(){
   const unseen=modifyCandidates(modifyCatalog, modifyCurrentName, modifySeen).length;
   const cards=modifyPicks.length?`<div id="modify-alts">${modifyPicks.map((m,j)=>{
-    const label=mealPriceLabel(mealIngredientQuote(m, weekServings(), preferredStoreObj()));
+    const label=modifyOptionLabel(m);
     return `<button type="button" class="day-card" onclick="applyModify(${modifySlot},${j})">
       <div class="day-photo">${mealThumbHtml(m)}</div>
       <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min</div><div class="tag-row">${mealTagHtml(m)}</div></div>
@@ -4546,7 +4652,7 @@ if(typeof window!=="undefined"){
     setAdvisor(proposed,idxs){advisorProposed=Array.isArray(proposed)?proposed:[];advisorPicked=new Set(idxs||[]);},
     STAPLES,CUPBOARD_ICONS,CUPBOARD_ICON_FALLBACK,cupboardIconSrc,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
     tagsFor,mealTags,MEAL_TAGS,USER_MEAL_TAGS,wantedTags,clampMeals,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,deliveryFrom,orderDeliverTo,captureChargePence,
-    splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,mealIngredientQuote,mealPriceLabel,weekIngredientLabel,
+    splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,mealIngredientQuote,mealPriceLabel,dinnerShownLabel,
   };
 }
 </script>

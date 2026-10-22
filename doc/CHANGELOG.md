@@ -2,6 +2,18 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-22 — Dinner prices sum to the basket
+
+- **Price.** A day card is that dinner’s penny share of this week’s grocery basket at 2, 4, or 6 servings. The cards sum to **Basket £**. Half-pack rounding and cupboard ticks are the basket’s, unchanged.
+- **Shared packs.** Oil, a seasoning jar, and any pack more than one dinner draws from are split by ingredient-cost weight: each dinner’s scaled portions ÷ pack × the shop’s first priced row (lowest id with a price). Seasonings are not inside the weight. A dinner with no usable ingredient cost counts as one average-cost dinner on that pack. A pack only one dinner uses, including what is left in it, is charged to that dinner.
+- **Pennies.** Largest remainder. A tie goes to the earlier day.
+- **Modify.** Each option is priced by simulating the swap into this week (same shop, servings, half-pack rule, cupboard ticks). After the swap the card shows that figure, and the other cards and the basket move with it. The six prices are memoised.
+- **Footer.** Basket £ + delivery + 5% fee = the total. The ingredients line and the “whole packs” note under the cards are gone.
+- **Kept.** Price soon for a customer and incomplete for an admin when a loaded shelf has no price. Catalogue fallback when the shelf has not loaded or no shop is picked. First priced row. Modify paging. Hold and `basketFor` unchanged. `supabase/meal_ingredient_prices.sql` stays unapplied, outside `supabase/migrations/`, and the parity test still checks the ingredient-cost weight.
+- **Why.** Product asked for the cards to add up to the basket again. Splitting shared jars by the dinner’s own ingredient cost keeps the claim explainable: the weight does not depend on the rest of the week, so the same dinner only moves when the other dinners that share the jar change.
+- **Tesco week** (beef ragù, shakshuka, Spanish tortilla, salmon traybake), shelf prices, no cupboard ticks. Basket £47.83 / £59.68 / £84.04 at 2 / 4 / 6. Shares at 2: ragù £18.52, shakshuka £13.77, tortilla £4.63, salmon £10.91. At 4: £25.96, £17.49, £5.32, £10.91. At 6: £36.20, £25.36, £9.47, £13.01. Salmon has no portions, so its own packs do not grow with servings.
+- **Pomodoro** (meal 28) in that week in place of salmon: £4.07 / £4.71 / £5.83 at 2 / 4 / 6. Ingredient-cost weight is still £1.93 / £3.87 / £5.78. Priced alone it is £14.03 at 2 servings, because that buys the whole bottle and the jars.
+
 ## 2026-10-22 — Price labels
 
 - **Note.** Under the day cards: “Dinner prices are the ingredients used; the basket buys whole packs.”

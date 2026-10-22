@@ -417,9 +417,12 @@ describe("source contracts", () => {
     assert.match(sql, /NOT APPLIED to production/);
     assert.doesNotMatch(sql, /update public\.ingredient_prices/i);
     assert.match(html, /function mealIngredientQuote/);
-    assert.match(html, /id="week-ingredients"/);
-    assert.match(html, /id="week-price-note"/);
-    assert.match(html, /Dinner prices are the ingredients used; the basket buys whole packs\./);
+    assert.match(html, /function splitMealPence/);
+    assert.match(html, /largest remainder/);
+    assert.doesNotMatch(html, /id="week-ingredients"/);
+    assert.doesNotMatch(html, /id="week-price-note"/);
+    assert.doesNotMatch(html, /Dinner prices are the ingredients used/);
+    assert.doesNotMatch(html, /Ingredients ~£/);
     assert.match(html, /Price soon/);
     assert.match(html, /Basket £/);
   });
