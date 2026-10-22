@@ -2,6 +2,10 @@
 
 Step-by-step so agents do not invent a second checkout or a second Ops path. Screens live in `plentry/index.html`.
 
+## Account
+
+**Log in** in the header opens email and password. **Don't have an account?** under that form opens sign-up (name, email, password). Sign-up still offers **Already have an account? Log in**. Onboarding does not ask for an account. Without an account, New week, choosing or swapping a dinner, meal details, and the meal advisor open sign-up, as does confirm when the basket is ready (**Create an account…**). The later guard whose copy is **Log in so we can take the card hold** opens login.
+
 ## 1. First customer — hold
 
 1. Onboarding: shop → what you eat (everything / vegetarian / vegan / pescatarian) → dinner tags (meal prep is not offered unless already saved) → household (1–6; cooking for becomes 2, 4, or 6; UK postcode) → dinners 1–7 → cupboard ticks. Each cupboard row has a same-origin picture (a fallback jar if the name has none). Goals and the budget slider are not steps. A new account has no budget, so New week has no ×1.2 cap and the week screen has no under/over line. A saved number still does both. Profile can set one, and an empty budget field clears it. Saved goals still apply for people who already set them.

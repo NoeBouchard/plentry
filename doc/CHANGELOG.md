@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-22 — Log in opens the login form
+
+- **Log in.** The header **Log in** opens email and password. Under that form, **Don't have an account?** opens the existing sign-up form (name, email, password). Sign-up still offers **Already have an account? Log in**.
+- **Sign up stays sign up.** New week, choosing or swapping a dinner, meal details, the meal advisor, and checkout confirm without an account still open sign-up (**Create an account…**). The later guard **Log in so we can take the card hold** opens login. Onboarding does not ask for an account.
+- **Why.** Log in was opening the sign-up form, with only a small Log in link underneath.
+- **Unchanged.** Same Supabase email/password calls. No auth config, no edge functions, no SQL.
+- **Not deployed.** Static only when it ships. No `pay` deploy.
+
 ## 2026-10-21 — Cupboard pictures
 
 - **Pictures.** Every cupboard row on onboarding (“What’s in the cupboard?”) and the Pantry tab has an in-house SVG: olive oil, butter, garlic, onions, lemons, curry paste, salt, black pepper, paprika, cumin, chilli flakes, mixed herbs, soy sauce, stock cubes. Garam masala (a seasoning a cupboard tick can skip; still not on the checklist) has one too. A name with no picture, including one added later, uses `vendor/cupboard/fallback.svg`. The basket’s cupboard lines use the same pictures at 28×28. The label sits next to the image, so the image is `alt=""` and `aria-hidden`. Width and height are fixed.
