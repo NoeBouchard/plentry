@@ -424,6 +424,7 @@ describe("source contracts", () => {
     assert.doesNotMatch(html, /Dinner prices are the ingredients used/);
     assert.doesNotMatch(html, /Ingredients ~£/);
     assert.match(html, /Price soon/);
+    assert.match(html, /From your cupboard/);
     assert.match(html, /Basket £/);
   });
 

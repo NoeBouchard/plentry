@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-22 — Pinned basket shares, and From your cupboard
+
+- **Pinned.** The Tesco week (beef ragù, shakshuka, Spanish tortilla, salmon traybake, no cupboard ticks) is locked in a test: shares and basket £47.83 / £59.68 / £84.04 at 2 / 4 / 6. Pomodoro (meal 28) swapped in for salmon is locked at £4.07 / £4.71 / £5.83. A change to the ingredient-cost weighting fails that test.
+- **Cupboard.** When every ingredient of a dinner is ticked, so its share is £0.00, the day card and the Modify option say **From your cupboard**. A missing shop price on a loaded shelf still says Price soon or incomplete.
+- **Unchanged.** The allocation rule, the hold, `basketFor`, and `supabase/meal_ingredient_prices.sql` (still not applied).
+
 ## 2026-10-22 — Dinner prices sum to the basket
 
 - **Price.** A day card is that dinner’s penny share of this week’s grocery basket at 2, 4, or 6 servings. The cards sum to **Basket £**. Half-pack rounding and cupboard ticks are the basket’s, unchanged.

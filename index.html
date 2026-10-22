@@ -3138,6 +3138,8 @@ function dinnerShownLabel(meals, index, servings, ticks, store){
   const shop=store===undefined?preferredStoreObj():store;
   if(dinnerHidesPrice(meal, sv, shop))return isAdmin()?"incomplete":"Price soon";
   const pence=splitMealPence(list, sv, have, shop)[index]||0;
+  // Every ingredient ticked: the basket has nothing left to charge this dinner.
+  if(!(pence>0))return "From your cupboard";
   return "£"+(pence/100).toFixed(2);
 }
 function modifyOptionLabel(m){
