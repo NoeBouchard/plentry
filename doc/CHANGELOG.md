@@ -2,6 +2,22 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-22 — One meal price
+
+- **Price.** A dinner’s price is the sum of its ingredient portions at 2, 4, or 6 servings in the chosen shop: scaled amount ÷ pack × that shop’s pack price. The day card and Modify show that same `~£` figure. **Ingredients ~£** under the week is the sum. **Basket £** stays the whole-pack shop (half-pack rule unchanged) plus delivery and 5%. The two can differ. Words are a proposal for Product.
+- **Why £3.55 was wrong.** Veggie spaghetti pomodoro was not a stale cache and not a missing price. The day card was that dinner’s penny share of the week’s packs, so a tin, 180g of pasta, and a few spoons of a shared £5.75 bottle of oil landed near a few pounds. Modify priced the dinner alone, which buys a whole bottle of oil and a whole jar of salt, pepper, and chilli (£14.03 at Tesco for 2 servings). Tesco ingredient cost from the live portions is £1.93 / £3.87 / £5.78 for 2 / 4 / 6.
+- **Incomplete.** A grocery with no shop price, or no usable portion, shows **incomplete** and no partial sum. No published meal is missing a price row at Tesco, Sainsbury’s, Asda, or Waitrose. **Beef & Tomato Tortilla Casserole** is the one published dinner with no portions, so it is incomplete.
+- **SQL.** `supabase/meal_ingredient_prices.sql` stores `meal_ingredient_prices` and refreshes it when a meal or an ingredient price changes. Not applied to production. No ingredient price was changed. The shared `basketFor` block is byte-identical.
+- **Not deployed.** No production SQL and no `pay` deploy.
+
+## 2026-10-22 — Modify alternatives
+
+- **List.** Tap Modify on a dinner and see 4–6 other verified dinners, 6 when at least 6 fit. The set is the published pool New week uses. Diet is a hard filter. Dinner tags use the same weights, so a preferred tag ranks higher. Meals already in the week, including the one being replaced, stay off the list.
+- **Refresh.** Show 4 more skips the current week and any alternative already shown for that slot. Fewer than 4 shows the rest. None left is a short message, the refresh button is disabled, and Start again brings the first page back. A week that already holds every matching dinner (6 vegan dinners, all in the week) shows the message and no empty grid.
+- **Swap.** Picking one replaces that slot. The basket and the week price follow the existing swap. The week does not grow.
+- **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-21 — Cupboard pictures
 
 - **Pictures.** Every cupboard row on onboarding (“What’s in the cupboard?”) and the Pantry tab has an in-house SVG: olive oil, butter, garlic, onions, lemons, curry paste, salt, black pepper, paprika, cumin, chilli flakes, mixed herbs, soy sauce, stock cubes. Garam masala (a seasoning a cupboard tick can skip; still not on the checklist) has one too. A name with no picture, including one added later, uses `vendor/cupboard/fallback.svg`. The basket’s cupboard lines use the same pictures at 28×28. The label sits next to the image, so the image is `alt=""` and `aria-hidden`. Width and height are fixed.

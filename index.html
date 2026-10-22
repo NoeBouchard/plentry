@@ -1212,6 +1212,8 @@ async function loadShelfPrices(){
     if(obShop&&obShop.style.display==="block")renderObStores();
     renderBasketFab();
     if(basketOpen)renderBasketDrawer();
+    const menuScr=document.getElementById("scr-menu");
+    if(menuScr&&menuScr.classList.contains("active"))renderMenu();
   }catch(e){}
 }
 function storePackMap(appId){
@@ -2939,6 +2941,75 @@ function mealNeedCost(m,s){
   const packs=basketFor([meal],weekServings(),cupboardTicks(),INGREDIENTS,false,storePackMap(s&&s.id));
   return Object.entries(packs).reduce((t,[i,q])=>t+q*itemUnitPrice(i,s),0);
 }
+// Ingredient cost of one dinner. Same figure on the day card and in Modify.
+// Scaled portion ÷ pack × that shop's pack price. Seasonings stay off this sum:
+// the basket still buys one jar. A missing shop price, or a grocery with no usable
+// portion, is incomplete — no partial sum. Keep in step with
+// private.refresh_meal_ingredient_prices in supabase/meal_ingredient_prices.sql.
+function ingredientPack(key, store){
+  const code=INGREDIENTS[key];
+  if(!code||!(+code.pack>0))return 0;
+  const row=store?shelfRow(key, store):null;
+  const qty=row?+row.pack_qty:0;
+  if(!(qty>0))return +code.pack;
+  const cu=String(code.pu||"").toLowerCase();
+  const su=String(row.pack_unit||"").toLowerCase();
+  if(su===cu)return qty;
+  if((cu==="g"&&su==="kg")||(cu==="ml"&&su==="l"))return qty*1000;
+  if((cu==="kg"&&su==="g")||(cu==="l"&&su==="ml"))return qty/1000;
+  return +code.pack;
+}
+function mealIngredientQuote(meal, servings, store){
+  const s=normServings(servings==null?weekServings():servings);
+  const ing=Array.isArray(meal&&meal.ing)?meal.ing:[];
+  const raw=meal&&meal.portions&&typeof meal.portions==="object"&&!Array.isArray(meal.portions)?meal.portions:null;
+  const missing=[];
+  function flag(key){ if(key&&missing.indexOf(key)<0)missing.push(key); }
+  ing.forEach(function(key){
+    if(SEASONINGS.indexOf(key)>=0)return;
+    const code=INGREDIENTS[key];
+    if(!code||!(+code.pack>0))return;
+    if(!raw||raw[key]==null)flag(key);
+  });
+  let sum=0;
+  if(raw){
+    Object.keys(raw).forEach(function(key){
+      if(SEASONINGS.indexOf(key)>=0)return;
+      const code=INGREDIENTS[key];
+      if(!code||!(+code.pack>0)){ flag(key); return; }
+      const spec=raw[key];
+      const bad=!Array.isArray(spec)||spec.length<2||String(spec[1])!==String(code.pu||"");
+      if(bad){ flag(key); return; }
+      const row=store?shelfRow(key, store):null;
+      const price=row&&Number.isFinite(+row.price_gbp)?+row.price_gbp:null;
+      if(price==null){ flag(key); return; }
+      const pack=ingredientPack(key, store);
+      if(!(pack>0)){ flag(key); return; }
+      const qty=scalePortion(+spec[0], String(spec[1]), key, s);
+      if(!(qty>=0)){ flag(key); return; }
+      sum+=qty/pack*price;
+    });
+  }
+  if(!raw||missing.length)return {pence:null, incomplete:true, missing};
+  return {pence:Math.round(sum*100), incomplete:false, missing:[]};
+}
+function mealPriceLabel(q){
+  if(!q||q.incomplete||q.pence==null)return "incomplete";
+  return "~£"+(q.pence/100).toFixed(2);
+}
+function weekIngredientLabel(meals, store){
+  const list=Array.isArray(meals)?meals:[];
+  if(!list.length)return "";
+  let pence=0, bad=0;
+  list.forEach(function(m){
+    const q=mealIngredientQuote(m, weekServings(), store);
+    if(q.incomplete||q.pence==null)bad++;
+    else pence+=q.pence;
+  });
+  if(bad===list.length)return "Ingredients incomplete";
+  const text="Ingredients ~£"+(pence/100).toFixed(2);
+  return bad?text+" · "+bad+" incomplete":text;
+}
 function mealTag(m){
   const ing=Array.isArray(m&&m.ing)?m.ing:[];
   const meat=["chicken thighs","salmon fillet","minced beef"];
@@ -3047,7 +3118,8 @@ function renderMenu(){
     const budgetLine=budget==null?"":`<div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${esc(budget)} budget`:`£${Math.abs(under).toFixed(0)} over your £${esc(budget)} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>`;
     const mk=s?STORE_MARK[s.id]:null;
     const priceFooter=meals.length
-      ?`<p class="week-sum" id="week-price-sum">Groceries £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}</p>
+      ?`<p class="week-sum" id="week-ingredients">${weekIngredientLabel(meals, s)}</p>
+      <p class="week-sum" id="week-price-sum">Basket £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}</p>
       <p class="sub" id="week-hold">The card hold is £${quote.hold.toFixed(2)} — a 30% buffer. Only the actual amount is captured, and the rest is released.</p>`
       :"";
     wrap.innerHTML=`<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:4px">
@@ -3063,13 +3135,13 @@ function renderMenu(){
       ${budgetLine}
       ${meals.length?meals.map((m,i)=>{
         const idx=S.menuOptions.findIndex(x=>x.name===m.name);
-        const mc=(quote.pence[i]||0)/100;
+        const label=mealPriceLabel(mealIngredientQuote(m, weekServings(), s));
         const det=idx>=0?idx:0;
         return `<div class="day-card">
           <div class="day-photo" onclick="showMealDetails(${det})">${mealThumbHtml(m)}<span class="day-badge">${days[i]||("D"+(i+1))}</span></div>
           <div style="flex:1;min-width:0;cursor:pointer" onclick="showMealDetails(${det})"><div class="nm">${esc(m.name)}</div><div class="meta">${cookMinutes(m)} min · serves ${weekServings()}</div><div class="tag-row">${mealTagHtml(m)}</div></div>
           <div class="day-side">
-            <div class="mp">${mc?`£${mc.toFixed(2)}`:"pantry"}</div>
+            <div class="mp">${label}</div>
             <button type="button" class="btn ghost sm" onclick="openModify(${i})">Modify</button>
           </div>
         </div>`;
@@ -3110,28 +3182,99 @@ function showMealDetails(idx){
     ${S.selected.indexOf(m.name)>=0?`<button class="btn ghost" style="width:100%;margin-top:8px" onclick="openModify(${S.selected.indexOf(m.name)})">Modify this dinner</button>`:""}`);
 }
 let modifyPicks=[];
+let modifySlot=-1;
+let modifyCurrentName="";
+let modifySeen=[];
+let modifyCatalog=[];
+let modifyToken=0;
+const MODIFY_FIRST=6;
+const MODIFY_MORE=4;
+// Same published pool autoPickWeek ranks, then the diet filter, minus this week,
+// the dinner being replaced, and alternatives already shown for this slot.
+function modifyCandidates(catalog, currentName, seen){
+  const week={};
+  (Array.isArray(S.selected)?S.selected:[]).forEach(n=>{if(n)week[n]=1;});
+  if(currentName)week[currentName]=1;
+  const skip={};
+  (Array.isArray(seen)?seen:[]).forEach(n=>{if(n)skip[n]=1;});
+  const used={};
+  return publishedPool(catalog||[]).filter(m=>{
+    if(!m||!m.name||week[m.name]||skip[m.name]||used[m.name])return false;
+    if(!mealFitsDiet(m))return false;
+    used[m.name]=1;
+    return true;
+  });
+}
+function takeModifyPage(first){
+  const ranked=rankCatalog(modifyCandidates(modifyCatalog, modifyCurrentName, modifySeen));
+  const cap=first?MODIFY_FIRST:MODIFY_MORE;
+  const take=Math.min(cap, ranked.length);
+  if(take>0){
+    modifyPicks=ranked.slice(0, take);
+    modifyPicks.forEach(m=>{if(modifySeen.indexOf(m.name)<0)modifySeen.push(m.name);});
+  }else if(first)modifyPicks=[];
+  return take;
+}
+function modifySheetHtml(){
+  const unseen=modifyCandidates(modifyCatalog, modifyCurrentName, modifySeen).length;
+  const cards=modifyPicks.length?`<div id="modify-alts">${modifyPicks.map((m,j)=>{
+    const label=mealPriceLabel(mealIngredientQuote(m, weekServings(), preferredStoreObj()));
+    return `<button type="button" class="day-card" onclick="applyModify(${modifySlot},${j})">
+      <div class="day-photo">${mealThumbHtml(m)}</div>
+      <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min</div><div class="tag-row">${mealTagHtml(m)}</div></div>
+      <div class="mp">${label}</div>
+    </button>`;
+  }).join("")}</div>`:"";
+  const poolEmpty=!modifyPicks.length;
+  const pagedOut=!poolEmpty&&unseen===0&&modifySeen.length>modifyPicks.length;
+  const allShown=!poolEmpty&&unseen===0&&!pagedOut;
+  let note="";
+  if(modifyPicks.length)note=`<p class="sub">Pick one. Your week stays ${esc(S.prefs.meals)} dinners.</p>`;
+  if(poolEmpty)note=`<p class="sub" id="modify-empty">Every dinner that fits what you eat is already in this week.</p>`;
+  const end=pagedOut?`<p class="sub" id="modify-end">That's every other dinner that fits. Start again to see the first ones.</p>`:"";
+  const all=allShown?`<p class="sub" id="modify-end">That's every other dinner that fits.</p>`:"";
+  const refreshLabel=unseen>=MODIFY_MORE?"Show 4 more":(unseen>0?`Show ${unseen} more`:"Show 4 more");
+  const restart=pagedOut?`<button type="button" class="btn ghost" id="modify-restart" style="width:100%;margin-top:8px" onclick="restartModify()">Start again</button>`:"";
+  return `<h2>Replace ${esc(modifyCurrentName)}</h2>
+    ${note}
+    ${cards}
+    ${end}
+    ${all}
+    <button type="button" class="btn ghost" id="modify-refresh" style="width:100%;margin-top:8px" onclick="refreshModify()" ${unseen?"":"disabled"}>${esc(refreshLabel)}</button>
+    ${restart}
+    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Keep this dinner</button>`;
+}
+function renderModifySheet(){openModal(modifySheetHtml());}
 async function openModify(selI){
   const current=selectedMeals()[selI];
   if(!current)return;
-  openModal(`<h2>Replace ${esc(current.name)}</h2><p class="sub">Five other dinners from the catalog…</p>`);
+  const token=++modifyToken;
+  modifySlot=selI;
+  modifyCurrentName=current.name;
+  modifySeen=[];
+  modifyPicks=[];
+  modifyCatalog=[];
+  openModal(`<h2>Replace ${esc(current.name)}</h2><p class="sub">Finding other dinners…</p>`);
   let catalog=[];
   try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
   if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
   catalog.forEach(m=>{if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.push(m);});
-  const pool=catalog.filter(m=>m.name!==current.name&&!S.selected.includes(m.name)&&isPublished(m)&&mealFitsDiet(m));
-  modifyPicks=rankCatalog(pool).slice(0,5);
-  const s=preferredStoreObj();
-  openModal(`<h2>Replace ${esc(current.name)}</h2>
-    <p class="sub">Pick one of these. Your week stays ${esc(S.prefs.meals)} dinners.</p>
-    ${modifyPicks.map((m,j)=>{
-      const mc=mealNeedCost(m,s);
-      return `<button type="button" class="day-card" onclick="applyModify(${selI},${j})">
-        <div class="day-photo">${mealThumbHtml(m)}</div>
-        <div style="flex:1;min-width:0"><div class="nm">${esc(m.name)}</div><div class="meta">${+m.time||0} min</div><div class="tag-row">${mealTagHtml(m)}</div></div>
-        <div class="mp">${mc?`£${mc.toFixed(2)}`:""}</div>
-      </button>`;
-    }).join("")||'<p class="sub">No other dinners in the catalog right now.</p>'}
-    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Keep this dinner</button>`);
+  if(token!==modifyToken)return;
+  modifyCatalog=catalog;
+  takeModifyPage(true);
+  renderModifySheet();
+}
+function refreshModify(){
+  if(modifySlot<0)return;
+  takeModifyPage(false);
+  renderModifySheet();
+}
+function restartModify(){
+  if(modifySlot<0)return;
+  modifySeen=[];
+  modifyPicks=[];
+  takeModifyPage(true);
+  renderModifySheet();
 }
 function applyModify(selI,j){
   const next=modifyPicks[j];
@@ -3714,7 +3857,7 @@ function confirmOrder(){
   openModal(`<h2 style="margin-bottom:6px">Confirm this shop</h2>
     <p class="sub">${basket.length} items at ${esc(chosenStore.name)} · pick a 2-hour window at least 3 days out</p>
     <p class="sub" style="white-space:normal">${preview}${extra}</p>
-    <p class="sub" style="margin:0">Groceries £${t.toFixed(2)} · Plentry 5% £${fee.toFixed(2)} · <b style="color:var(--text)">you pay £${pay.toFixed(2)}</b></p>
+    <p class="sub" style="margin:0">Basket £${t.toFixed(2)} · Plentry 5% £${fee.toFixed(2)} · <b style="color:var(--text)">you pay £${pay.toFixed(2)}</b></p>
     ${basket.some(b=>isStaple(b.i))?spiceSkipAlertHtml():""}
     ${addrBlock}
     ${slotPickerHtml()}
@@ -4368,10 +4511,12 @@ if(typeof window!=="undefined"){
     validMeal,
     setModifyPicks(a){modifyPicks=Array.isArray(a)?a:[];},
     modifyPicks:()=>modifyPicks,
+    modifySeen:()=>modifySeen.slice(),
+    modifyCandidates,
     setAdvisor(proposed,idxs){advisorProposed=Array.isArray(proposed)?proposed:[];advisorPicked=new Set(idxs||[]);},
     STAPLES,CUPBOARD_ICONS,CUPBOARD_ICON_FALLBACK,cupboardIconSrc,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
     tagsFor,mealTags,MEAL_TAGS,USER_MEAL_TAGS,wantedTags,clampMeals,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,deliveryFrom,orderDeliverTo,captureChargePence,
-    splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,
+    splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,mealIngredientQuote,mealPriceLabel,weekIngredientLabel,
   };
 }
 </script>
