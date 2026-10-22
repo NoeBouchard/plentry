@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-22 — Price labels
+
+- **Note.** Under the day cards: “Dinner prices are the ingredients used; the basket buys whole packs.”
+- **Gap.** A customer sees **Price soon**. An admin sees **incomplete**. No partial sum.
+- **Fallback.** No shop, or a shelf that did not load, uses the catalogue price the way the basket does. A loaded shop still uses that shop’s first row that has a price (lowest id), the same row the SQL function uses.
+- **Parity.** The site formula and `supabase/meal_ingredient_prices.sql` agree at 2, 4, and 6 for pomodoro (meal 28), beef ragù, and a rice bowl, including a blank earlier spaghetti row. The SQL file is still not applied.
+- **Unchanged.** Hold, basket packs, and the shared `basketFor` block.
+
 ## 2026-10-22 — One meal price
 
 - **Price.** A dinner’s price is the sum of its ingredient portions at 2, 4, or 6 servings in the chosen shop: scaled amount ÷ pack × that shop’s pack price. The day card and Modify show that same `~£` figure. **Ingredients ~£** under the week is the sum. **Basket £** stays the whole-pack shop (half-pack rule unchanged) plus delivery and 5%. The two can differ. Words are a proposal for Product.

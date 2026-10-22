@@ -418,6 +418,9 @@ describe("source contracts", () => {
     assert.doesNotMatch(sql, /update public\.ingredient_prices/i);
     assert.match(html, /function mealIngredientQuote/);
     assert.match(html, /id="week-ingredients"/);
+    assert.match(html, /id="week-price-note"/);
+    assert.match(html, /Dinner prices are the ingredients used; the basket buys whole packs\./);
+    assert.match(html, /Price soon/);
     assert.match(html, /Basket £/);
   });
 

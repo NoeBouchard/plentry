@@ -961,7 +961,7 @@ describe("Modify alternatives", () => {
     assert.notEqual(afterSum, beforeSum);
     const card = week.querySelector(".day-card");
     assert.ok(card.textContent.includes("Plain rice bowl"));
-    assert.match(card.querySelector(".mp").textContent, /£|incomplete/);
+    assert.match(card.querySelector(".mp").textContent, /£|incomplete|Price soon/);
   });
 });
 
@@ -1062,6 +1062,10 @@ describe("one meal price", () => {
       assert.notEqual(document.getElementById("week-ingredients").textContent, beforeIng, `servings ${servings}`);
       assert.match(document.getElementById("week-ingredients").textContent, /Ingredients ~£/);
       assert.match(document.getElementById("week-price-sum").textContent, /Basket £/);
+      assert.equal(
+        document.getElementById("week-price-note").textContent,
+        "Dinner prices are the ingredients used; the basket buys whole packs.",
+      );
     }
   });
 
@@ -1072,19 +1076,28 @@ describe("one meal price", () => {
     assert.equal(quote.incomplete, true);
     assert.equal(quote.pence, null);
     assert.ok(quote.missing.includes("chopped tomatoes"));
-    assert.equal(window.mealPriceLabel(quote), "incomplete");
+    assert.equal(window.isAdmin(), false);
+    assert.equal(window.mealPriceLabel(quote), "Price soon");
     await window.openModify(0);
     window.__plentry.setModifyPicks([pomodoro]);
     window.renderModifySheet();
     const btn = [...document.querySelectorAll("#modify-alts .day-card")]
       .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
-    assert.equal(btn.querySelector(".mp").textContent, "incomplete");
+    assert.equal(btn.querySelector(".mp").textContent, "Price soon");
     assert.equal(btn.querySelector(".mp").textContent.includes("£"), false);
     btn.click();
     const card = [...document.querySelectorAll("#menu-week .day-card")]
       .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
-    assert.equal(card.querySelector(".mp").textContent, "incomplete");
+    assert.equal(card.querySelector(".mp").textContent, "Price soon");
     assert.equal(card.querySelector(".mp").textContent.includes("£"), false);
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), true);
+    window.renderMenu();
+    const adminCard = [...document.querySelectorAll("#menu-week .day-card")]
+      .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
+    assert.equal(adminCard.querySelector(".mp").textContent, "incomplete");
+    assert.equal(window.mealPriceLabel(quote), "incomplete");
   });
 
   it("flags a published meal with no portions", async () => {
@@ -1097,7 +1110,141 @@ describe("one meal price", () => {
     const quote = window.__plentry.mealIngredientQuote(bare, 2, { id: "tesco" });
     assert.equal(quote.incomplete, true);
     assert.equal(quote.pence, null);
+    assert.equal(window.mealPriceLabel(quote), "Price soon");
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+    await window.checkAdminStatus();
     assert.equal(window.mealPriceLabel(quote), "incomplete");
+  });
+
+  it("uses catalogue prices when the shelf has not loaded or no shop is picked", async () => {
+    const state = weekState();
+    state.prefs.preferredStore = "";
+    const { window, document } = await loadApp({
+      localState: state,
+      tables: { meals: [pomodoro], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.menuOptions = [pomodoro];
+    S.selected = [pomodoro.name];
+    S.weekServings = 2;
+    S.pantry = {};
+    window.renderMenu();
+    const none = window.__plentry.mealIngredientQuote(pomodoro, 2, null);
+    assert.equal(none.incomplete, false);
+    assert.equal(none.pence, 182);
+    assert.equal(document.querySelector("#menu-week .day-side .mp").textContent, "~£1.82");
+    assert.equal(document.querySelector("#menu-week .day-side .mp").textContent.includes("Price soon"), false);
+    const tesco = window.__plentry.mealIngredientQuote(pomodoro, 2, { id: "tesco", mult: 1 });
+    assert.equal(tesco.pence, 182);
+    const sains = window.__plentry.mealIngredientQuote(pomodoro, 2, { id: "sains", mult: 1.07 });
+    assert.equal(sains.pence, 195);
+  });
+
+  it("prices from the first shop row that has a price, skipping an earlier blank", async () => {
+    const prices = shelf.map((r) => ({ ...r }));
+    prices.unshift({
+      id: 0,
+      meal_key: "spaghetti",
+      store: "tesco",
+      price_gbp: null,
+      pack_qty: 100,
+      pack_unit: "g",
+      product_name: "blank",
+      display_name: "spaghetti",
+    });
+    const { window } = await bootPrice(2, prices);
+    assert.equal(window.shelfRow("spaghetti", { id: "tesco" }).price_gbp, null);
+    const quote = window.__plentry.mealIngredientQuote(pomodoro, 2, { id: "tesco" });
+    assert.equal(quote.incomplete, false);
+    assert.equal(quote.pence, 193);
+  });
+
+  it("matches supabase/meal_ingredient_prices.sql at 2, 4 and 6, including live pomodoro", async () => {
+    const ragu = {
+      id: 23,
+      name: "Beef ragù spaghetti",
+      ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+      portions: {
+        salt: [0.5, "tsp"], garlic: [2, "clove"], onions: [1, "pc"], passata: [400, "g"],
+        parmesan: [30, "g"], "olive oil": [1, "tbsp"], "soy sauce": [1, "tsp"], spaghetti: [180, "g"],
+        "minced beef": [400, "g"], "mixed herbs": [1, "tsp"], "stock cubes": [1, "pc"], "black pepper": [0.25, "tsp"],
+      },
+    };
+    const meals = [pomodoro, ragu, rice];
+    const prices = [
+      { id: 0, meal_key: "spaghetti", store: "tesco", price_gbp: null, pack_qty: 100, pack_unit: "g" },
+      { id: 1, meal_key: "garlic", store: "tesco", price_gbp: 0.87, pack_qty: 40, pack_unit: "clove" },
+      { id: 2, meal_key: "olive oil", store: "tesco", price_gbp: 5.75, pack_qty: 33, pack_unit: "tbsp" },
+      { id: 3, meal_key: "spaghetti", store: "tesco", price_gbp: 0.75, pack_qty: 500, pack_unit: "g" },
+      { id: 4, meal_key: "red onions", store: "tesco", price_gbp: 1, pack_qty: 3, pack_unit: "pc" },
+      { id: 5, meal_key: "fresh basil", store: "tesco", price_gbp: 0.5, pack_qty: 30, pack_unit: "g" },
+      { id: 6, meal_key: "tomato puree", store: "tesco", price_gbp: 0.59, pack_qty: 200, pack_unit: "g" },
+      { id: 7, meal_key: "chopped tomatoes", store: "tesco", price_gbp: 0.47, pack_qty: 400, pack_unit: "g" },
+      { id: 8, meal_key: "onions", store: "tesco", price_gbp: 0.95, pack_qty: 7, pack_unit: "pc" },
+      { id: 9, meal_key: "parmesan", store: "tesco", price_gbp: 4, pack_qty: 200, pack_unit: "g" },
+      { id: 10, meal_key: "passata", store: "tesco", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+      { id: 11, meal_key: "minced beef", store: "tesco", price_gbp: 6.75, pack_qty: 500, pack_unit: "g" },
+      { id: 12, meal_key: "rice", store: "tesco", price_gbp: 1.79, pack_qty: 1000, pack_unit: "g" },
+      { id: 13, meal_key: "salt", store: "tesco", price_gbp: 1.9, pack_qty: 1500, pack_unit: "g" },
+      { id: 14, meal_key: "black pepper", store: "tesco", price_gbp: 1.2, pack_qty: 25, pack_unit: "g" },
+      { id: 15, meal_key: "chilli flakes", store: "tesco", price_gbp: 1, pack_qty: 32, pack_unit: "g" },
+      { id: 16, meal_key: "mixed herbs", store: "tesco", price_gbp: 1, pack_qty: 18, pack_unit: "g" },
+      { id: 17, meal_key: "soy sauce", store: "tesco", price_gbp: 0.55, pack_qty: 150, pack_unit: "ml" },
+      { id: 18, meal_key: "stock cubes", store: "tesco", price_gbp: 1, pack_qty: 10, pack_unit: "pc" },
+    ];
+    const { window } = await bootPrice(2, prices.map((r) => ({
+      ...r, product_name: r.meal_key, display_name: r.meal_key,
+    })));
+    const { readFileSync } = await import("node:fs");
+    const { PGlite } = await import("@electric-sql/pglite");
+    const db = new PGlite();
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create table public.meals (
+        id bigint primary key,
+        ing jsonb,
+        portions jsonb
+      );
+      create table public.ingredient_prices (
+        id bigint primary key,
+        meal_key text,
+        store text,
+        price_gbp numeric,
+        pack_qty numeric,
+        pack_unit text
+      );
+    `);
+    await db.exec(readFileSync(new URL("../supabase/meal_ingredient_prices.sql", import.meta.url), "utf8"));
+    for (const row of prices) {
+      await db.query(
+        "insert into public.ingredient_prices (id, meal_key, store, price_gbp, pack_qty, pack_unit) values ($1,$2,$3,$4,$5,$6)",
+        [row.id, row.meal_key, row.store, row.price_gbp, row.pack_qty, row.pack_unit],
+      );
+    }
+    for (const meal of meals) {
+      await db.query(
+        "insert into public.meals (id, ing, portions) values ($1, $2::jsonb, $3::jsonb)",
+        [meal.id, JSON.stringify(meal.ing), JSON.stringify(meal.portions)],
+      );
+    }
+    const { rows } = await db.query(
+      "select meal_id, servings, price_gbp, incomplete from public.meal_ingredient_prices where store = 'tesco' order by meal_id, servings",
+    );
+    assert.equal(rows.length, meals.length * 3);
+    const store = { id: "tesco" };
+    for (const meal of meals) {
+      for (const servings of [2, 4, 6]) {
+        const sql = rows.find((r) => Number(r.meal_id) === meal.id && Number(r.servings) === servings);
+        const quote = window.__plentry.mealIngredientQuote(meal, servings, store);
+        const sqlPence = sql.price_gbp == null ? null : Math.round(Number(sql.price_gbp) * 100);
+        assert.equal(quote.incomplete, sql.incomplete === true || sql.incomplete === "t", `${meal.name} ${servings}`);
+        assert.equal(quote.pence, sqlPence, `${meal.name} ${servings}`);
+      }
+    }
+    const pom = rows.find((r) => Number(r.meal_id) === 28 && Number(r.servings) === 2);
+    assert.equal(Math.round(Number(pom.price_gbp) * 100), 193);
+    await db.close();
   });
 });
 

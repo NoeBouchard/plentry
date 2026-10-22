@@ -23,6 +23,7 @@
     "@supabase/server": "^1.2.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "jsdom": "^25.0.1"
   }
 }

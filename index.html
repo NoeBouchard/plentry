@@ -1178,7 +1178,7 @@ function rankCatalog(list){
 // Keyed by meal_key (same keys as meals.ing / INGREDIENTS) then app store id.
 // Used for per-store totals + matched products on the manual path; Pepesto live quotes still win.
 const DB_STORE={tesco:"tesco",asda:"asda",sains:"sainsburys",wait:"waitrose"}; // app id -> db store id
-let SHELF={};let SHELF_READY=false;
+let SHELF={};let SHELF_ROWS=[];let SHELF_READY=false;
 async function loadShelfPrices(){
   if(!sb)return;
   try{
@@ -1188,6 +1188,7 @@ async function loadShelfPrices(){
       .select("id,meal_key,display_name,store,product_name,pack_size,price_gbp,unit_price,is_estimate");
     const data=res.data,error=res.error;
     if(error||!data)return;
+    SHELF_ROWS=data;
     // key by meal_key when linked to the meal catalog, else display_name — so pantry
     // items outside the meal keys (soy sauce, ketchup, …) still price correctly.
     // Several rows for one key and store collapse with firstShelfRow (lowest id).
@@ -2943,13 +2944,15 @@ function mealNeedCost(m,s){
 }
 // Ingredient cost of one dinner. Same figure on the day card and in Modify.
 // Scaled portion ÷ pack × that shop's pack price. Seasonings stay off this sum:
-// the basket still buys one jar. A missing shop price, or a grocery with no usable
-// portion, is incomplete — no partial sum. Keep in step with
-// private.refresh_meal_ingredient_prices in supabase/meal_ingredient_prices.sql.
-function ingredientPack(key, store){
+// the basket still buys one jar. A grocery with no usable portion, or no shop
+// price once the shelf has loaded, is incomplete — no partial sum. Keep in step
+// with private.refresh_meal_ingredient_prices in supabase/meal_ingredient_prices.sql.
+// The priced row is the lowest id whose price_gbp is not null, matching that SQL.
+// No shop, or a shelf that never loaded, uses the catalogue price the way the
+// basket does (catalogue price × the shop multiplier, or × 1 when no shop).
+function ingredientPack(key, row){
   const code=INGREDIENTS[key];
   if(!code||!(+code.pack>0))return 0;
-  const row=store?shelfRow(key, store):null;
   const qty=row?+row.pack_qty:0;
   if(!(qty>0))return +code.pack;
   const cu=String(code.pu||"").toLowerCase();
@@ -2959,11 +2962,36 @@ function ingredientPack(key, store){
   if((cu==="kg"&&su==="g")||(cu==="l"&&su==="ml"))return qty/1000;
   return +code.pack;
 }
+function rowPrice(row){
+  if(!row||row.price_gbp==null||row.price_gbp==="")return null;
+  const n=+row.price_gbp;
+  return Number.isFinite(n)?n:null;
+}
+function pricedShelfRow(key, store){
+  if(!store||!store.id)return null;
+  const db=DB_STORE[store.id]||store.id;
+  const rows=[];
+  (Array.isArray(SHELF_ROWS)?SHELF_ROWS:[]).forEach(function(r){
+    if(!r||r.meal_key!==key||r.store!==db)return;
+    if(rowPrice(r)==null)return;
+    rows.push(r);
+  });
+  return firstShelfRow(rows);
+}
+function shelfPricesReady(store){
+  return !!(store&&store.id&&SHELF_READY);
+}
+function catalogPackPrice(key, store){
+  const code=INGREDIENTS[key];
+  if(!code||!Number.isFinite(+code.price))return null;
+  return +code.price*((store&&+store.mult)||1);
+}
 function mealIngredientQuote(meal, servings, store){
   const s=normServings(servings==null?weekServings():servings);
   const ing=Array.isArray(meal&&meal.ing)?meal.ing:[];
   const raw=meal&&meal.portions&&typeof meal.portions==="object"&&!Array.isArray(meal.portions)?meal.portions:null;
   const missing=[];
+  const shop=shelfPricesReady(store);
   function flag(key){ if(key&&missing.indexOf(key)<0)missing.push(key); }
   ing.forEach(function(key){
     if(SEASONINGS.indexOf(key)>=0)return;
@@ -2980,10 +3008,10 @@ function mealIngredientQuote(meal, servings, store){
       const spec=raw[key];
       const bad=!Array.isArray(spec)||spec.length<2||String(spec[1])!==String(code.pu||"");
       if(bad){ flag(key); return; }
-      const row=store?shelfRow(key, store):null;
-      const price=row&&Number.isFinite(+row.price_gbp)?+row.price_gbp:null;
+      const row=shop?pricedShelfRow(key, store):null;
+      const price=shop?rowPrice(row):catalogPackPrice(key, store);
       if(price==null){ flag(key); return; }
-      const pack=ingredientPack(key, store);
+      const pack=ingredientPack(key, shop?row:null);
       if(!(pack>0)){ flag(key); return; }
       const qty=scalePortion(+spec[0], String(spec[1]), key, s);
       if(!(qty>=0)){ flag(key); return; }
@@ -2994,7 +3022,7 @@ function mealIngredientQuote(meal, servings, store){
   return {pence:Math.round(sum*100), incomplete:false, missing:[]};
 }
 function mealPriceLabel(q){
-  if(!q||q.incomplete||q.pence==null)return "incomplete";
+  if(!q||q.incomplete||q.pence==null)return isAdmin()?"incomplete":"Price soon";
   return "~£"+(q.pence/100).toFixed(2);
 }
 function weekIngredientLabel(meals, store){
@@ -3006,9 +3034,10 @@ function weekIngredientLabel(meals, store){
     if(q.incomplete||q.pence==null)bad++;
     else pence+=q.pence;
   });
-  if(bad===list.length)return "Ingredients incomplete";
+  if(bad===list.length)return isAdmin()?"Ingredients incomplete":"Price soon";
   const text="Ingredients ~£"+(pence/100).toFixed(2);
-  return bad?text+" · "+bad+" incomplete":text;
+  if(!bad)return text;
+  return text+" · "+(isAdmin()?bad+" incomplete":"Price soon");
 }
 function mealTag(m){
   const ing=Array.isArray(m&&m.ing)?m.ing:[];
@@ -3118,7 +3147,8 @@ function renderMenu(){
     const budgetLine=budget==null?"":`<div class="${under>=0?"week-under":"week-under week-over"}">${under>=0?`£${under.toFixed(0)} under your £${esc(budget)} budget`:`£${Math.abs(under).toFixed(0)} over your £${esc(budget)} budget`}${pantryValue?` · £${pantryValue.toFixed(0)} already in the pantry`:""}</div>`;
     const mk=s?STORE_MARK[s.id]:null;
     const priceFooter=meals.length
-      ?`<p class="week-sum" id="week-ingredients">${weekIngredientLabel(meals, s)}</p>
+      ?`<p class="sub" id="week-price-note">Dinner prices are the ingredients used; the basket buys whole packs.</p>
+      <p class="week-sum" id="week-ingredients">${weekIngredientLabel(meals, s)}</p>
       <p class="week-sum" id="week-price-sum">Basket £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}</p>
       <p class="sub" id="week-hold">The card hold is £${quote.hold.toFixed(2)} — a 30% buffer. Only the actual amount is captured, and the rest is released.</p>`
       :"";
