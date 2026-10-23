@@ -800,6 +800,196 @@ describe("week and modify", () => {
   });
 });
 
+describe("seeded tie-break", () => {
+  const ING = ["minced beef", "spaghetti", "onions", "garlic", "passata"];
+  function tied(id, tags) {
+    return {
+      name: "Tied " + id,
+      emoji: "🍝",
+      time: 30,
+      ing: ING.slice(),
+      tags: tags || ["dinner", "meat"],
+      id,
+      reviewed_at: "2026-10-23",
+    };
+  }
+  function names(list) {
+    return list.map((m) => m.name);
+  }
+  function armWeek(window, pool) {
+    const S = window.__plentry.state();
+    S.menuOptions = pool.map((m) => ({ ...m, ing: m.ing.slice(), tags: m.tags.slice() }));
+    S.prefs.meals = 4;
+    S.prefs.budget = null;
+    S.prefs.diet = "omnivore";
+    S.prefs.tags = [];
+    S.prefs.goals = [];
+    S.selected = [];
+    return S;
+  }
+
+  it("I-W08 the same seed repeats the week and each Modify page", async () => {
+    const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((id) => tied(id));
+    async function run(seed) {
+      const { window } = await loadApp({
+        url: "https://getplentry.com/?seed=" + seed,
+        localState: weekState(),
+        tables: { meals: pool, orders: [], profiles: [], ingredient_prices: [] },
+      });
+      const S = armWeek(window, pool);
+      assert.equal(window.__plentry.weekSeed(), seed);
+      window.autoPickWeek();
+      const week = Array.from(S.selected);
+      S.selected = [week[0]];
+      await window.openModify(0);
+      const first = window.__plentry.modifyPicks().map((m) => m.name);
+      window.refreshModify();
+      const second = window.__plentry.modifyPicks().map((m) => m.name);
+      return { week, first, second };
+    }
+    const a = await run(4242);
+    const b = await run(4242);
+    assert.deepEqual(b, a);
+    assert.equal(a.week.length, 4);
+    assert.equal(new Set(a.week).size, 4);
+    assert.equal(a.first.length, 6);
+    assert.equal(a.second.length, 4);
+    a.second.forEach((name) => assert.equal(a.first.includes(name), false, name));
+    assert.equal(a.first.includes(a.week[0]), false);
+    assert.equal(a.second.includes(a.week[0]), false);
+  });
+
+  it("I-W08 a different seed can change the week and the Modify order", async () => {
+    const pool = [1, 2, 3, 4, 5, 6, 7, 8].map((id) => tied(id));
+    const { window } = await loadApp({
+      localState: weekState(),
+      tables: { meals: pool, orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = armWeek(window, pool);
+    const weeks = new Set();
+    const pages = new Set();
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+      window.__plentry.setWeekSeed(seed);
+      S.menuOptions = pool.map((m) => ({ ...m, ing: m.ing.slice(), tags: m.tags.slice() }));
+      S.selected = [];
+      S.prefs.meals = 4;
+      S.prefs.budget = null;
+      window.autoPickWeek();
+      weeks.add(Array.from(S.selected).join("|"));
+      S.selected = ["Tied 1"];
+      await window.openModify(0);
+      pages.add(window.__plentry.modifyPicks().map((m) => m.name).join("|"));
+    }
+    assert.ok(weeks.size > 1, [...weeks].slice(0, 4).join(" / "));
+    assert.ok(pages.size > 1, [...pages].slice(0, 4).join(" / "));
+  });
+
+  it("I-W08 a higher score stays ahead of the tie-break", async () => {
+    const { window } = await loadApp();
+    const meat = tied(1, ["dinner", "meat"]);
+    const fish = tied(2, ["dinner", "fish"]);
+    fish.name = "Tied fish";
+    const veg = tied(3, ["dinner", "vegetarian"]);
+    veg.name = "Tied veg";
+    veg.ing = ["chickpeas", "rice", "onions", "garlic"];
+    const input = [veg, fish, meat];
+    for (const seed of [0, 1, 7, 99, 4242]) {
+      window.__plentry.setWeekSeed(seed);
+      const forward = names(window.rankCatalog(input));
+      const backward = names(window.rankCatalog(input.slice().reverse()));
+      assert.deepEqual(forward, ["Tied 1", "Tied fish", "Tied veg"], "seed " + seed);
+      assert.deepEqual(backward, forward);
+      const scores = window.rankCatalog(input).map((m) => window.__plentry.scoreMeal(m));
+      for (let i = 1; i < scores.length; i++) assert.ok(scores[i - 1] >= scores[i]);
+    }
+  });
+
+  it("I-W08 the tie-break key follows the meal id, including when the id is missing", async () => {
+    const { window } = await loadApp();
+    window.__plentry.setWeekSeed(42);
+    const a = tied(10);
+    const b = tied(20);
+    const c = tied(30);
+    const pair = names(window.rankCatalog([b, a]));
+    const withC = names(window.rankCatalog([c, a, b])).filter((n) => n !== c.name);
+    assert.deepEqual(withC, pair);
+
+    const x = tied(1);
+    const y = tied(2);
+    delete x.id;
+    delete y.id;
+    x.name = "No id A";
+    y.name = "No id B";
+    assert.deepEqual(names(window.rankCatalog([y, x])), names(window.rankCatalog([x, y])));
+  });
+
+  it("I-W08 rankCatalog does not call Math.random", async () => {
+    const { window } = await loadApp();
+    window.__plentry.setWeekSeed(3);
+    const meals = [1, 2, 3, 4, 5].map((id) => tied(id));
+    let calls = 0;
+    const orig = window.Math.random;
+    window.Math.random = function () {
+      calls += 1;
+      return orig.call(this);
+    };
+    window.rankCatalog(meals);
+    window.rankCatalog(meals.slice().reverse());
+    window.autoPickWeek();
+    window.Math.random = orig;
+    assert.equal(calls, 0);
+  });
+
+  it("I-W08 tie-break order across seeds is roughly uniform", async () => {
+    const { window } = await loadApp();
+    const meals = [1, 2, 3, 4].map((id) => tied(id));
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const n = 800;
+    for (let s = 1; s <= n; s++) {
+      window.__plentry.setWeekSeed(s);
+      const first = window.rankCatalog(meals)[0];
+      counts[first.id] += 1;
+    }
+    const expected = n / 4;
+    let chi = 0;
+    for (const id of [1, 2, 3, 4]) {
+      assert.ok(counts[id] > expected * 0.7 && counts[id] < expected * 1.3, JSON.stringify(counts));
+      chi += ((counts[id] - expected) ** 2) / expected;
+    }
+    assert.ok(chi < 25, "chi " + chi + " " + JSON.stringify(counts));
+  });
+
+  it("I-W08 ?seed= and setWeekSeed pin the session seed", async () => {
+    const stored = await loadApp();
+    stored.window.sessionStorage.setItem("plentry_week_seed", "99");
+    assert.equal(stored.window.__plentry.weekSeed(), 99);
+    assert.equal(stored.window.__plentry.weekSeed(), 99);
+    assert.equal(stored.window.sessionStorage.getItem("plentry_week_seed"), "99");
+
+    const minted = await loadApp();
+    const a = minted.window.__plentry.weekSeed();
+    assert.equal(minted.window.__plentry.weekSeed(), a);
+    assert.equal(minted.window.sessionStorage.getItem("plentry_week_seed"), String(a));
+    assert.equal(a >>> 0, a);
+
+    const queried = await loadApp({ url: "https://getplentry.com/?seed=15" });
+    queried.window.sessionStorage.setItem("plentry_week_seed", "99");
+    assert.equal(queried.window.__plentry.weekSeed(), 15);
+    assert.equal(queried.window.sessionStorage.getItem("plentry_week_seed"), "15");
+    assert.equal(queried.window.__plentry.setWeekSeed(8), 8);
+    assert.equal(queried.window.__plentry.weekSeed(), 8);
+    assert.equal(queried.window.setWeekSeed("8"), 8);
+    assert.equal(queried.window.sessionStorage.getItem("plentry_week_seed"), "8");
+
+    const text = await loadApp({ url: "https://getplentry.com/?seed=smoke" });
+    const hashed = text.window.__plentry.weekSeed();
+    assert.equal(typeof hashed, "number");
+    assert.equal(hashed >>> 0, hashed);
+    const again = await loadApp({ url: "https://getplentry.com/?seed=smoke" });
+    assert.equal(again.window.__plentry.weekSeed(), hashed);
+  });
+});
+
 describe("Modify alternatives", () => {
   const FALLBACK_WEEK = [
     "Chicken & chickpea curry",

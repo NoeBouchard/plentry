@@ -433,6 +433,43 @@ describe("source contracts", () => {
     assert.match(html, /function addAdvisorMeals/);
   });
 
+  function sourceFn(src, name) {
+    const start = src.indexOf("function " + name + "(");
+    assert.ok(start >= 0, name);
+    let i = src.indexOf("{", start);
+    let depth = 0;
+    for (; i < src.length; i++) {
+      const c = src[i];
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) return src.slice(start, i + 1);
+      }
+    }
+    assert.fail("unclosed " + name);
+  }
+
+  it("I-W08 rankCatalog sorts by score, seeded key, then id, with no Math.random in the comparator", () => {
+    const rank = sourceFn(html, "rankCatalog");
+    const cmp = sourceFn(html, "compareRankedMeals");
+    assert.doesNotMatch(rank, /Math\.random/);
+    assert.doesNotMatch(cmp, /Math\.random/);
+    assert.match(rank, /rows\.sort\(compareRankedMeals\)/);
+    assert.match(rank, /mealTieKey\(seed,m\)/);
+    assert.match(cmp, /a\.s!==b\.s/);
+    assert.match(cmp, /a\.k<b\.k/);
+    assert.match(cmp, /a\.id<b\.id/);
+    assert.match(html, /function mulberry32\(/);
+    assert.match(html, /function setWeekSeed\(/);
+    assert.match(html, /function weekSeed\(/);
+    assert.match(html, /const WEEK_SEED_KEY="plentry_week_seed"/);
+    assert.match(html, /new URLSearchParams\(location\.search\)\.get\("seed"\)/);
+    assert.match(html, /setWeekSeed,weekSeed,rankCatalog/);
+    assert.doesNotMatch(rank, /Math\.random\(\)-0\.5/);
+    assert.match(html, /const MODIFY_FIRST=6;/);
+    assert.match(html, /const MODIFY_MORE=4;/);
+  });
+
   it("Modify and New week load the meals catalog, not meal_options AI", () => {
     assert.match(html, /async function openModify/);
     assert.match(html, /await loadCatalogMeals\(\)/);
