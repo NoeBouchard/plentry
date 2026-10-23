@@ -4,9 +4,9 @@ Vault history of **functional** product changes. Newest first. Agents append her
 
 ## 2026-10-23 — Seeded tie-break for New week and Modify
 
-- **Order.** When two dinners have the same score, New week and Modify order them with a mulberry32 key from a session seed and the meal id, then the id. A dinner with no id uses its name for that key. The key is computed once per dinner before the sort. The comparator does not call `Math.random`.
-- **Seed.** One seed per tab, in `sessionStorage` (`plentry_week_seed`). A new tab mints a new seed, so weeks still vary between sessions. The same seed repeats the week and each Modify page, including Show 4 more.
-- **Smoke.** Open `?seed=4242` (a whole number is used as-is; any other text is hashed). That value is stored for the tab. In the console, `window.__plentry.setWeekSeed(4242)` (also `window.setWeekSeed`) overrides the query and the stored seed, then tap New week. `window.__plentry.weekSeed()` reads the seed in use.
+- **Order.** When two dinners have the same score, New week and Modify order them with a mulberry32 key from the week's seed and the meal id, then the id. A dinner with no id uses its name for that key. The key is computed once per dinner before the sort. Ordering does not call `Math.random`.
+- **New week.** Each tap mints a new seed, so the next week usually changes. A shared `?seed=` link pins the sequence: the first New week uses that seed, and each further tap uses the next number (`seed`, `seed+1`, `seed+2`, wrapping at 2³²). `window.__plentry.setWeekSeed(4242)` (also `window.setWeekSeed`) does the same from the console. Modify, including Show 4 more, stays on the seed of the week on screen.
+- **Smoke.** Open `https://getplentry.com/?seed=4242`. A whole number is used as-is; any other text is hashed. The value is stored for the tab (`plentry_week_seed`, plus the pin and the step). Tap **New week** to walk the sequence. `window.__plentry.weekSeed()` reads the seed of the week on screen.
 - **Unchanged.** Score weights. Modify still lists 6, then up to 4, and still stops with the same message when the pool runs out. Prices, the shared basket block, and the hold stay as they are.
 - **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
 

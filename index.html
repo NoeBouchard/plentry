@@ -1167,10 +1167,18 @@ function scoreMeal(m){
   }
   return s;
 }
-// Equal scores break with a session seed. One mulberry32 key per meal id is
-// computed before the sort, then the id. The comparator does not call Math.random.
+// Equal scores break with this week's seed. One mulberry32 key per meal id is
+// computed before the sort, then the id. New week mints a seed, or steps a
+// pinned seed (?seed= or setWeekSeed): seed, seed+1, seed+2. Modify keeps
+// the seed of the week on screen.
 const WEEK_SEED_KEY="plentry_week_seed";
-let weekSeedOverride=null;
+const WEEK_SEED_PIN_KEY="plentry_week_seed_pin";
+const WEEK_SEED_STEP_KEY="plentry_week_seed_step";
+let weekSeedPin=null;
+let weekSeedStep=0;
+let weekSeedCurrent=null;
+let weekSeedUsed=false;
+let weekSeedReady=false;
 function mulberry32(a){
   a=a>>>0;
   a=(a+0x6D2B79F5)|0;
@@ -1196,13 +1204,15 @@ function normalizeSeed(raw){
   }
   return mix32(0x811c9dc5,s);
 }
+let weekSeedMintNonce=0;
 function mintWeekSeed(){
   try{
     const buf=new Uint32Array(1);
     crypto.getRandomValues(buf);
     return buf[0];
   }catch(e){
-    return (Math.random()*4294967296)>>>0;
+    weekSeedMintNonce=(weekSeedMintNonce+1)>>>0;
+    return mix32((Date.now()>>>0)^weekSeedMintNonce,String(weekSeedMintNonce));
   }
 }
 function queryWeekSeed(){
@@ -1212,23 +1222,79 @@ function queryWeekSeed(){
     return normalizeSeed(q);
   }catch(e){return null;}
 }
-function rememberWeekSeed(n){
-  weekSeedOverride=n>>>0;
-  try{sessionStorage.setItem(WEEK_SEED_KEY,String(weekSeedOverride));}catch(e){}
-  return weekSeedOverride;
+function persistWeekSeed(){
+  try{
+    if(weekSeedCurrent!=null)sessionStorage.setItem(WEEK_SEED_KEY,String(weekSeedCurrent>>>0));
+    if(weekSeedPin!=null){
+      sessionStorage.setItem(WEEK_SEED_PIN_KEY,String(weekSeedPin>>>0));
+      sessionStorage.setItem(WEEK_SEED_STEP_KEY,String(weekSeedStep>>>0));
+    }else{
+      sessionStorage.removeItem(WEEK_SEED_PIN_KEY);
+      sessionStorage.removeItem(WEEK_SEED_STEP_KEY);
+    }
+  }catch(e){}
+}
+function loadWeekSeed(){
+  if(weekSeedReady)return;
+  weekSeedReady=true;
+  const fromQuery=queryWeekSeed();
+  if(fromQuery!=null){
+    weekSeedPin=fromQuery;
+    weekSeedStep=0;
+    weekSeedCurrent=fromQuery;
+    weekSeedUsed=false;
+    persistWeekSeed();
+    return;
+  }
+  try{
+    const pin=sessionStorage.getItem(WEEK_SEED_PIN_KEY);
+    const cur=sessionStorage.getItem(WEEK_SEED_KEY);
+    const step=sessionStorage.getItem(WEEK_SEED_STEP_KEY);
+    if(pin!=null&&String(pin).trim()!==""){
+      weekSeedPin=normalizeSeed(pin);
+      weekSeedStep=step!=null&&String(step).trim()!==""?normalizeSeed(step):0;
+      weekSeedCurrent=cur!=null&&String(cur).trim()!==""?normalizeSeed(cur):(weekSeedPin+weekSeedStep)>>>0;
+      weekSeedUsed=true;
+    }else if(cur!=null&&String(cur).trim()!==""){
+      weekSeedCurrent=normalizeSeed(cur);
+      weekSeedPin=null;
+      weekSeedUsed=true;
+    }
+  }catch(e){}
 }
 function setWeekSeed(raw){
-  return rememberWeekSeed(normalizeSeed(raw));
+  loadWeekSeed();
+  const n=normalizeSeed(raw);
+  weekSeedPin=n;
+  weekSeedStep=0;
+  weekSeedCurrent=n;
+  weekSeedUsed=false;
+  persistWeekSeed();
+  return n;
 }
 function weekSeed(){
-  if(weekSeedOverride!=null)return weekSeedOverride;
-  const fromQuery=queryWeekSeed();
-  if(fromQuery!=null)return rememberWeekSeed(fromQuery);
-  try{
-    const existing=sessionStorage.getItem(WEEK_SEED_KEY);
-    if(existing!=null&&String(existing).trim()!=="")return rememberWeekSeed(normalizeSeed(existing));
-  }catch(e){}
-  return rememberWeekSeed(mintWeekSeed());
+  loadWeekSeed();
+  if(weekSeedCurrent==null){
+    weekSeedCurrent=weekSeedPin!=null?(weekSeedPin+weekSeedStep)>>>0:mintWeekSeed();
+    persistWeekSeed();
+  }
+  weekSeedUsed=true;
+  return weekSeedCurrent;
+}
+// New week only. A pin steps seed, seed+1, seed+2. Otherwise mint.
+// The first tap after a fresh pin uses that seed; a tap after this week was
+// already built with it steps once.
+function advanceWeekSeed(){
+  loadWeekSeed();
+  if(weekSeedPin!=null){
+    if(weekSeedUsed)weekSeedStep=(weekSeedStep+1)>>>0;
+    weekSeedCurrent=(weekSeedPin+weekSeedStep)>>>0;
+  }else{
+    weekSeedCurrent=mintWeekSeed();
+  }
+  weekSeedUsed=false;
+  persistWeekSeed();
+  return weekSeedCurrent;
 }
 function mealTieIdentity(m){
   if(m&&m.id!=null&&m.id!==""&&Number.isFinite(+m.id))return "#"+Math.trunc(+m.id);
@@ -2903,7 +2969,6 @@ const normMeal=m=>{
   if(r)out.recipe=r;
   return out;
 };
-const shuffle=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
 // Customer week reads the shared catalog. Founder writes via the Meals screen
 // (RLS email gate). The `ai` function still inserts advisor drafts as newcoming.
 async function loadCatalogMeals(){
@@ -3273,6 +3338,7 @@ async function loadMenuOptions(force){
   try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
   if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
   S.menuOptions=catalog;
+  advanceWeekSeed();
   autoPickWeek();
   mealsChanged();
   renderMenu();

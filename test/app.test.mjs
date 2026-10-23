@@ -828,35 +828,94 @@ describe("seeded tie-break", () => {
     return S;
   }
 
-  it("I-W08 the same seed repeats the week and each Modify page", async () => {
+  function signIn(window) {
+    const S = window.__plentry.state();
+    S.user = { id: "u-seed", email: "seed@example.com" };
+    S.prefs.meals = 4;
+    S.prefs.budget = null;
+    S.prefs.diet = "omnivore";
+    S.prefs.tags = [];
+    S.prefs.goals = [];
+    return S;
+  }
+
+  async function newWeekSequence(window, n) {
+    const S = window.__plentry.state();
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      await window.loadMenuOptions(true);
+      const seed = window.__plentry.weekSeed();
+      const week = Array.from(S.selected);
+      await window.openModify(0);
+      const modify = window.__plentry.modifyPicks().map((m) => m.name);
+      window.closeModal();
+      await window.openModify(0);
+      assert.deepEqual(window.__plentry.modifyPicks().map((m) => m.name), modify, "Modify stays on this week's seed");
+      assert.equal(window.__plentry.weekSeed(), seed);
+      window.closeModal();
+      out.push({ seed, week, modify });
+    }
+    return out;
+  }
+
+  it("I-W08 a pinned seed repeats the New week sequence, and Modify stays on that week", async () => {
     const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((id) => tied(id));
-    async function run(seed) {
+    async function run(seed, how) {
       const { window } = await loadApp({
-        url: "https://getplentry.com/?seed=" + seed,
+        url: how === "query" ? "https://getplentry.com/?seed=" + seed : "https://getplentry.com/",
         localState: weekState(),
         tables: { meals: pool, orders: [], profiles: [], ingredient_prices: [] },
       });
-      const S = armWeek(window, pool);
-      assert.equal(window.__plentry.weekSeed(), seed);
-      window.autoPickWeek();
-      const week = Array.from(S.selected);
-      S.selected = [week[0]];
-      await window.openModify(0);
-      const first = window.__plentry.modifyPicks().map((m) => m.name);
-      window.refreshModify();
-      const second = window.__plentry.modifyPicks().map((m) => m.name);
-      return { week, first, second };
+      signIn(window);
+      if (how === "setter") window.__plentry.setWeekSeed(seed);
+      return newWeekSequence(window, 3);
     }
-    const a = await run(4242);
-    const b = await run(4242);
-    assert.deepEqual(b, a);
-    assert.equal(a.week.length, 4);
-    assert.equal(new Set(a.week).size, 4);
-    assert.equal(a.first.length, 6);
-    assert.equal(a.second.length, 4);
-    a.second.forEach((name) => assert.equal(a.first.includes(name), false, name));
-    assert.equal(a.first.includes(a.week[0]), false);
-    assert.equal(a.second.includes(a.week[0]), false);
+    const queryA = await run(4242, "query");
+    const queryB = await run(4242, "query");
+    assert.deepEqual(queryB, queryA);
+    assert.deepEqual(queryA.map((row) => row.seed), [4242, 4243, 4244]);
+    assert.equal(new Set(queryA.map((row) => row.week.join("|"))).size, 3);
+    queryA.forEach((row) => {
+      assert.equal(row.week.length, 4);
+      assert.equal(row.modify.length, 6);
+      row.modify.forEach((name) => assert.equal(row.week.includes(name), false, name));
+    });
+
+    const setA = await run(50, "setter");
+    const setB = await run(50, "setter");
+    assert.deepEqual(setB, setA);
+    assert.deepEqual(setA.map((row) => row.seed), [50, 51, 52]);
+
+    const wrap = await run(0xffffffff, "setter");
+    assert.deepEqual(wrap.map((row) => row.seed), [0xffffffff, 0, 1]);
+  });
+
+  it("I-W08 consecutive unpinned New week taps mint a new seed and usually differ", async () => {
+    const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((id) => tied(id));
+    const { window } = await loadApp({
+      localState: weekState(),
+      tables: { meals: pool, orders: [], profiles: [], ingredient_prices: [] },
+    });
+    signIn(window);
+    const seeds = [];
+    const weeks = [];
+    for (let i = 0; i < 6; i++) {
+      await window.loadMenuOptions(true);
+      const seed = window.__plentry.weekSeed();
+      seeds.push(seed);
+      weeks.push(Array.from(window.__plentry.state().selected).join("|"));
+      await window.openModify(0);
+      const page = window.__plentry.modifyPicks().map((m) => m.name);
+      window.closeModal();
+      await window.openModify(0);
+      assert.deepEqual(window.__plentry.modifyPicks().map((m) => m.name), page);
+      assert.equal(window.__plentry.weekSeed(), seed);
+      window.closeModal();
+    }
+    assert.equal(new Set(seeds).size, seeds.length, "each tap mints a seed");
+    let changes = 0;
+    for (let i = 1; i < weeks.length; i++) if (weeks[i] !== weeks[i - 1]) changes += 1;
+    assert.ok(changes >= 4, weeks.join(" / "));
   });
 
   it("I-W08 a different seed can change the week and the Modify order", async () => {

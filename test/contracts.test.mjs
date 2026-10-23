@@ -462,10 +462,14 @@ describe("source contracts", () => {
     assert.match(html, /function mulberry32\(/);
     assert.match(html, /function setWeekSeed\(/);
     assert.match(html, /function weekSeed\(/);
+    assert.match(html, /function advanceWeekSeed\(/);
     assert.match(html, /const WEEK_SEED_KEY="plentry_week_seed"/);
     assert.match(html, /new URLSearchParams\(location\.search\)\.get\("seed"\)/);
     assert.match(html, /setWeekSeed,weekSeed,rankCatalog/);
-    assert.doesNotMatch(rank, /Math\.random\(\)-0\.5/);
+    assert.doesNotMatch(rank, /Math\.random/);
+    assert.doesNotMatch(html, /Math\.random\(\)/);
+    assert.doesNotMatch(html, /const shuffle=/);
+    assert.match(sourceFn(html, "loadMenuOptions"), /advanceWeekSeed\(\);\s*autoPickWeek\(\)/);
     assert.match(html, /const MODIFY_FIRST=6;/);
     assert.match(html, /const MODIFY_MORE=4;/);
   });
