@@ -251,7 +251,7 @@
 <div class="app">
   <header>
     <div class="logo">plentry<span>.</span></div>
-    <a class="pill" href="#" id="hdr-pill" onclick="openAuth();return false">Log in</a>
+    <a class="pill" href="#" id="hdr-pill" onclick="openLogin();return false">Log in</a>
   </header>
   <div id="mfa-banner">
     <p>2-step verification is on. Enter the code from your authenticator app — Ops stays locked until you do.</p>
@@ -1303,7 +1303,7 @@ else S.weekServings=normServings(S.weekServings);
 S.prefs.delivery=deliveryFrom(S.prefs.delivery);
 if(S.basketEdit!=null&&!Array.isArray(S.basketEdit))S.basketEdit=null;
 if(Array.isArray(S.basketEdit)&&!S.basketEdit.length)S.basketEdit=null;
-let basket=[],chosenStore=null,authMode="signup",basketOpen=false,pendingCheckout=false,pendingMeals=false,obStep=1,lastAuthMsg="";
+let basket=[],chosenStore=null,authMode="login",basketOpen=false,pendingCheckout=false,pendingMeals=false,obStep=1,lastAuthMsg="";
 let liveQuote=null,liveQuoteKey="",liveQuoteLoading=false; // live store prices for the current basket
 let sampleQuote=null,sampleQuoteLoading=false;
 function load(){
@@ -1534,6 +1534,12 @@ function stripeCheckoutUrl(u){
 }
 function authFormHtml(){
   const signup=authMode==="signup";
+  const switchRow=signup
+    ?`<p class="sub" style="margin:12px 0 0;text-align:center">
+      <span id="auth-switch-label">Already have an account?</span>
+      <a href="#" style="color:var(--green)" onclick="openLogin();return false" id="auth-switch">Log in</a>
+    </p>`
+    :`<button type="button" class="btn ghost" style="width:100%;margin-top:12px" id="auth-switch" onclick="openSignup()">Don't have an account?</button>`;
   return `<h2 id="auth-title">${signup?"Create your account":"Welcome back"}</h2>
     <p class="sub" id="auth-sub">${signup?"Card hold at checkout — we order to your door from your supermarket.":"Log in to your kitchen."}</p>
     <div class="field" id="f-name" style="${signup?"":"display:none"}"><label>Name</label><input id="su-name" placeholder="Noe"></div>
@@ -1541,26 +1547,22 @@ function authFormHtml(){
     <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="••••••••"></div>
     <div class="err" id="auth-err"></div>
     <button class="btn" style="width:100%" id="auth-btn" onclick="submitAuth()">${signup?"Sign up →":"Log in →"}</button>
-    <p class="sub" style="margin:12px 0 0;text-align:center">
-      <span id="auth-switch-label">${signup?"Already have an account?":"New here?"}</span>
-      <a href="#" style="color:var(--green)" onclick="toggleAuthMode();return false" id="auth-switch">${signup?"Log in":"Sign up"}</a>
-    </p>`;
+    ${switchRow}`;
 }
-function openAuth(msg){
+function openAuth(msg, mode){
+  if(mode==="login"||mode==="signup")authMode=mode;
   if(S.user&&S.user.id){if(S.onboarded)nav("profile");return;}
-  if(msg)lastAuthMsg=msg;
+  lastAuthMsg=typeof msg==="string"?msg:"";
   openModal(authFormHtml());
   if(lastAuthMsg){const sub=document.getElementById("auth-sub");if(sub)sub.textContent=lastAuthMsg;}
 }
+function openLogin(msg){openAuth(msg,"login");}
+function openSignup(msg){openAuth(msg,"signup");}
 function requireAccount(msg){
   if(S.user&&(S.user.id||S.user.email))return true;
   pendingMeals=true;
-  openAuth(msg||"Create an account to choose this week's dinners.");
+  openSignup(msg||"Create an account to choose this week's dinners.");
   return false;
-}
-function toggleAuthMode(){
-  authMode=authMode==="signup"?"login":"signup";
-  openAuth();
 }
 async function submitAuth(){
   const nameEl=document.getElementById("su-name");
@@ -1582,7 +1584,7 @@ async function submitAuth(){
         if(!data.session){
           openModal(`<h2 style="margin-bottom:6px">📬 Check your inbox</h2>
             <p class="sub">We sent a confirmation link to <b style="color:var(--text)">${esc(email)}</b>. Click it, then log in here.</p>
-            <button class="btn" style="width:100%" onclick="authMode='login';openAuth()">Got it</button>`);
+            <button class="btn" style="width:100%" onclick="openLogin()">Got it</button>`);
           return;
         }
         await loadCloudState(data.session.user);
@@ -3696,7 +3698,7 @@ function confirmOrder(){
   if(!S.user||!S.user.id){
     pendingCheckout=true;
     closeBasket();
-    openAuth("Create an account so we can take the card hold and order to your door.");
+    openSignup("Create an account so we can take the card hold and order to your door.");
     return;
   }
   const {t,pay,fee,live}=compareQuote(chosenStore);
@@ -3736,7 +3738,7 @@ async function placeOrder(){
   if(!chosenStore||!basket.length)return;
   if(!sb||!S.user||!S.user.id){
     pendingCheckout=true;
-    openAuth("Log in so we can take the card hold and deliver to you.");
+    openLogin("Log in so we can take the card hold and deliver to you.");
     return;
   }
   const saved=deliveryFrom(S.prefs.delivery);
@@ -4259,7 +4261,7 @@ function syncHeader(){
     pill.onclick=function(e){e.preventDefault();if(S.onboarded)nav("profile");};
   }else{
     pill.textContent="Log in";
-    pill.onclick=function(e){e.preventDefault();openAuth();};
+    pill.onclick=function(e){e.preventDefault();openLogin();};
   }
 }
 function nav(s){
