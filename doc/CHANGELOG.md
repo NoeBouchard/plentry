@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-22 — Log in opens the login form
+
+- **Log in.** The header **Log in** opens email and password. Under that form, **Don't have an account?** opens the existing sign-up form (name, email, password). Sign-up still offers **Already have an account? Log in**.
+- **Sign up stays sign up.** New week, choosing or swapping a dinner, meal details, the meal advisor, and checkout confirm without an account still open sign-up (**Create an account…**). The later guard **Log in so we can take the card hold** opens login. Onboarding does not ask for an account.
+- **Why.** Log in was opening the sign-up form, with only a small Log in link underneath.
+- **Unchanged.** Same Supabase email/password calls. No auth config, no edge functions, no SQL.
+- **Not deployed.** Static only when it ships. No `pay` deploy.
+
 ## 2026-10-22 — Pinned basket shares, and From your cupboard
 
 - **Pinned.** The Tesco week (beef ragù, shakshuka, Spanish tortilla, salmon traybake, no cupboard ticks) is locked in a test: shares and basket £47.83 / £59.68 / £84.04 at 2 / 4 / 6. Pomodoro (meal 28) swapped in for salmon is locked at £4.07 / £4.71 / £5.83. A change to the ingredient-cost weighting fails that test.

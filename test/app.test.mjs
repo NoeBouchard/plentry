@@ -211,7 +211,7 @@ describe("postcode and budget", () => {
     const { window, document } = await loadApp();
     let called = 0;
     window.__mockSb.auth.signUp = async () => { called++; return { data: { user: null, session: null }, error: { message: "unit-test" } }; };
-    window.openAuth();
+    window.openSignup();
     document.getElementById("su-name").value = "Noe";
     document.getElementById("su-email").value = "noe@example.com";
     document.getElementById("su-pass").value = "1234567";
@@ -221,6 +221,89 @@ describe("postcode and budget", () => {
     document.getElementById("su-pass").value = "12345678";
     await window.submitAuth();
     assert.equal(called, 1, "8 characters reaches signUp");
+  });
+});
+
+describe("login opens login", () => {
+  function assertLogin(document) {
+    assert.equal(document.getElementById("auth-title").textContent, "Welcome back");
+    assert.equal(document.getElementById("auth-sub").textContent, "Log in to your kitchen.");
+    assert.equal(document.getElementById("auth-btn").textContent, "Log in →");
+    assert.equal(document.getElementById("f-name").style.display, "none");
+    assert.ok(document.getElementById("su-email"));
+    assert.equal(document.getElementById("su-pass").type, "password");
+    const sw = document.getElementById("auth-switch");
+    assert.equal(sw.tagName, "BUTTON");
+    assert.equal(sw.textContent, "Don't have an account?");
+  }
+
+  function assertSignup(document) {
+    assert.equal(document.getElementById("auth-title").textContent, "Create your account");
+    assert.equal(document.getElementById("auth-btn").textContent, "Sign up →");
+    assert.notEqual(document.getElementById("f-name").style.display, "none");
+    assert.ok(document.getElementById("su-name"));
+    assert.equal(document.getElementById("auth-switch-label").textContent, "Already have an account?");
+    assert.equal(document.getElementById("auth-switch").textContent, "Log in");
+  }
+
+  it("Log in opens the login form", async () => {
+    const { document } = await loadApp();
+    const pill = document.getElementById("hdr-pill");
+    assert.equal(pill.textContent, "Log in");
+    pill.click();
+    assertLogin(document);
+  });
+
+  it('the "Don\'t have an account?" button switches to sign-up, which can return to log in', async () => {
+    const { document } = await loadApp();
+    document.getElementById("hdr-pill").click();
+    assertLogin(document);
+    document.getElementById("auth-switch").click();
+    assertSignup(document);
+    assert.equal(document.getElementById("auth-sub").textContent, "Card hold at checkout — we order to your door from your supermarket.");
+    document.getElementById("auth-switch").click();
+    assertLogin(document);
+  });
+
+  it("sign-up entry points still open sign-up", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    document.getElementById("hdr-pill").click();
+    assertLogin(document);
+
+    assert.equal(window.requireAccount(), false);
+    assertSignup(document);
+    assert.match(document.getElementById("auth-sub").textContent, /Create an account/);
+
+    document.getElementById("hdr-pill").click();
+    assertLogin(document);
+    window.openAdvisor();
+    assertSignup(document);
+    assert.match(document.getElementById("auth-sub").textContent, /meal advisor/);
+
+    document.getElementById("hdr-pill").click();
+    assertLogin(document);
+    window.showMealDetails(0);
+    assertSignup(document);
+
+    document.getElementById("hdr-pill").click();
+    assertLogin(document);
+    window.toggleMealAt(0);
+    assertSignup(document);
+
+    document.getElementById("hdr-pill").click();
+    assertLogin(document);
+    await window.loadMenuOptions(true);
+    assertSignup(document);
+    assert.match(document.getElementById("auth-sub").textContent, /new week/);
+
+    document.getElementById("hdr-pill").click();
+    assertLogin(document);
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    assert.ok(window.__plentry.getBasket().length > 0);
+    window.confirmOrder();
+    assertSignup(document);
+    assert.match(document.getElementById("auth-sub").textContent, /card hold/);
   });
 });
 
