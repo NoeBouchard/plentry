@@ -692,7 +692,7 @@ describe("week and modify", () => {
     assert.equal(S.prefs.budget, 80);
   });
 
-  it("openModify offers 5 catalog dinners and does not call the AI", async () => {
+  it("openModify offers 6 catalog dinners when enough fit and does not call the AI", async () => {
     const dbMeals = extraMeals().concat([
       { name: "Lemon chicken & parmesan rice", emoji: "🍋", time: 30, ing: ["chicken thighs", "rice", "lemons", "garlic", "parmesan"] },
       { name: "Crispy salmon & smashed potatoes", emoji: "🐟", time: 25, ing: ["salmon fillet", "potatoes", "broccoli", "olive oil", "lemons"] },
@@ -713,7 +713,7 @@ describe("week and modify", () => {
     const aiCalls = calls.filter((c) => c.url.includes("/functions/v1/ai"));
     assert.equal(aiCalls.length, 0);
     const picks = window.__plentry.modifyPicks();
-    assert.equal(picks.length, 5);
+    assert.equal(picks.length, 6);
     const S = window.__plentry.state();
     picks.forEach((m) => {
       assert.ok(!S.selected.includes(m.name));
@@ -797,6 +797,569 @@ describe("week and modify", () => {
     window.nav("profile");
     assert.ok(document.getElementById("pr-tags").textContent.includes("High protein"));
     assert.ok(!document.getElementById("pr-tags").textContent.includes("Meal prep"));
+  });
+});
+
+describe("Modify alternatives", () => {
+  const FALLBACK_WEEK = [
+    "Chicken & chickpea curry",
+    "Salmon traybake",
+    "Beef ragù spaghetti",
+    "Halloumi fajitas",
+    "Shakshuka",
+    "Chickpea & spinach curry",
+    "Greek chicken bowls",
+    "Veggie spaghetti pomodoro",
+  ];
+  const VEGAN_ING = ["chickpeas", "rice", "spinach", "onions", "garlic"];
+  let seq = 1;
+  function reviewed(name, tags, ing) {
+    seq += 1;
+    return {
+      name,
+      emoji: "🍽️",
+      time: 30,
+      ing: ing || ["minced beef", "spaghetti", "onions", "garlic", "passata"],
+      tags,
+      id: seq,
+      reviewed_at: "2026-10-22",
+    };
+  }
+  function meat(name, tags) {
+    return reviewed(name, tags || ["dinner", "meat"]);
+  }
+  async function boot() {
+    return loadApp({
+      localState: weekState(),
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [] },
+    });
+  }
+  function arm(window, tables, meals, opts = {}) {
+    const S = window.__plentry.state();
+    tables.meals = meals;
+    S.prefs.diet = opts.diet || "omnivore";
+    S.prefs.tags = opts.tags || [];
+    S.prefs.goals = [];
+    if (opts.meals) S.prefs.meals = opts.meals;
+    S.selected = (opts.selected || FALLBACK_WEEK).slice();
+    if (opts.menuOptions) S.menuOptions = opts.menuOptions;
+    return S;
+  }
+  function pickNames(window) {
+    return window.__plentry.modifyPicks().map((m) => m.name);
+  }
+
+  it("I-W02 shows 6 alternatives when at least 6 fit, and 4 or 5 when that is all", async () => {
+    const { window, document, tables } = await boot();
+    for (const n of [6, 5, 4, 10]) {
+      const meals = Array.from({ length: n === 10 ? 10 : n }, (_, i) => meat(`Count ${n}-${i + 1}`));
+      arm(window, tables, meals);
+      await window.openModify(0);
+      const want = n >= 6 ? 6 : n;
+      assert.equal(pickNames(window).length, want, `pool ${n}`);
+      assert.equal(document.querySelectorAll("#modify-alts .day-card").length, want);
+      const refresh = document.getElementById("modify-refresh");
+      assert.ok(refresh);
+      if (n > 6) assert.equal(refresh.disabled, false);
+      else assert.equal(refresh.disabled, true);
+    }
+  });
+
+  it("I-W02 excludes this week, the dinner being replaced, and alternatives already shown", async () => {
+    const { window, document, tables } = await boot();
+    const meals = Array.from({ length: 12 }, (_, i) => meat(`Page ${i + 1}`));
+    const S = arm(window, tables, meals, { selected: FALLBACK_WEEK.concat(["Page 1"]) });
+    await window.openModify(0);
+    const first = pickNames(window);
+    assert.equal(first.length, 6);
+    assert.equal(first.includes("Page 1"), false);
+    assert.equal(first.includes(S.selected[0]), false);
+    first.forEach((name) => assert.equal(S.selected.includes(name), false, name));
+    assert.deepEqual([...window.__plentry.modifySeen()].sort(), [...first].sort());
+    assert.equal(document.getElementById("modify-refresh").textContent, "Show 4 more");
+
+    document.getElementById("modify-refresh").click();
+    const second = pickNames(window);
+    assert.equal(second.length, 4);
+    second.forEach((name) => {
+      assert.equal(first.includes(name), false, name);
+      assert.equal(S.selected.includes(name), false, name);
+    });
+    assert.equal(document.getElementById("modify-refresh").textContent, "Show 1 more");
+
+    document.getElementById("modify-refresh").click();
+    const third = pickNames(window);
+    assert.equal(third.length, 1);
+    third.concat(second).forEach((name) => assert.equal(first.includes(name), false));
+    const shown = first.concat(second, third).sort();
+    const eligible = meals.map((m) => m.name).filter((name) => name !== "Page 1").sort();
+    assert.deepEqual(shown, eligible);
+    assert.equal(document.querySelectorAll("#modify-alts .day-card").length, 1);
+    assert.equal(document.getElementById("modify-refresh").disabled, true);
+    assert.ok(document.getElementById("modify-end"));
+    assert.equal(document.getElementById("modify-empty"), null);
+
+    window.refreshModify();
+    assert.deepEqual(pickNames(window), third);
+    assert.equal(document.querySelectorAll("#modify-alts .day-card").length, 1);
+    assert.ok(document.getElementById("modify-end"));
+    assert.equal(document.getElementById("modify-refresh").disabled, true);
+
+    document.getElementById("modify-restart").click();
+    assert.equal(pickNames(window).length, 6);
+    assert.equal(window.__plentry.modifySeen().length, 6);
+    assert.equal(document.getElementById("modify-refresh").disabled, false);
+    assert.equal(document.getElementById("modify-end"), null);
+    pickNames(window).forEach((name) => assert.equal(S.selected.includes(name), false));
+  });
+
+  it("I-W02 diet filter drops meals that do not fit, including unpublished rows", async () => {
+    const { window, document, tables } = await boot();
+    const vegan = reviewed("Alt vegan bowl", ["dinner", "vegan", "vegetarian"], VEGAN_ING);
+    const veg = reviewed("Alt veg eggs", ["dinner", "vegetarian"], ["eggs", "passata", "onions", "feta", "garlic"]);
+    const fish = reviewed("Alt fish supper", ["dinner", "fish"], ["salmon fillet", "potatoes", "lemons", "garlic"]);
+    const meatMeal = meat("Alt meat supper");
+    const draft = reviewed("Alt draft vegan", ["dinner", "vegan", "vegetarian"], VEGAN_ING);
+    draft.reviewed_at = null;
+    const meals = [vegan, veg, fish, meatMeal, draft];
+
+    arm(window, tables, meals, { diet: "vegan" });
+    await window.openModify(0);
+    assert.deepEqual(pickNames(window), ["Alt vegan bowl"]);
+    assert.equal(document.getElementById("modal").textContent.includes("Alt draft vegan"), false);
+    assert.equal(document.getElementById("modal").textContent.includes("Alt meat supper"), false);
+
+    arm(window, tables, meals, { diet: "vegetarian" });
+    await window.openModify(0);
+    const vegPicks = pickNames(window).sort();
+    assert.deepEqual(vegPicks, ["Alt veg eggs", "Alt vegan bowl"]);
+    vegPicks.forEach((name) => {
+      const diet = window.__plentry.mealDiet(window.__plentry.modifyPicks().find((m) => m.name === name));
+      assert.ok(diet === "vegetarian" || diet === "vegan", name);
+    });
+
+    arm(window, tables, meals, { diet: "pescatarian" });
+    await window.openModify(0);
+    const fishPicks = pickNames(window);
+    assert.equal(fishPicks.includes("Alt meat supper"), false);
+    assert.equal(fishPicks.includes("Alt draft vegan"), false);
+    assert.ok(fishPicks.includes("Alt fish supper"));
+    fishPicks.forEach((name) => assert.notEqual(window.__plentry.mealDiet(window.mealByName(name)), "meat"));
+  });
+
+  it("I-W02 preferred dinner tags rank above the same diet", async () => {
+    const { window, tables } = await boot();
+    const quick = [1, 2, 3].map((i) => meat(`Quick meat ${i}`, ["dinner", "meat", "quick"]));
+    const plain = [1, 2, 3, 4, 5, 6].map((i) => meat(`Plain meat ${i}`, ["dinner", "meat"]));
+    arm(window, tables, quick.concat(plain), { tags: ["quick"] });
+    await window.openModify(0);
+    const picks = window.__plentry.modifyPicks();
+    assert.equal(picks.length, 6);
+    const scores = picks.map((m) => window.__plentry.scoreMeal(m));
+    for (let i = 1; i < scores.length; i++) assert.ok(scores[i - 1] >= scores[i]);
+    const quickNames = quick.map((m) => m.name).sort();
+    assert.deepEqual(picks.slice(0, 3).map((m) => m.name).sort(), quickNames);
+    picks.slice(3).forEach((m) => assert.equal(m.tags.includes("quick"), false, m.name));
+    assert.ok(scores[0] > scores[3]);
+  });
+
+  it("I-W02 shows a short list when fewer than 4 alternatives remain", async () => {
+    const { window, document, tables } = await boot();
+    const meals = [meat("Left one"), meat("Left two")];
+    arm(window, tables, meals);
+    await window.openModify(0);
+    assert.deepEqual(pickNames(window).sort(), ["Left one", "Left two"]);
+    assert.equal(document.querySelectorAll("#modify-alts .day-card").length, 2);
+    assert.equal(document.getElementById("modify-refresh").disabled, true);
+    assert.ok(document.getElementById("modify-end").textContent.includes("That's every other dinner"));
+    assert.equal(document.getElementById("modify-empty"), null);
+    assert.equal(document.getElementById("modify-restart"), null);
+    window.refreshModify();
+    assert.equal(document.querySelectorAll("#modify-alts .day-card").length, 2);
+    assert.equal(document.getElementById("modify-empty"), null);
+  });
+
+  it("I-W02 vegan week that already holds every vegan dinner shows a message, not an empty grid", async () => {
+    const { window, document, tables } = await boot();
+    const vegans = [0, 1, 2, 3, 4, 5].map((i) => reviewed(
+      i === 0 ? "Chickpea & spinach curry" : `Vegan supper ${i}`,
+      ["dinner", "vegan", "vegetarian"],
+      VEGAN_ING,
+    ));
+    const S = arm(window, tables, vegans, {
+      diet: "vegan",
+      meals: 6,
+      selected: vegans.map((m) => m.name),
+      menuOptions: vegans,
+    });
+    assert.equal(S.selected.length, 6);
+    await window.openModify(0);
+    assert.equal(window.__plentry.modifyPicks().length, 0);
+    assert.equal(document.getElementById("modify-alts"), null);
+    assert.equal(document.querySelectorAll("#modal .day-card").length, 0);
+    const empty = document.getElementById("modify-empty");
+    assert.ok(empty);
+    assert.match(empty.textContent, /already in this week/);
+    assert.equal(document.getElementById("modify-refresh").disabled, true);
+    assert.equal(document.getElementById("modify-restart"), null);
+    assert.equal(document.getElementById("modal").textContent.toLowerCase().includes("error"), false);
+    window.refreshModify();
+    assert.equal(document.getElementById("modify-alts"), null);
+    assert.equal(document.querySelectorAll("#modal .day-card").length, 0);
+    assert.ok(document.getElementById("modify-empty"));
+    assert.equal(document.getElementById("modify-refresh").disabled, true);
+  });
+
+  it("picking an alternative swaps that slot and rebuilds the basket and week price", async () => {
+    const { window, document } = await boot();
+    const S = window.__plentry.state();
+    window.renderMenu();
+    const n = S.selected.length;
+    const beforeName = S.selected[0];
+    const beforeSum = document.getElementById("week-price-sum").textContent;
+    assert.match(beforeSum, /Basket £/);
+    S.basketEdit = [{ i: "rice", q: 9 }];
+    S.basketFor = JSON.stringify(S.selected);
+    window.syncBasketFromMeals();
+    assert.deepEqual(window.__plentry.getBasket().map((b) => ({ i: b.i, q: b.q })), [{ i: "rice", q: 9 }]);
+    await window.openModify(0);
+    const replacement = reviewed("Plain rice bowl", ["dinner", "vegan", "vegetarian"], ["rice", "onions", "garlic"]);
+    S.menuOptions.push(replacement);
+    window.__plentry.setModifyPicks([replacement]);
+    document.querySelector("#modify-alts .day-card").click();
+    assert.equal(S.selected[0], "Plain rice bowl");
+    assert.notEqual(S.selected[0], beforeName);
+    assert.equal(S.selected.length, n);
+    assert.equal(S.basketEdit, null);
+    const basket = window.__plentry.getBasket();
+    assert.equal(basket.some((b) => b.i === "rice" && b.q === 9), false);
+    assert.equal(basket.some((b) => b.i === "salmon fillet"), false);
+    assert.ok(basket.length > 1);
+    assert.equal(document.getElementById("modal-bg").classList.contains("open"), false);
+    const week = document.getElementById("menu-week");
+    assert.ok(week.textContent.includes("Plain rice bowl"));
+    assert.ok(week.textContent.includes("Modify"));
+    const afterSum = document.getElementById("week-price-sum").textContent;
+    assert.match(afterSum, /Basket £/);
+    assert.notEqual(afterSum, beforeSum);
+    const card = week.querySelector(".day-card");
+    assert.ok(card.textContent.includes("Plain rice bowl"));
+    assert.match(card.querySelector(".mp").textContent, /£|incomplete|Price soon/);
+  });
+});
+
+describe("one meal price", () => {
+  const pomodoro = {
+    id: 28,
+    name: "Veggie spaghetti pomodoro",
+    emoji: "🍅",
+    time: 20,
+    ing: ["black pepper", "chilli flakes", "chopped tomatoes", "fresh basil", "garlic", "olive oil", "red onions", "salt", "spaghetti", "tomato puree"],
+    portions: {
+      salt: [0.5, "tsp"], garlic: [2, "clove"], "olive oil": [3, "tbsp"], spaghetti: [180, "g"],
+      "red onions": [1, "pc"], "fresh basil": [15, "g"], "black pepper": [0.25, "tsp"],
+      "tomato puree": [15, "g"], "chilli flakes": [0.5, "tsp"], "chopped tomatoes": [400, "g"],
+    },
+    reviewed_at: "2026-10-01T00:00:00Z",
+    tags: ["vegetarian", "dinner", "quick"],
+  };
+  const rice = {
+    id: 29,
+    name: "Plain rice bowl",
+    emoji: "🍚",
+    time: 20,
+    ing: ["rice", "salt"],
+    portions: { rice: [150, "g"], salt: [0.5, "tsp"] },
+    reviewed_at: "2026-10-01T00:00:00Z",
+    tags: ["vegan", "vegetarian", "dinner"],
+  };
+  const shelf = [
+    ["garlic", 0.87, 40, "clove"],
+    ["olive oil", 5.75, 33, "tbsp"],
+    ["spaghetti", 0.75, 500, "g"],
+    ["red onions", 1, 3, "pc"],
+    ["fresh basil", 0.5, 30, "g"],
+    ["tomato puree", 0.59, 200, "g"],
+    ["chopped tomatoes", 0.47, 400, "g"],
+    ["salt", 1.9, 1500, "g"],
+    ["black pepper", 1.2, 25, "g"],
+    ["chilli flakes", 1, 32, "g"],
+    ["rice", 1.79, 1000, "g"],
+  ].map(([meal_key, price_gbp, pack_qty, pack_unit], i) => ({
+    id: i + 1, meal_key, store: "tesco", price_gbp, pack_qty, pack_unit, product_name: meal_key, display_name: meal_key,
+  }));
+
+  async function bootPrice(servings, prices) {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      tables: { meals: [pomodoro, rice], orders: [], profiles: [], ingredient_prices: prices || shelf },
+    });
+    const S = window.__plentry.state();
+    S.prefs.diet = "omnivore";
+    S.prefs.servings = servings;
+    S.weekServings = servings;
+    S.menuOptions = [rice, pomodoro];
+    S.selected = [rice.name];
+    S.pantry = {};
+    await window.loadShelfPrices();
+    window.pickStore("tesco");
+    window.renderMenu();
+    return { window, document, S };
+  }
+
+  it("prices Veggie spaghetti pomodoro from Tesco portions at 2, 4 and 6", async () => {
+    const { window } = await bootPrice(2);
+    const store = { id: "tesco" };
+    const q2 = window.__plentry.mealIngredientQuote(pomodoro, 2, store);
+    const q4 = window.__plentry.mealIngredientQuote(pomodoro, 4, store);
+    const q6 = window.__plentry.mealIngredientQuote(pomodoro, 6, store);
+    assert.equal(q2.incomplete, false);
+    assert.equal(q2.pence, 193);
+    assert.equal(q4.pence, 387);
+    assert.equal(q6.pence, 578);
+    assert.equal(window.mealPriceLabel(q2), "~£1.93");
+    assert.ok(q2.pence > 100 && q2.pence < 800);
+    assert.notEqual(q2.pence, 355);
+    assert.notEqual(q2.pence, 1403);
+  });
+
+  it("I-P06 Modify share equals the day card after the swap at 2, 4 and 6", async () => {
+    const oil = {
+      name: "Oil supper",
+      ing: ["olive oil", "salt"],
+      portions: { "olive oil": [2, "tbsp"], salt: [0.5, "tsp"] },
+      reviewed_at: "2026-10-01T00:00:00Z",
+    };
+    for (const servings of [2, 4, 6]) {
+      const { window, document, S } = await bootPrice(servings);
+      const store = { id: "tesco" };
+      S.menuOptions = [rice, oil, pomodoro];
+      S.selected = [oil.name, rice.name];
+      window.renderMenu();
+      const beforeBasket = document.getElementById("week-price-sum").textContent;
+      const beforeRice = [...document.querySelectorAll("#menu-week .day-card")]
+        .find((el) => el.textContent.includes("Plain rice bowl"))
+        .querySelector(".mp").textContent;
+      await window.openModify(0);
+      const alts = [0, 1, 2, 3, 4, 5].map((n) => ({
+        name: `Rice plate ${n}`,
+        ing: ["rice", "salt"],
+        portions: { rice: [80 + n * 20, "g"], salt: [0.5, "tsp"] },
+        reviewed_at: "2026-10-01T00:00:00Z",
+      }));
+      window.__plentry.setModifyPicks(alts);
+      const started = performance.now();
+      window.renderModifySheet();
+      const elapsed = performance.now() - started;
+      assert.ok(elapsed < 250, `six Modify prices took ${elapsed.toFixed(0)}ms`);
+      assert.equal(document.querySelectorAll("#modify-alts .day-card").length, 6);
+      window.__plentry.setModifyPicks([pomodoro]);
+      window.renderModifySheet();
+      const btn = [...document.querySelectorAll("#modify-alts .day-card")]
+        .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
+      assert.ok(btn, `servings ${servings}`);
+      const listed = btn.querySelector(".mp").textContent;
+      assert.match(listed, /^£\d+\.\d{2}$/, `servings ${servings}`);
+      const simulatedWeek = [pomodoro.name, rice.name].map((name) => window.mealByName(name));
+      assert.equal(listed, window.__plentry.dinnerShownLabel(simulatedWeek, 0, servings, [], window.preferredStoreObj()), `servings ${servings}`);
+      btn.click();
+      const cards = [...document.querySelectorAll("#menu-week .day-card")];
+      const card = cards.find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
+      const riceCard = cards.find((el) => el.textContent.includes("Plain rice bowl"));
+      assert.equal(card.querySelector(".mp").textContent, listed, `servings ${servings}`);
+      assert.notEqual(riceCard.querySelector(".mp").textContent, beforeRice, `servings ${servings}`);
+      assert.notEqual(document.getElementById("week-price-sum").textContent, beforeBasket, `servings ${servings}`);
+      assert.match(document.getElementById("week-price-sum").textContent, /Basket £/);
+      assert.equal(document.getElementById("week-ingredients"), null);
+      assert.equal(document.getElementById("week-price-note"), null);
+      const shown = cards.map((el) => el.querySelector(".mp").textContent);
+      const pence = shown.map((text) => Math.round(Number(text.slice(1)) * 100));
+      const groceries = window.__plentry.basketGroceryPence(
+        window.__plentry.weekPacks([pomodoro, rice], servings, [], store),
+        store,
+      );
+      assert.equal(pence.reduce((a, b) => a + b, 0), groceries, `servings ${servings}`);
+    }
+  });
+
+  it("flags a meal with a missing ingredient price instead of a partial sum", async () => {
+    const prices = shelf.filter((r) => r.meal_key !== "chopped tomatoes");
+    const { window, document } = await bootPrice(2, prices);
+    const quote = window.__plentry.mealIngredientQuote(pomodoro, 2, { id: "tesco" });
+    assert.equal(quote.incomplete, true);
+    assert.equal(quote.pence, null);
+    assert.ok(quote.missing.includes("chopped tomatoes"));
+    assert.equal(window.isAdmin(), false);
+    assert.equal(window.mealPriceLabel(quote), "Price soon");
+    await window.openModify(0);
+    window.__plentry.setModifyPicks([pomodoro]);
+    window.renderModifySheet();
+    const btn = [...document.querySelectorAll("#modify-alts .day-card")]
+      .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
+    assert.equal(btn.querySelector(".mp").textContent, "Price soon");
+    assert.equal(btn.querySelector(".mp").textContent.includes("£"), false);
+    btn.click();
+    const card = [...document.querySelectorAll("#menu-week .day-card")]
+      .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
+    assert.equal(card.querySelector(".mp").textContent, "Price soon");
+    assert.equal(card.querySelector(".mp").textContent.includes("£"), false);
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+    await window.checkAdminStatus();
+    assert.equal(window.isAdmin(), true);
+    window.renderMenu();
+    const adminCard = [...document.querySelectorAll("#menu-week .day-card")]
+      .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
+    assert.equal(adminCard.querySelector(".mp").textContent, "incomplete");
+    assert.equal(window.mealPriceLabel(quote), "incomplete");
+  });
+
+  it("flags a published meal with no portions", async () => {
+    const { window } = await bootPrice(2);
+    const bare = {
+      name: "Beef & Tomato Tortilla Casserole",
+      ing: ["bell peppers", "chopped tomatoes", "minced beef", "olive oil", "onions", "parmesan", "tortillas", "salt"],
+      reviewed_at: "2026-10-01T00:00:00Z",
+    };
+    const quote = window.__plentry.mealIngredientQuote(bare, 2, { id: "tesco" });
+    assert.equal(quote.incomplete, true);
+    assert.equal(quote.pence, null);
+    assert.equal(window.mealPriceLabel(quote), "Price soon");
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+    await window.checkAdminStatus();
+    assert.equal(window.mealPriceLabel(quote), "incomplete");
+  });
+
+  it("uses catalogue prices when the shelf has not loaded or no shop is picked", async () => {
+    const state = weekState();
+    state.prefs.preferredStore = "";
+    const { window, document } = await loadApp({
+      localState: state,
+      tables: { meals: [pomodoro], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.menuOptions = [pomodoro];
+    S.selected = [pomodoro.name];
+    S.weekServings = 2;
+    S.pantry = {};
+    window.renderMenu();
+    const none = window.__plentry.mealIngredientQuote(pomodoro, 2, null);
+    assert.equal(none.incomplete, false);
+    assert.equal(none.pence, 182);
+    const share = window.__plentry.splitMealPence([pomodoro], 2, [], null);
+    assert.equal(document.querySelector("#menu-week .day-side .mp").textContent, "£" + (share[0] / 100).toFixed(2));
+    assert.ok(share[0] > none.pence);
+    assert.equal(document.querySelector("#menu-week .day-side .mp").textContent.includes("Price soon"), false);
+    const tesco = window.__plentry.mealIngredientQuote(pomodoro, 2, { id: "tesco", mult: 1 });
+    assert.equal(tesco.pence, 182);
+    const sains = window.__plentry.mealIngredientQuote(pomodoro, 2, { id: "sains", mult: 1.07 });
+    assert.equal(sains.pence, 195);
+  });
+
+  it("prices from the first shop row that has a price, skipping an earlier blank", async () => {
+    const prices = shelf.map((r) => ({ ...r }));
+    prices.unshift({
+      id: 0,
+      meal_key: "spaghetti",
+      store: "tesco",
+      price_gbp: null,
+      pack_qty: 100,
+      pack_unit: "g",
+      product_name: "blank",
+      display_name: "spaghetti",
+    });
+    const { window } = await bootPrice(2, prices);
+    assert.equal(window.shelfRow("spaghetti", { id: "tesco" }).price_gbp, null);
+    const quote = window.__plentry.mealIngredientQuote(pomodoro, 2, { id: "tesco" });
+    assert.equal(quote.incomplete, false);
+    assert.equal(quote.pence, 193);
+  });
+
+  it("matches supabase/meal_ingredient_prices.sql at 2, 4 and 6, including live pomodoro", async () => {
+    const ragu = {
+      id: 23,
+      name: "Beef ragù spaghetti",
+      ing: ["black pepper", "garlic", "minced beef", "mixed herbs", "olive oil", "onions", "parmesan", "passata", "salt", "soy sauce", "spaghetti", "stock cubes"],
+      portions: {
+        salt: [0.5, "tsp"], garlic: [2, "clove"], onions: [1, "pc"], passata: [400, "g"],
+        parmesan: [30, "g"], "olive oil": [1, "tbsp"], "soy sauce": [1, "tsp"], spaghetti: [180, "g"],
+        "minced beef": [400, "g"], "mixed herbs": [1, "tsp"], "stock cubes": [1, "pc"], "black pepper": [0.25, "tsp"],
+      },
+    };
+    const meals = [pomodoro, ragu, rice];
+    const prices = [
+      { id: 0, meal_key: "spaghetti", store: "tesco", price_gbp: null, pack_qty: 100, pack_unit: "g" },
+      { id: 1, meal_key: "garlic", store: "tesco", price_gbp: 0.87, pack_qty: 40, pack_unit: "clove" },
+      { id: 2, meal_key: "olive oil", store: "tesco", price_gbp: 5.75, pack_qty: 33, pack_unit: "tbsp" },
+      { id: 3, meal_key: "spaghetti", store: "tesco", price_gbp: 0.75, pack_qty: 500, pack_unit: "g" },
+      { id: 4, meal_key: "red onions", store: "tesco", price_gbp: 1, pack_qty: 3, pack_unit: "pc" },
+      { id: 5, meal_key: "fresh basil", store: "tesco", price_gbp: 0.5, pack_qty: 30, pack_unit: "g" },
+      { id: 6, meal_key: "tomato puree", store: "tesco", price_gbp: 0.59, pack_qty: 200, pack_unit: "g" },
+      { id: 7, meal_key: "chopped tomatoes", store: "tesco", price_gbp: 0.47, pack_qty: 400, pack_unit: "g" },
+      { id: 8, meal_key: "onions", store: "tesco", price_gbp: 0.95, pack_qty: 7, pack_unit: "pc" },
+      { id: 9, meal_key: "parmesan", store: "tesco", price_gbp: 4, pack_qty: 200, pack_unit: "g" },
+      { id: 10, meal_key: "passata", store: "tesco", price_gbp: 0.6, pack_qty: 500, pack_unit: "g" },
+      { id: 11, meal_key: "minced beef", store: "tesco", price_gbp: 6.75, pack_qty: 500, pack_unit: "g" },
+      { id: 12, meal_key: "rice", store: "tesco", price_gbp: 1.79, pack_qty: 1000, pack_unit: "g" },
+      { id: 13, meal_key: "salt", store: "tesco", price_gbp: 1.9, pack_qty: 1500, pack_unit: "g" },
+      { id: 14, meal_key: "black pepper", store: "tesco", price_gbp: 1.2, pack_qty: 25, pack_unit: "g" },
+      { id: 15, meal_key: "chilli flakes", store: "tesco", price_gbp: 1, pack_qty: 32, pack_unit: "g" },
+      { id: 16, meal_key: "mixed herbs", store: "tesco", price_gbp: 1, pack_qty: 18, pack_unit: "g" },
+      { id: 17, meal_key: "soy sauce", store: "tesco", price_gbp: 0.55, pack_qty: 150, pack_unit: "ml" },
+      { id: 18, meal_key: "stock cubes", store: "tesco", price_gbp: 1, pack_qty: 10, pack_unit: "pc" },
+    ];
+    const { window } = await bootPrice(2, prices.map((r) => ({
+      ...r, product_name: r.meal_key, display_name: r.meal_key,
+    })));
+    const { readFileSync } = await import("node:fs");
+    const { PGlite } = await import("@electric-sql/pglite");
+    const db = new PGlite();
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create table public.meals (
+        id bigint primary key,
+        ing jsonb,
+        portions jsonb
+      );
+      create table public.ingredient_prices (
+        id bigint primary key,
+        meal_key text,
+        store text,
+        price_gbp numeric,
+        pack_qty numeric,
+        pack_unit text
+      );
+    `);
+    await db.exec(readFileSync(new URL("../supabase/meal_ingredient_prices.sql", import.meta.url), "utf8"));
+    for (const row of prices) {
+      await db.query(
+        "insert into public.ingredient_prices (id, meal_key, store, price_gbp, pack_qty, pack_unit) values ($1,$2,$3,$4,$5,$6)",
+        [row.id, row.meal_key, row.store, row.price_gbp, row.pack_qty, row.pack_unit],
+      );
+    }
+    for (const meal of meals) {
+      await db.query(
+        "insert into public.meals (id, ing, portions) values ($1, $2::jsonb, $3::jsonb)",
+        [meal.id, JSON.stringify(meal.ing), JSON.stringify(meal.portions)],
+      );
+    }
+    const { rows } = await db.query(
+      "select meal_id, servings, price_gbp, incomplete from public.meal_ingredient_prices where store = 'tesco' order by meal_id, servings",
+    );
+    assert.equal(rows.length, meals.length * 3);
+    const store = { id: "tesco" };
+    for (const meal of meals) {
+      for (const servings of [2, 4, 6]) {
+        const sql = rows.find((r) => Number(r.meal_id) === meal.id && Number(r.servings) === servings);
+        const quote = window.__plentry.mealIngredientQuote(meal, servings, store);
+        const sqlPence = sql.price_gbp == null ? null : Math.round(Number(sql.price_gbp) * 100);
+        assert.equal(quote.incomplete, sql.incomplete === true || sql.incomplete === "t", `${meal.name} ${servings}`);
+        assert.equal(quote.pence, sqlPence, `${meal.name} ${servings}`);
+      }
+    }
+    const pom = rows.find((r) => Number(r.meal_id) === 28 && Number(r.servings) === 2);
+    assert.equal(Math.round(Number(pom.price_gbp) * 100), 193);
+    await db.close();
   });
 });
 
@@ -2705,6 +3268,8 @@ describe("shop switch uses that shop's packs", () => {
     ["stock cubes", "sainsburys", 1.10, 10, "pc"], ["stock cubes", "tesco", 1.00, 10, "pc"],
     ["tomatoes", "sainsburys", 0.99, 6, "pc"], ["tomatoes", "tesco", 0.99, 6, "pc"],
     ["tortillas", "sainsburys", 0.99, 8, "pc"], ["tortillas", "tesco", 1.40, 8, "pc"],
+    ["fresh basil", "tesco", 0.50, 30, "g"], ["tomato puree", "tesco", 0.59, 200, "g"],
+    ["red onions", "tesco", 1.00, 3, "pc"], ["chopped tomatoes", "tesco", 0.47, 400, "g"],
   ].map(([meal_key, store, price_gbp, pack_qty, pack_unit], i) => ({
     id: i + 1, meal_key, store, price_gbp, pack_qty, pack_unit, product_name: meal_key, display_name: meal_key,
   }));
@@ -2824,7 +3389,12 @@ describe("shop switch uses that shop's packs", () => {
       assert.ok(pence.every((p) => p >= 0 && Number.isInteger(p)), label);
       window.renderMenu();
       const shown = [...document.querySelectorAll("#menu-week .day-side .mp")].map((el) => el.textContent);
-      assert.deepEqual(shown, pence.map((p) => (p ? `£${(p / 100).toFixed(2)}` : "pantry")), label);
+      const labels = list.map((m, i) => window.__plentry.dinnerShownLabel(list, i, mode.servings, mode.ticks, store));
+      assert.deepEqual(shown, labels, label);
+      assert.equal(document.getElementById("week-ingredients"), null, label);
+      assert.equal(document.getElementById("week-price-note"), null, label);
+      const parsed = shown.map((text) => Math.round(Number(text.replace(/[^0-9.]/g, "")) * 100));
+      assert.deepEqual(parsed, Array.from(pence), label);
       const quote = window.__plentry.weekPriceQuote(list, store);
       assert.equal(Math.round(quote.groceries * 100), groceries, label);
       assert.equal(quote.delivery, store.fee, label);
@@ -2833,7 +3403,7 @@ describe("shop switch uses that shop's packs", () => {
       assert.equal(quote.total, window.customerTotal(quote.est), label);
       assert.equal(quote.hold, window.holdAmount(quote.est), label);
       assert.equal(Math.round(quote.hold * 100), Math.round(quote.est * 1.05 * 1.30 * 100), label);
-      const sumText = `Groceries £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}`;
+      const sumText = `Basket £${quote.groceries.toFixed(2)} + delivery £${quote.delivery.toFixed(2)} + 5% fee £${quote.fee.toFixed(2)} = £${quote.total.toFixed(2)}`;
       assert.equal(document.getElementById("week-price-sum").textContent, sumText, label);
       assert.equal(
         document.getElementById("week-hold").textContent,
@@ -2849,27 +3419,188 @@ describe("shop switch uses that shop's packs", () => {
       }
     }
   });
+
+  it("I-P06 pomodoro's Tesco share stays under a whole private basket at 2, 4 and 6", async () => {
+    const pomodoro = {
+      id: 28,
+      name: "Veggie spaghetti pomodoro",
+      ing: ["black pepper", "chilli flakes", "chopped tomatoes", "fresh basil", "garlic", "olive oil", "red onions", "salt", "spaghetti", "tomato puree"],
+      portions: {
+        salt: [0.5, "tsp"], garlic: [2, "clove"], "olive oil": [3, "tbsp"], spaghetti: [180, "g"],
+        "red onions": [1, "pc"], "fresh basil": [15, "g"], "black pepper": [0.25, "tsp"],
+        "tomato puree": [15, "g"], "chilli flakes": [0.5, "tsp"], "chopped tomatoes": [400, "g"],
+      },
+    };
+    for (const servings of [2, 4, 6]) {
+      const { window, document, S } = await loadWeek();
+      const store = window.preferredStoreObj();
+      S.weekServings = servings;
+      S.menuOptions = [pomodoro, shakshuka, tortilla, ragu];
+      S.selected = [pomodoro.name, shakshuka.name, tortilla.name, ragu.name];
+      window.renderMenu();
+      const cards = [...document.querySelectorAll("#menu-week .day-side .mp")].map((el) => el.textContent);
+      assert.ok(cards.every((text) => /^£\d+\.\d{2}$/.test(text)), cards.join(" | "));
+      const shown = cards.map((text) => Math.round(Number(text.slice(1)) * 100));
+      const list = S.selected.map(window.mealByName);
+      const groceries = window.__plentry.basketGroceryPence(
+        window.__plentry.weekPacks(list, servings, [], store),
+        store,
+      );
+      assert.equal(shown.reduce((a, b) => a + b, 0), groceries, `servings ${servings}`);
+      const share = shown[0];
+      const quote = window.__plentry.mealIngredientQuote(pomodoro, servings, store);
+      const solo = window.__plentry.basketGroceryPence(
+        window.__plentry.weekPacks([pomodoro], servings, [], store),
+        store,
+      );
+      assert.equal(quote.incomplete, false, `servings ${servings}`);
+      assert.equal(quote.pence, [193, 387, 578][servings / 2 - 1], `servings ${servings}`);
+      assert.ok(share > quote.pence, `share ${share} weight ${quote.pence}`);
+      assert.ok(share < solo - 100, `share ${share} solo ${solo}`);
+      const pair = window.__plentry.splitMealPence([pomodoro, shakshuka], servings, [], store)[0];
+      assert.ok(Math.abs(pair - share) < 575, `pair ${pair} week ${share}`);
+      await window.openModify(0);
+      window.__plentry.setModifyPicks([pomodoro]);
+      window.renderModifySheet();
+      const listed = document.querySelector("#modify-alts .mp").textContent;
+      assert.equal(listed, "£" + (share / 100).toFixed(2));
+    }
+  });
+
+  it("I-P06 pins the Tesco week shares and pomodoro swapped in for salmon", async () => {
+    const pounds = (pence) => "£" + (pence / 100).toFixed(2);
+    // Locked. A change to the ingredient-cost weighting must fail this test.
+    const pinned = {
+      2: [1852, 1377, 463, 1091],
+      4: [2596, 1749, 532, 1091],
+      6: [3620, 2536, 947, 1301],
+    };
+    const baskets = { 2: 4783, 4: 5968, 6: 8404 };
+    const pomodoroPence = { 2: 407, 4: 471, 6: 583 };
+    const pomodoro = {
+      id: 28,
+      name: "Veggie spaghetti pomodoro",
+      ing: ["black pepper", "chilli flakes", "chopped tomatoes", "fresh basil", "garlic", "olive oil", "red onions", "salt", "spaghetti", "tomato puree"],
+      portions: {
+        salt: [0.5, "tsp"], garlic: [2, "clove"], "olive oil": [3, "tbsp"], spaghetti: [180, "g"],
+        "red onions": [1, "pc"], "fresh basil": [15, "g"], "black pepper": [0.25, "tsp"],
+        "tomato puree": [15, "g"], "chilli flakes": [0.5, "tsp"], "chopped tomatoes": [400, "g"],
+      },
+    };
+    const { window, document, S } = await loadWeek();
+    const store = window.preferredStoreObj();
+    for (const servings of [2, 4, 6]) {
+      S.weekServings = servings;
+      S.pantry = {};
+      S.menuOptions = [ragu, shakshuka, tortilla, salmon];
+      S.selected = [ragu.name, shakshuka.name, tortilla.name, salmon.name];
+      const list = S.selected.map(window.mealByName);
+      const pence = Array.from(window.__plentry.splitMealPence(list, servings, [], store));
+      assert.deepEqual(pence, pinned[servings], `shares at ${servings}`);
+      const groceries = window.__plentry.basketGroceryPence(
+        window.__plentry.weekPacks(list, servings, [], store),
+        store,
+      );
+      assert.equal(groceries, baskets[servings], `basket at ${servings}`);
+      assert.equal(pence.reduce((a, b) => a + b, 0), baskets[servings], `sum at ${servings}`);
+      window.renderMenu();
+      const shown = [...document.querySelectorAll("#menu-week .day-side .mp")].map((el) => el.textContent);
+      assert.deepEqual(shown, pinned[servings].map(pounds), `cards at ${servings}`);
+      assert.ok(
+        document.getElementById("week-price-sum").textContent.startsWith("Basket " + pounds(baskets[servings])),
+        `footer at ${servings}`,
+      );
+    }
+    for (const servings of [2, 4, 6]) {
+      S.weekServings = servings;
+      S.pantry = {};
+      S.menuOptions = [ragu, shakshuka, tortilla, pomodoro];
+      S.selected = [ragu.name, shakshuka.name, tortilla.name, pomodoro.name];
+      const list = S.selected.map(window.mealByName);
+      const pence = Array.from(window.__plentry.splitMealPence(list, servings, [], store));
+      assert.equal(pence[3], pomodoroPence[servings], `pomodoro share at ${servings}: ${pence.join(",")}`);
+      window.renderMenu();
+      const card = [...document.querySelectorAll("#menu-week .day-card")]
+        .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
+      assert.equal(card.querySelector(".day-side .mp").textContent, pounds(pomodoroPence[servings]));
+    }
+  });
+
+  it("I-P06 a dinner with every ingredient ticked says From your cupboard", async () => {
+    const { window, document, S } = await loadWeek();
+    const store = window.preferredStoreObj();
+    S.weekServings = 2;
+    S.pantry = {};
+    const ticks = window.__plentry.completeIng(window.mealByName(tortilla.name));
+    ticks.forEach((k) => { S.pantry[k] = 1; });
+    const list = S.selected.map(window.mealByName);
+    const pence = Array.from(window.__plentry.splitMealPence(list, 2, ticks, store));
+    assert.equal(pence[2], 0);
+    assert.ok(pence.every((p, i) => i === 2 || p > 0), pence.join(","));
+    assert.equal(window.__plentry.dinnerShownLabel(list, 2, 2, ticks, store), "From your cupboard");
+    window.renderMenu();
+    const cards = [...document.querySelectorAll("#menu-week .day-card")];
+    const tortillaCard = cards.find((el) => el.textContent.includes("Spanish tortilla"));
+    assert.equal(tortillaCard.querySelector(".day-side .mp").textContent, "From your cupboard");
+    assert.equal(tortillaCard.textContent.includes("£0.00"), false);
+    cards.forEach((el) => {
+      if (el === tortillaCard) return;
+      const text = el.querySelector(".day-side .mp").textContent;
+      assert.match(text, /^£\d+\.\d{2}$/);
+      assert.notEqual(text, "£0.00");
+      assert.notEqual(text, "From your cupboard");
+    });
+    const groceries = window.__plentry.basketGroceryPence(
+      window.__plentry.weekPacks(list, 2, ticks, store),
+      store,
+    );
+    assert.equal(pence.reduce((a, b) => a + b, 0), groceries);
+    const pantrySupper = {
+      name: "Pantry supper",
+      ing: ticks.slice(),
+      portions: tortilla.portions,
+    };
+    S.menuOptions.push(pantrySupper);
+    await window.openModify(2);
+    window.__plentry.setModifyPicks([window.mealByName("Pantry supper")]);
+    window.renderModifySheet();
+    const alt = [...document.querySelectorAll("#modify-alts button")]
+      .find((el) => el.textContent.includes("Pantry supper"));
+    assert.equal(alt.querySelector(".mp").textContent, "From your cupboard");
+    assert.equal(alt.textContent.includes("£0.00"), false);
+    const mince = {
+      name: "Mince on the side",
+      ing: ["minced beef", "salt"],
+      portions: { "minced beef": [200, "g"], salt: [0.5, "tsp"] },
+    };
+    window.__plentry.setModifyPicks([mince]);
+    window.renderModifySheet();
+    const minceLabel = document.querySelector("#modify-alts .mp").textContent;
+    assert.match(minceLabel, /^£\d+\.\d{2}$/);
+    assert.notEqual(minceLabel, "£0.00");
+    assert.notEqual(minceLabel, "From your cupboard");
+  });
 });
 
 describe("per-meal price split (I-P06)", () => {
-  it("splits shared packs by quantity, seasonings and portion-less items evenly, remainder on the last meal", async () => {
+  it("splits shared packs by ingredient-cost weight, ties to the earlier day", async () => {
     const { window } = await loadApp();
     const saltRice = { name: "Rice", ing: ["salt", "rice"], portions: { rice: [100, "g"], salt: [0.5, "tsp"] } };
     const saltPasta = { name: "Pasta", ing: ["salt", "spaghetti"], portions: { spaghetti: [100, "g"], salt: [0.5, "tsp"] } };
     const open = window.__plentry.splitMealPence([saltRice, saltPasta], 2, [], null);
-    assert.deepEqual(open, [177, 128]);
+    assert.deepEqual(Array.from(open), [173, 132]);
     assert.equal(open[0] + open[1], 65 + 145 + 95);
     const ticked = window.__plentry.splitMealPence([saltRice, saltPasta], 2, ["salt"], null);
-    assert.deepEqual(ticked, [145, 95]);
+    assert.deepEqual(Array.from(ticked), [145, 95]);
     const onionA = { name: "One", ing: ["onions"], portions: { onions: [1, "pc"] } };
     const onionB = { name: "Two", ing: ["onions"], portions: { onions: [2, "pc"] } };
     const onions = window.__plentry.splitMealPence([onionA, onionB], 2, [], null);
-    assert.deepEqual(onions, [28, 57]);
+    assert.deepEqual(Array.from(onions), [28, 57]);
     assert.equal(onions[0] + onions[1], 85);
     const eggsA = { name: "A", ing: ["eggs", "onions"] };
     const eggsB = { name: "B", ing: ["eggs"] };
     const eggs = window.__plentry.splitMealPence([eggsA, eggsB], 2, [], null);
-    assert.deepEqual(eggs, [162, 78]);
+    assert.deepEqual(Array.from(eggs), [163, 77]);
     assert.equal(eggs[0] + eggs[1], 155 + 85);
     for (const servings of [2, 4, 6]) {
       const list = [saltRice, saltPasta, onionA];

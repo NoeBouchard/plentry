@@ -408,6 +408,26 @@ describe("source contracts", () => {
     assert.match(html, /await hydrateOrdersFromDb\(\)/);
   });
 
+  it("meal ingredient prices are stored by the migration and not written onto ingredient_prices", () => {
+    const sql = readFileSync(path.join(ROOT, "supabase/meal_ingredient_prices.sql"), "utf8");
+    assert.match(sql, /create table if not exists public\.meal_ingredient_prices/);
+    assert.match(sql, /servings in \(2, 4, 6\)/);
+    assert.match(sql, /private\.refresh_meal_ingredient_prices/);
+    assert.match(sql, /incomplete/);
+    assert.match(sql, /NOT APPLIED to production/);
+    assert.doesNotMatch(sql, /update public\.ingredient_prices/i);
+    assert.match(html, /function mealIngredientQuote/);
+    assert.match(html, /function splitMealPence/);
+    assert.match(html, /largest remainder/);
+    assert.doesNotMatch(html, /id="week-ingredients"/);
+    assert.doesNotMatch(html, /id="week-price-note"/);
+    assert.doesNotMatch(html, /Dinner prices are the ingredients used/);
+    assert.doesNotMatch(html, /Ingredients ~£/);
+    assert.match(html, /Price soon/);
+    assert.match(html, /From your cupboard/);
+    assert.match(html, /Basket £/);
+  });
+
   it("advisor add keeps week at prefs.meals", () => {
     assert.match(html, /S\.selected=next\.slice\(0,n\)/);
     assert.match(html, /function addAdvisorMeals/);
@@ -416,6 +436,11 @@ describe("source contracts", () => {
   it("Modify and New week load the meals catalog, not meal_options AI", () => {
     assert.match(html, /async function openModify/);
     assert.match(html, /await loadCatalogMeals\(\)/);
+    assert.match(html, /const MODIFY_FIRST=6;/);
+    assert.match(html, /const MODIFY_MORE=4;/);
+    assert.match(html, /function refreshModify/);
+    assert.match(html, /function modifyCandidates/);
+    assert.match(html, /function mealIngredientQuote/);
     assert.doesNotMatch(html, /ai\("meal_options"/);
     assert.match(html, /ai\("advisor"/);
     assert.match(html, /const STAPLES=/);
