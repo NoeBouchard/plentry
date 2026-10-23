@@ -665,3 +665,133 @@ describe("source contracts", () => {
     assert.doesNotMatch(html, /async function loadIngredientPrices\(\)/);
   });
 });
+
+function stripSqlComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join("\n");
+}
+
+function sqlBody(name) {
+  return readFileSync(path.join(ROOT, "supabase", name), "utf8");
+}
+
+describe("I-A13 published meals read (pending SQL, not applied)", () => {
+  const raw = sqlBody("meals_read_published.sql");
+  const active = stripSqlComments(raw);
+  const schema = sqlBody("schema.sql");
+  const adminRoles = sqlBody("admin_roles.sql");
+
+  function anonColumns() {
+    const grants = [...active.matchAll(/grant select\s*\(([^)]+)\)\s*on\s+public\.meals\s+to\s+anon/gi)];
+    assert.equal(grants.length, 1);
+    return grants[0][1].split(",").map((s) => s.trim().replace(/"/g, "")).filter(Boolean);
+  }
+
+  it("I-A13 policy is published-only for anon and authenticated, in a transaction, and not a migration", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.equal(existsSync(path.join(ROOT, "supabase/meals_read_published.sql")), true);
+    assert.match(raw, /PENDING/);
+    assert.match(raw, /Not applied/);
+    const begin = active.indexOf("begin;");
+    const commit = active.lastIndexOf("commit;");
+    assert.ok(begin >= 0 && commit > begin);
+    const body = active.slice(begin, commit);
+    assert.match(body, /drop policy if exists "read meals" on public\.meals/);
+    assert.match(body, /drop policy if exists "read published meals" on public\.meals/);
+    assert.match(body, /create policy "read published meals"\s+on public\.meals\s+for select\s+to anon,\s*authenticated\s+using \(reviewed_at is not null\)/);
+    assert.equal([...active.matchAll(/create policy/gi)].length, 1);
+    assert.doesNotMatch(active, /create policy "read meals"/);
+    assert.match(raw, /Rollback/);
+    assert.match(raw, /create policy "read meals" on public\.meals/);
+    assert.match(raw, /using \(auth\.role\(\) = 'authenticated'\)/);
+    assert.match(raw, /grant select on public\.meals to anon;/);
+    assert.match(schema, /PENDING, NOT APPLIED: supabase\/meals_read_published\.sql/);
+    assert.match(schema, /create policy "read meals" on public\.meals/);
+  });
+
+  it("I-A13 anon column allow-list excludes created_by, source, and created_at", () => {
+    const cols = anonColumns();
+    assert.deepEqual(cols, [
+      "id",
+      "name",
+      "emoji",
+      "time",
+      "ing",
+      "image_url",
+      "recipe",
+      "tags",
+      "reviewed_at",
+      "portions",
+      "category",
+    ]);
+    for (const banned of ["created_by", "source", "created_at"]) {
+      assert.equal(cols.includes(banned), false, banned);
+    }
+    assert.match(active, /revoke select on public\.meals from anon/);
+    assert.doesNotMatch(active, /grant select on public\.meals to anon/);
+  });
+
+  it("I-A13 leaves admin read, insert, and update policies untouched", () => {
+    const drops = [...active.matchAll(/drop policy if exists "([^"]+)"/gi)].map((m) => m[1]);
+    assert.deepEqual(drops.sort(), ["read meals", "read published meals"]);
+    assert.doesNotMatch(active, /admin read meals|admin insert meals|admin update meals|admin delete meals|is_admin_aal2/);
+    assert.match(adminRoles, /create policy "admin read meals" on public\.meals\s+for select to authenticated\s+using \(public\.is_admin_aal2\(\)\)/);
+    assert.match(adminRoles, /create policy "admin insert meals" on public\.meals/);
+    assert.match(adminRoles, /create policy "admin update meals review" on public\.meals/);
+    assert.doesNotMatch(adminRoles, /drop policy if exists "read meals"/);
+  });
+
+  it("I-A13 anon meals queries in index.html only reference the anon allow-list", () => {
+    const allow = new Set(anonColumns());
+    const banned = new Set(["created_by", "source", "created_at"]);
+    const adminStart = html.indexOf("async function loadAdminMeals(");
+    const adminEnd = html.indexOf("function renderMeals(");
+    assert.ok(adminStart >= 0 && adminEnd > adminStart);
+    const direct = [...html.matchAll(/\.from\("meals"\)\.select\("([^"]*)"\)/g)];
+    assert.ok(direct.length >= 4);
+    for (const hit of direct) {
+      const inAdmin = hit.index > adminStart && hit.index < adminEnd;
+      assert.equal(inAdmin, false);
+      const cols = hit[1].split(",").map((s) => s.trim()).filter(Boolean);
+      assert.ok(cols.length > 0);
+      assert.equal(cols.includes("*"), false);
+      for (const col of cols) {
+        assert.equal(allow.has(col), true, col);
+        assert.equal(banned.has(col), false, col);
+      }
+    }
+    assert.doesNotMatch(html, /\.from\("meals"\)\.select\(\s*["']\*["']\s*\)/);
+    assert.doesNotMatch(html, /\.from\('meals'\)/);
+
+    function between(start, end) {
+      const i = html.indexOf(start);
+      const j = html.indexOf(end, i + start.length);
+      assert.ok(i >= 0 && j > i, start);
+      return html.slice(i, j);
+    }
+    const catalog = between("async function loadCatalogMeals()", "function itemUnitPrice(");
+    const byName = between("async function catalogMealByName(", "function parseStepWithHeading(");
+    for (const src of [catalog, byName]) {
+      const lists = [...src.matchAll(/\.select\("([^"]*)"\)/g)];
+      assert.ok(lists.length >= 1);
+      for (const list of lists) {
+        for (const col of list[1].split(",").map((s) => s.trim()).filter(Boolean)) {
+          assert.equal(allow.has(col), true, col);
+          assert.equal(banned.has(col), false, col);
+        }
+      }
+    }
+    assert.match(catalog, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions"\)/);
+    assert.match(catalog, /\.from\("meals"\)\.select\("name,emoji,time,ing,image_url"\)/);
+    assert.match(catalog, /\.from\("meals"\)\.select\("name,emoji,time,ing"\)/);
+    assert.match(byName, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions"\)/);
+
+    const adminFn = html.slice(adminStart, adminEnd);
+    assert.match(adminFn, /if\(!isAdmin\(\)\)/);
+    assert.match(adminFn, /source,created_at/);
+    assert.match(adminFn, /\.from\("meals"\)\.select\(cols\)/);
+  });
+});
