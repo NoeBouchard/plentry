@@ -9,6 +9,22 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Left.** Four other seed photo IDs still 404: tomato & parmesan baked rice, tandoori-style yoghurt chicken, beef stuffed peppers, and Spanish tortilla / the potatoes fallback.
 - **Not deployed.** No production static ship and no SQL apply. No `pay` change.
 
+## 2026-10-23 — Seeded tie-break for New week and Modify
+
+- **Order.** When two dinners have the same score, New week and Modify order them with a mulberry32 key from the week's seed and the meal id, then the id. A dinner with no id uses its name for that key. The key is computed once per dinner before the sort. Ordering does not call `Math.random`.
+- **New week.** Each tap mints a new seed, so the next week usually changes. A shared `?seed=` link pins the sequence: the first New week uses that seed, and each further tap uses the next number (`seed`, `seed+1`, `seed+2`, wrapping at 2³²). `window.__plentry.setWeekSeed(4242)` (also `window.setWeekSeed`) does the same from the console. Modify, including Show 4 more, stays on the seed of the week on screen.
+- **Smoke.** Open `https://getplentry.com/?seed=4242`. A whole number is used as-is; any other text is hashed. The value is stored for the tab (`plentry_week_seed`, plus the pin and the step). Tap **New week** to walk the sequence. `window.__plentry.weekSeed()` reads the seed of the week on screen.
+- **Unchanged.** Score weights. Modify still lists 6, then up to 4, and still stops with the same message when the pool runs out. Prices, the shared basket block, and the hold stay as they are.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
+## 2026-10-23 — Published meals read (SQL written, not applied)
+
+- **Policy.** `supabase/meals_read_published.sql` drops `read meals` and creates `read published meals` FOR SELECT TO anon, authenticated USING (`reviewed_at is not null`). Anon loses table SELECT and is granted only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off that list. `admin read meals`, admin insert, and admin update are not changed.
+- **Why.** Production `read meals` lets any signed-in user read the unpublished drafts, including `created_by` and `source`. Anon matches no row, so the site falls back to the 8 `FALLBACK_MEALS`.
+- **Columns.** Names match `schema.sql`, `servings.sql` (`portions`), and `meals_categories_tags_ingredients_v2.sql` (`category`). No rename.
+- **Client.** `loadCatalogMeals` and `catalogMealByName` already select a subset of that allow-list (they omit `category`). No query change. `loadAdminMeals` still selects `source` and `created_at` behind `isAdmin()`.
+- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. Do not apply it from GitHub. Production behaviour is unchanged until it is pasted in the SQL editor. Manual check after that: [TESTING.md](TESTING.md). `schema.sql` still documents the old policy and points at this file as pending.
+
 ## 2026-10-23 — From your cupboard means no basket line
 
 - **Label.** A day card and a Modify option say **From your cupboard** only when that dinner owns no basket line: every ingredient it uses is ticked, so the basket has nothing left for it. A share that rounds to 0p while the dinner still owns a line shows the price, including **£0.00**.

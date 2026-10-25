@@ -30,6 +30,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 3. After the advisor (or you) add a dinner: **Meals → New meal** → run its record through [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) → **Verify & publish**. Unpublish sends a live dinner back to New meal. Do not delete the row.
 4. **Recipe source-check** — work the 75 pending records in `meal-ingredient verification/STATUS.md`, 5 per session, most-ordered dishes first; apply each DB patch via the Meals tab. Decide `tomato purée` as a 36th key once 3 records want it.
 5. ~~**Servings (LIVE 6 Oct 2026)**~~ — PR #3 merged, SQL applied, `pay` v29 and that static deploy. Basket lines are whole packs from `meals.portions`. ~~**Half-pack basket (LIVE 8 Oct 2026)**~~ — shared extra pack, from PR #7, shipped in PR #8. PR #7 was closed unmerged.
+6. **Meals read (written, not applied).** Paste `supabase/meals_read_published.sql` in the SQL editor. It is not a migration and must not be moved into `supabase/migrations/`. Then the manual check in [TESTING.md](TESTING.md): anon REST returns 52 published rows and no drafts, a non-admin login sees no drafts, and `select=*` as anon fails. Do not apply it from GitHub.
 
 ## Next product
 

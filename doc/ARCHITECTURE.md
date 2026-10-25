@@ -29,11 +29,11 @@ From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), merging to `main` auto-
 |---|---|
 | `profiles` | One row per user; `state` JSONB (≤256 KB) |
 | `orders` | Concierge queue. `status` `new\|ordered\|delivered`. Payment columns from `orders_payment.sql` |
-| `meals` | Shared catalog. `source` `seed\|ai\|advisor\|ops`. `tags` jsonb (closed set). `reviewed_at` null = **New meal**. Clients cannot INSERT; founder can INSERT/UPDATE/DELETE (JWT email); `ai` inserts drafts via service role |
+| `meals` | Shared catalog. `source` `seed\|ai\|advisor\|ops`. `tags` jsonb (closed set). `reviewed_at` null = **New meal**. Clients cannot INSERT; admin insert/update is `is_admin_aal2()`; `ai` inserts drafts via service role. Production SELECT is still `read meals` (authenticated, every row). Pending, not applied: `meals_read_published.sql` |
 | `ingredient_prices` | Shelf prices per store for quoting when Pepesto is off |
 | `rate_limits` | Used by edge functions |
 
-RLS: users see own profiles/orders; authenticated can read meals. Ops: JWT email `noyouchka.bouchard@gmail.com` can select/update all orders and write the meals catalog (`admin_policies.sql`).
+RLS on production: users see own profiles/orders. `read meals` is SELECT for `authenticated` on every `public.meals` row, so anon gets no rows (the site uses the 8 `FALLBACK_MEALS`) and any signed-in user can read drafts, including `created_by` and `source`. Admin writes and the extra admin read use `admin_roles.sql` (`is_admin_aal2()`). **Pending, not applied:** `supabase/meals_read_published.sql` (loose file, not a migration) replaces `read meals` with `read published meals` for `anon` and `authenticated` using `reviewed_at is not null`, revokes anon table SELECT, and grants anon only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. It does not change `admin read meals`, admin insert, or admin update.
 
 ## Edge functions
 
