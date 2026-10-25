@@ -92,13 +92,17 @@ See the status table above. Live (DB 17 Sep, functions 17 Sep, static 18 Sep): S
 - `notify_order_webhook_fn` was callable via PostgREST; `EXECUTE` revoked from `anon` / `authenticated` / `PUBLIC`.
 - Free-beta Telegram triggers (insert `none`, unpaid→none) dropped. Only `notify_order_paid_webhook` remains.
 
+## Closed on production after PR #28
+
+- **S-18.** `read meals` (authenticated, every row) is replaced by `read published meals` (`reviewed_at is not null`) for anon and authenticated. Anon SELECT is `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. Drafts are hidden from anon and from signed-in non-admins. `admin read meals` and admin insert/update are unchanged. Applied in the SQL editor. `I-A13`.
+
 ## Open — SQL written, not applied
 
 | ID | Sev | Where | Finding | Status | Fix / test |
 |---|---|---|---|---|---|
-| S-18 | Medium | `public.meals` RLS | Policy `read meals` is SELECT for `authenticated` on every row. Anon gets 0 rows, so the site uses the 8 `FALLBACK_MEALS`. Any signed-in non-admin can read the unpublished drafts, including `created_by` and `source`. | **Open — file written, not applied** | `supabase/meals_read_published.sql` (loose file, not `supabase/migrations/`). Policy `read published meals` for anon and authenticated, `reviewed_at is not null`. Anon SELECT limited to `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `admin read meals` and admin insert/update are unchanged. Apply by pasting it in the SQL editor, then the check in [TESTING.md](TESTING.md). `I-A13` parses the file only. |
+| S-19 | Medium | `public.meals` grants | After S-18, authenticated still has table SELECT, so a signed-in non-admin can read `created_by` and `source` on published rows. Advisor drafts store a customer id in `created_by`. Anon still has table INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER. TRUNCATE ignores RLS. | **Open — file written, not applied** | `supabase/meals_followups.sql` (loose file, not `supabase/migrations/`). Same 11-column SELECT for authenticated. `admin_read_meals()` returns `source`, `created_by`, and `created_at` only when `is_admin_aal2()`. Anon write privileges revoked. Any new public catalogue column must be added to the anon and authenticated column grants. Apply by pasting it in the SQL editor, then the check in [TESTING.md](TESTING.md). `I-A14` runs both SQL files on PGlite. |
 
-- `plentry/supabase/meals_read_published.sql` — **not applied**. Do not put it in `supabase/migrations/`.
+- `supabase/meals_followups.sql` — **not applied**. Do not put it in `supabase/migrations/`.
 
 ## Known accepted risks (do not “fix” without product sign-off)
 

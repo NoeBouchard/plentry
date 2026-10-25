@@ -66,16 +66,20 @@ alter table public.meals add column if not exists reviewed_at timestamptz;
 
 alter table public.meals enable row level security;
 
--- Production still has the policy below ("read meals": authenticated, every
--- row, including drafts). Anon matches no row.
--- PENDING, NOT APPLIED: supabase/meals_read_published.sql is a loose file in
--- supabase/, not a migration. It drops "read meals" and creates
--- "read published meals" FOR SELECT TO anon, authenticated
--- USING (reviewed_at is not null). Anon SELECT is then only
--- id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions,
--- category. "admin read meals" (is_admin_aal2()) and admin insert/update are
--- not changed. Re-running THIS file recreates "read meals"; run
--- meals_read_published.sql again after that.
+-- Production, applied in the SQL editor after PR #28: policy "read published
+-- meals" FOR SELECT TO anon, authenticated USING (reviewed_at is not null).
+-- Anon SELECT is the 11 catalogue columns (not created_by, source, or
+-- created_at). This bootstrap file still creates the old "read meals" policy
+-- below. Re-running THIS file recreates "read meals"; run
+-- meals_read_published.sql again after that, then meals_followups.sql.
+-- Any new public catalogue column on public.meals must be added to the anon
+-- column grant and to the authenticated column grant. Do not add created_by
+-- or source.
+-- PENDING, NOT APPLIED: supabase/meals_followups.sql is a loose file in
+-- supabase/, not a migration. It revokes authenticated table SELECT, grants
+-- the same 11 columns to anon and authenticated, adds admin_read_meals()
+-- (is_admin_aal2()), and revokes anon INSERT, UPDATE, DELETE, TRUNCATE,
+-- REFERENCES, and TRIGGER.
 drop policy if exists "read meals" on public.meals;
 create policy "read meals" on public.meals
   for select using (auth.role() = 'authenticated');

@@ -2,6 +2,15 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-25 — Meals column follow-ups (SQL written, not applied)
+
+- **Grants.** `supabase/meals_followups.sql` revokes table SELECT from authenticated and grants the same 11 catalogue columns as anon: `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off both grants. A column revoke does not stick while table SELECT remains, so the table grant is revoked.
+- **Admin read.** The Meals card shows `source` and `created_at`. `created_by` on advisor drafts is a customer id. Column grants are per role, so an aal2 admin cannot be given extra columns on `authenticated`. `admin_read_meals()` is security definer, checks `is_admin_aal2()`, and returns those columns plus the catalogue, including drafts. The Meals screen calls it when the function exists and otherwise keeps the table select. The card does not print `created_by`. `pay`, `newcoming`, and advisor writes use the service role and are unchanged. `ai`'s user-scoped read is `name, emoji, time, ing, tags`.
+- **Anon writes.** The file revokes anon INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER. Supabase grants those by default. TRUNCATE ignores row level security.
+- **Columns.** Any new public catalogue column on `meals` must be added to both grants in this file and to the anon grant in `meals_read_published.sql`.
+- **Why.** `meals_read_published.sql` is applied (PR #28). Signed-in non-admins can still read `created_by` and `source` on published rows.
+- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. `meals_read_published.sql` is unchanged. Do not apply this from GitHub. PGlite runs both files in `npm test`. Production behaviour is unchanged until the file is pasted in the SQL editor.
+
 ## 2026-10-23 — Published meals read (SQL written, not applied)
 
 - **Policy.** `supabase/meals_read_published.sql` drops `read meals` and creates `read published meals` FOR SELECT TO anon, authenticated USING (`reviewed_at is not null`). Anon loses table SELECT and is granted only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off that list. `admin read meals`, admin insert, and admin update are not changed.
