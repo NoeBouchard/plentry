@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-23 — Published meals read (SQL written, not applied)
+
+- **Policy.** `supabase/meals_read_published.sql` drops `read meals` and creates `read published meals` FOR SELECT TO anon, authenticated USING (`reviewed_at is not null`). Anon loses table SELECT and is granted only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off that list. `admin read meals`, admin insert, and admin update are not changed.
+- **Why.** Production `read meals` lets any signed-in user read the unpublished drafts, including `created_by` and `source`. Anon matches no row, so the site falls back to the 8 `FALLBACK_MEALS`.
+- **Columns.** Names match `schema.sql`, `servings.sql` (`portions`), and `meals_categories_tags_ingredients_v2.sql` (`category`). No rename.
+- **Client.** `loadCatalogMeals` and `catalogMealByName` already select a subset of that allow-list (they omit `category`). No query change. `loadAdminMeals` still selects `source` and `created_at` behind `isAdmin()`.
+- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. Do not apply it from GitHub. Production behaviour is unchanged until it is pasted in the SQL editor. Manual check after that: [TESTING.md](TESTING.md). `schema.sql` still documents the old policy and points at this file as pending.
+
 ## 2026-10-23 — From your cupboard means no basket line
 
 - **Label.** A day card and a Modify option say **From your cupboard** only when that dinner owns no basket line: every ingredient it uses is ticked, so the basket has nothing left for it. A share that rounds to 0p while the dinner still owns a line shows the price, including **£0.00**.
