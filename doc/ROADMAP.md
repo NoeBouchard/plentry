@@ -22,7 +22,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 - ~~Admin Meals and Ingredients~~ — live 8 Oct (PR #8). `admin_roles.sql` applied. Meals are unpublish-only. `public.admins` is one row (Noé).
 - ~~Garam masala, one jar~~ — unscaled seasoning, one jar per week at any servings. PR #10 squash-merged 13 Oct 2026 as `711f059d9087e65406d3004c7d29aa1d3efd0e9c`. That merge auto-deployed static (`dpl_FjLuhYS8QSV28DcxmqnPzdGWjdWL`); `pay` v33. See [RUNBOOK.md](RUNBOOK.md) before the next shared basket change.
 - ~~Per-meal price split~~ — day cards share the week basket. PR #15 squash-merged 15 Oct 2026 as `e35b087b6a7f64e6cb50e0cc8dfde10ade247ca9`. Static-only REST ship `dpl_ByazVmgr1eDffUFhqEwwWRDdTVea`, promoted 15:52 BST. `pay` was not redeployed. The headline price is based on the meal basket, not a basket the user has edited.
-- ~~Meals read~~ — `supabase/meals_read_published.sql` applied to prod 25 Oct 2026 at 12:59 GMT. Anon and authenticated see 52 published meals and 0 drafts. Static the same day: `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp` (PR #29, `7d1d53ac`), promoted 13:14:43 GMT. `pay` is still v33.
+- ~~Meals read~~ — `supabase/meals_read_published.sql` applied to prod 25 Oct 2026 at 12:59 GMT. Anon and authenticated see 52 published meals and 0 drafts. Static the same day: `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp` (PR #29, `7d1d53ac`), promoted 13:14:43 GMT. `pay` is v52, auto-redeployed at 13:10:17 GMT on 25 Oct 2026 (all 6 edge functions redeployed on merge to main; cause under investigation), code identical to main.
 
 ## Now
 
