@@ -719,7 +719,7 @@ function sqlBody(name) {
   return readFileSync(path.join(ROOT, "supabase", name), "utf8");
 }
 
-describe("I-A13 published meals read (pending SQL, not applied)", () => {
+describe("I-A13 published meals read (applied on prod 25 Oct 2026)", () => {
   const raw = sqlBody("meals_read_published.sql");
   const active = stripSqlComments(raw);
   const schema = sqlBody("schema.sql");
@@ -734,8 +734,8 @@ describe("I-A13 published meals read (pending SQL, not applied)", () => {
   it("I-A13 policy is published-only for anon and authenticated, in a transaction, and not a migration", () => {
     assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
     assert.equal(existsSync(path.join(ROOT, "supabase/meals_read_published.sql")), true);
-    assert.match(raw, /PENDING/);
-    assert.match(raw, /Not applied/);
+    assert.match(raw, /APPLIED to prod 25 Oct 2026 12:59 GMT/);
+    assert.doesNotMatch(raw, /Not applied/);
     const begin = active.indexOf("begin;");
     const commit = active.lastIndexOf("commit;");
     assert.ok(begin >= 0 && commit > begin);
@@ -749,7 +749,8 @@ describe("I-A13 published meals read (pending SQL, not applied)", () => {
     assert.match(raw, /create policy "read meals" on public\.meals/);
     assert.match(raw, /using \(auth\.role\(\) = 'authenticated'\)/);
     assert.match(raw, /grant select on public\.meals to anon;/);
-    assert.match(schema, /PENDING, NOT APPLIED: supabase\/meals_read_published\.sql/);
+    assert.match(schema, /APPLIED to prod 25 Oct 2026 12:59 GMT/);
+    assert.match(schema, /supabase\/meals_read_published\.sql/);
     assert.match(schema, /create policy "read meals" on public\.meals/);
   });
 

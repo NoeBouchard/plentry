@@ -2,28 +2,39 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-25 13:14 GMT — production ship (PR #27, #28, #29)
+
+- **Merged:** all squash, on 25 Oct 2026. PR #27 `fix/review-followups` `ca43eb1749a349804cb2845d639d9967e781f46e`. PR #28 `fix/meals-read-published` `31a864f2005b5a9f92ceec8b380bdbc750692a07`. PR #29 `fix/seeded-tiebreak` `7d1d53ace5ec9883802c4ca5f3bb92b7470699ec`.
+- **Live:** A share that rounds to 0p while the dinner still owns a basket line shows the price, including £0.00. **From your cupboard** stays for a dinner that owns no basket line. Equal scores on New week and Modify break with a mulberry32 key from the week's seed and the meal id, then the id. Each New week tap mints a new seed. A `?seed=` link or `setWeekSeed` pins the sequence (`seed`, `seed+1`, `seed+2`). Modify stays on the seed of the week on screen. Anon and a signed-in non-admin read published meals only (`reviewed_at` set). Anon cannot read `created_by`, `source`, or `created_at`.
+- **SQL:** `supabase/meals_read_published.sql` was applied to prod Supabase at 12:59 GMT on 25 Oct 2026. The applied file sha256 is `3efbb68ce7adc1f613a5251d412da0a1a31b8cbe4cb93858ac4eb5f4a701ac59`. Loose file, not a migration. Post-apply checks passed: `pg_policies` shows `read published meals` plus the 3 admin policies; anon has no table-level SELECT and exactly 11 columns granted; anon and authenticated each see 52 published meals and 0 drafts; anon REST `select=*` and `select=created_by` return permission denied. The admin-with-MFA draft visibility check is untested. This vault stamps the file header `APPLIED to prod 25 Oct 2026 12:59 GMT`. SQL statements and the commented rollback are byte-identical to the applied file. The stamped file sha256 is `fe56606436014f837d6513d725c524e9bdb1a2ed5a02033cab3f7a35d51162b4`.
+- **Static:** `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp` from `7d1d53ac`. READY at 13:09:49 GMT, promoted at 13:14:43 GMT. `index.html` sha256 went from `d81025a6f85e6f23cb89bc0190fc8726773e5052ffe80e27bd4d66ca06281241` to `14fea34d522c3dbd74cbc30fdc138d1592e1b01360ccd239ea6c0a7197439c6c`. `pay` is still v33 and was not redeployed.
+- **Rollback:** `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`.
+- **Smoke:** passed before the promote, on the deployment, through a temporary Vercel share link (the deployment URL is SSO-protected), and after the promote on getplentry.com. A non-admin smoke test account exists for prod smoke tests. Its credentials live in box env vars `PLENTRY_SMOKE_EMAIL` and `PLENTRY_SMOKE_PASSWORD`.
+- **Known:** the checkout quote returns `{live:false}` on prod, before and after this ship, so baskets use shelf prices. It is under review.
+- **Vault only.** This entry records the ship. It does not deploy.
+
 ## 2026-10-23 — Seeded tie-break for New week and Modify
 
 - **Order.** When two dinners have the same score, New week and Modify order them with a mulberry32 key from the week's seed and the meal id, then the id. A dinner with no id uses its name for that key. The key is computed once per dinner before the sort. Ordering does not call `Math.random`.
 - **New week.** Each tap mints a new seed, so the next week usually changes. A shared `?seed=` link pins the sequence: the first New week uses that seed, and each further tap uses the next number (`seed`, `seed+1`, `seed+2`, wrapping at 2³²). `window.__plentry.setWeekSeed(4242)` (also `window.setWeekSeed`) does the same from the console. Modify, including Show 4 more, stays on the seed of the week on screen.
 - **Smoke.** Open `https://getplentry.com/?seed=4242`. A whole number is used as-is; any other text is hashed. The value is stored for the tab (`plentry_week_seed`, plus the pin and the step). Tap **New week** to walk the sequence. `window.__plentry.weekSeed()` reads the seed of the week on screen.
 - **Unchanged.** Score weights. Modify still lists 6, then up to 4, and still stops with the same message when the pool runs out. Prices, the shared basket block, and the hold stay as they are.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Shipped** 25 Oct 2026 at 13:14:43 GMT in the production-ship entry above. Static `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp` from `7d1d53ac`. No `pay` deploy and no SQL in this change.
 
-## 2026-10-23 — Published meals read (SQL written, not applied)
+## 2026-10-23 — Published meals read (SQL written; applied 25 Oct 2026)
 
 - **Policy.** `supabase/meals_read_published.sql` drops `read meals` and creates `read published meals` FOR SELECT TO anon, authenticated USING (`reviewed_at is not null`). Anon loses table SELECT and is granted only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off that list. `admin read meals`, admin insert, and admin update are not changed.
-- **Why.** Production `read meals` lets any signed-in user read the unpublished drafts, including `created_by` and `source`. Anon matches no row, so the site falls back to the 8 `FALLBACK_MEALS`.
+- **Why.** Before this file, production `read meals` let any signed-in user read the unpublished drafts, including `created_by` and `source`. Anon matched no row, so the site fell back to the 8 `FALLBACK_MEALS`.
 - **Columns.** Names match `schema.sql`, `servings.sql` (`portions`), and `meals_categories_tags_ingredients_v2.sql` (`category`). No rename.
 - **Client.** `loadCatalogMeals` and `catalogMealByName` already select a subset of that allow-list (they omit `category`). No query change. `loadAdminMeals` still selects `source` and `created_at` behind `isAdmin()`.
-- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. Do not apply it from GitHub. Production behaviour is unchanged until it is pasted in the SQL editor. Manual check after that: [TESTING.md](TESTING.md). `schema.sql` still documents the old policy and points at this file as pending.
+- **Applied** 25 Oct 2026 at 12:59 GMT. See the production-ship entry above. Loose file under `supabase/`, not `supabase/migrations/`. Do not apply it from GitHub. The header says APPLIED. `schema.sql` still recreates `read meals` if that file is re-run; run `meals_read_published.sql` again after that. Manual check: [TESTING.md](TESTING.md).
 
 ## 2026-10-23 — From your cupboard means no basket line
 
 - **Label.** A day card and a Modify option say **From your cupboard** only when that dinner owns no basket line: every ingredient it uses is ticked, so the basket has nothing left for it. A share that rounds to 0p while the dinner still owns a line shows the price, including **£0.00**.
 - **Why.** A sliver of a shared jar can round to 0p without the cupboard covering that dinner.
 - **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change. `supabase/meal_ingredient_prices.sql` is not applied.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Shipped** 25 Oct 2026 at 13:14:43 GMT in the production-ship entry above (PR #27, inside the static from PR #29). No `pay` deploy and no SQL in this change.
 
 ## 2026-10-23 — Dinner prices sum to the basket (PR #26)
 
@@ -39,7 +50,7 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Log in.** The header **Log in** opens email and password. Under that form, **Don't have an account?** opens the existing sign-up form (name, email, password). Sign-up still offers **Already have an account? Log in**.
 - **Sign up stays sign up.** New week, choosing or swapping a dinner, meal details, the meal advisor, and checkout confirm without an account still open sign-up (**Create an account…**). The later guard **Log in so we can take the card hold** opens login. Onboarding does not ask for an account.
 - **Why.** Log in was opening the sign-up form, with only a small Log in link underneath.
-- **Static:** `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. Same Supabase email/password calls. No auth config, no edge functions, no SQL. `pay` was not redeployed. PR #26 shipped after this and is the current static.
+- **Static:** `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. Same Supabase email/password calls. No auth config, no edge functions, no SQL. `pay` was not redeployed. PR #26 shipped after this. The 25 Oct ship is the current static.
 
 ## 2026-10-21 — Cupboard pictures
 

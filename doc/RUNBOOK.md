@@ -285,13 +285,23 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 
 Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
 
+### 2026-10-25 13:14 GMT — PR #27, #28, #29, static + SQL
+
+All squash, on 25 Oct 2026. PR #27 `fix/review-followups` `ca43eb1749a349804cb2845d639d9967e781f46e`. PR #28 `fix/meals-read-published` `31a864f2005b5a9f92ceec8b380bdbc750692a07`. PR #29 `fix/seeded-tiebreak` `7d1d53ace5ec9883802c4ca5f3bb92b7470699ec`. A 0p share that still owns a basket line shows the price. **From your cupboard** stays for a dinner with no basket line. New week and Modify break equal scores with the week's seed. Anon and a signed-in non-admin read published meals only.
+
+- **SQL:** `supabase/meals_read_published.sql` applied to prod Supabase at 12:59 GMT. Applied file sha256 `3efbb68ce7adc1f613a5251d412da0a1a31b8cbe4cb93858ac4eb5f4a701ac59`. Loose file, not a migration. Post-apply checks passed: `pg_policies` shows `read published meals` plus the 3 admin policies; anon has no table-level SELECT and exactly 11 columns granted; anon and authenticated each see 52 published meals and 0 drafts; anon REST `select=*` and `select=created_by` return permission denied. The admin-with-MFA draft visibility check is untested. The repo header now says `APPLIED to prod 25 Oct 2026 12:59 GMT`. SQL statements and the commented rollback are byte-identical to the applied file. Stamped file sha256 `fe56606436014f837d6513d725c524e9bdb1a2ed5a02033cab3f7a35d51162b4`.
+- **Static:** `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp` from `7d1d53ac`. READY at 13:09:49 GMT, promoted at 13:14:43 GMT. `index.html` sha256 went from `d81025a6f85e6f23cb89bc0190fc8726773e5052ffe80e27bd4d66ca06281241` to `14fea34d522c3dbd74cbc30fdc138d1592e1b01360ccd239ea6c0a7197439c6c`. `pay` is still v33 and was not redeployed.
+- **Rollback:** `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`.
+- **Smoke:** passed before the promote, on the deployment, through a temporary Vercel share link (the deployment URL is SSO-protected), and after the promote on getplentry.com. A non-admin smoke test account exists for prod smoke tests. Its credentials live in box env vars `PLENTRY_SMOKE_EMAIL` and `PLENTRY_SMOKE_PASSWORD`.
+- **Known:** the checkout quote returns `{live:false}` on prod, before and after this ship, so baskets use shelf prices. It is under review.
+
 ### 2026-10-23 — PR #26, static only
 
 Squash `7f1453ea4722de15b4bdf0aae07a2f2ff681d859`. Dinner prices are each dinner’s share of the whole-pack basket. Production deployment `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`. `pay` was not redeployed. `supabase/meal_ingredient_prices.sql` was not applied. No SQL.
 
 ### 2026-10-23 — PR #25, static only
 
-Squash `f1f37b0e0bad5eff14912e9097b9d59e69b37e37`. Header **Log in** opens the login form. Production deployment `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. `pay` was not redeployed. No SQL. PR #26 is the current static.
+Squash `f1f37b0e0bad5eff14912e9097b9d59e69b37e37`. Header **Log in** opens the login form. Production deployment `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. `pay` was not redeployed. No SQL. The 25 Oct ship is the current static.
 
 ### 2026-10-19 — PR #19, no deploy
 
