@@ -285,6 +285,14 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 
 Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
 
+### 2026-10-23 — PR #26, static only
+
+Squash `7f1453ea4722de15b4bdf0aae07a2f2ff681d859`. Dinner prices are each dinner’s share of the whole-pack basket. Production deployment `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`. `pay` was not redeployed. `supabase/meal_ingredient_prices.sql` was not applied. No SQL.
+
+### 2026-10-23 — PR #25, static only
+
+Squash `f1f37b0e0bad5eff14912e9097b9d59e69b37e37`. Header **Log in** opens the login form. Production deployment `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. `pay` was not redeployed. No SQL. PR #26 is the current static.
+
 ### 2026-10-19 — PR #19, no deploy
 
 Squash `1599a417fc564fe5368fad53c96da77eeab2cd5f`. `claude-review` uses the repository secret `ANTHROPIC_API_KEY`, `--model opus`, `--fallback-model sonnet`. CI and docs only. No static build and no `pay` deploy.

@@ -3580,6 +3580,75 @@ describe("shop switch uses that shop's packs", () => {
     assert.notEqual(minceLabel, "£0.00");
     assert.notEqual(minceLabel, "From your cupboard");
   });
+
+  it("I-P06 a 0p share that still owns a basket line shows the price", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    const heavy = {
+      name: "Big rice",
+      ing: ["rice", "salt", "black pepper"],
+      portions: { rice: [1000, "g"], salt: [0.5, "tsp"], "black pepper": [0.25, "tsp"] },
+    };
+    const crumb = {
+      name: "Rice crumb",
+      ing: ["rice", "salt", "black pepper"],
+      portions: { rice: [4, "g"], salt: [0.5, "tsp"], "black pepper": [0.25, "tsp"] },
+    };
+    S.weekServings = 2;
+    S.prefs.servings = 2;
+    S.prefs.preferredStore = "tesco";
+    S.pantry = { rice: 1, "black pepper": 1 };
+    S.menuOptions = [heavy, crumb];
+    S.selected = [heavy.name, crumb.name];
+    S.basketEdit = null;
+    const store = window.preferredStoreObj();
+    const ticks = ["rice", "black pepper"];
+    const list = [heavy, crumb];
+    const packs = window.__plentry.weekPacks(list, 2, ticks, store);
+    assert.equal(packs.salt, 1);
+    assert.equal(packs.rice, undefined);
+    assert.equal(packs["black pepper"], undefined);
+    const pence = Array.from(window.__plentry.splitMealPence(list, 2, ticks, store));
+    assert.equal(pence[1], 0, pence.join(","));
+    assert.ok(pence[0] > 0, pence.join(","));
+    const groceries = window.__plentry.basketGroceryPence(packs, store);
+    assert.equal(pence[0] + pence[1], groceries);
+    assert.equal(window.__plentry.dinnerShownLabel(list, 1, 2, ticks, store), "£0.00");
+    assert.equal(window.__plentry.dinnerShownLabel(list, 0, 2, ticks, store), "£" + (pence[0] / 100).toFixed(2));
+    window.syncBasketFromMeals();
+    window.renderMenu();
+    const crumbCard = [...document.querySelectorAll("#menu-week .day-card")]
+      .find((el) => el.textContent.includes("Rice crumb"));
+    assert.equal(crumbCard.querySelector(".day-side .mp").textContent, "£0.00");
+    assert.equal(crumbCard.textContent.includes("From your cupboard"), false);
+    const saltCrumb = {
+      name: "Salt crumb",
+      ing: ["rice", "salt", "black pepper"],
+      portions: { rice: [4, "g"], salt: [0.5, "tsp"], "black pepper": [0.25, "tsp"] },
+    };
+    S.menuOptions.push(saltCrumb);
+    await window.openModify(1);
+    window.__plentry.setModifyPicks([window.mealByName("Salt crumb")]);
+    window.renderModifySheet();
+    const alt = [...document.querySelectorAll("#modify-alts button")]
+      .find((el) => el.textContent.includes("Salt crumb"));
+    assert.equal(alt.querySelector(".mp").textContent, "£0.00");
+    assert.equal(alt.textContent.includes("From your cupboard"), false);
+    const covered = ["rice", "salt", "black pepper"];
+    covered.forEach((k) => { S.pantry[k] = 1; });
+    assert.equal(window.__plentry.dinnerShownLabel(list, 1, 2, covered, store), "From your cupboard");
+    assert.equal(window.__plentry.dinnerShownLabel(list, 0, 2, covered, store), "From your cupboard");
+    window.renderMenu();
+    const coveredCards = [...document.querySelectorAll("#menu-week .day-card")];
+    assert.equal(coveredCards.length, 2);
+    coveredCards.forEach((el) => {
+      assert.equal(el.querySelector(".day-side .mp").textContent, "From your cupboard");
+      assert.equal(el.textContent.includes("£0.00"), false);
+    });
+  });
 });
 
 describe("per-meal price split (I-P06)", () => {
