@@ -11,6 +11,14 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Why.** `meals_read_published.sql` is applied (PR #28). Signed-in non-admins can still read `created_by` and `source` on published rows.
 - **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. `meals_read_published.sql` is unchanged. Do not apply this from GitHub. PGlite runs both files in `npm test`. Production behaviour is unchanged until the file is pasted in the SQL editor.
 
+## 2026-10-23 — Seeded tie-break for New week and Modify
+
+- **Order.** When two dinners have the same score, New week and Modify order them with a mulberry32 key from the week's seed and the meal id, then the id. A dinner with no id uses its name for that key. The key is computed once per dinner before the sort. Ordering does not call `Math.random`.
+- **New week.** Each tap mints a new seed, so the next week usually changes. A shared `?seed=` link pins the sequence: the first New week uses that seed, and each further tap uses the next number (`seed`, `seed+1`, `seed+2`, wrapping at 2³²). `window.__plentry.setWeekSeed(4242)` (also `window.setWeekSeed`) does the same from the console. Modify, including Show 4 more, stays on the seed of the week on screen.
+- **Smoke.** Open `https://getplentry.com/?seed=4242`. A whole number is used as-is; any other text is hashed. The value is stored for the tab (`plentry_week_seed`, plus the pin and the step). Tap **New week** to walk the sequence. `window.__plentry.weekSeed()` reads the seed of the week on screen.
+- **Unchanged.** Score weights. Modify still lists 6, then up to 4, and still stops with the same message when the pool runs out. Prices, the shared basket block, and the hold stay as they are.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
 ## 2026-10-23 — Published meals read (SQL written, not applied)
 
 - **Policy.** `supabase/meals_read_published.sql` drops `read meals` and creates `read published meals` FOR SELECT TO anon, authenticated USING (`reviewed_at is not null`). Anon loses table SELECT and is granted only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off that list. `admin read meals`, admin insert, and admin update are not changed.
