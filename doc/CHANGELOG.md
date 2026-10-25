@@ -10,55 +10,36 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Unchanged.** Score weights. Modify still lists 6, then up to 4, and still stops with the same message when the pool runs out. Prices, the shared basket block, and the hold stay as they are.
 - **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
 
-## 2026-10-22 — Log in opens the login form
+## 2026-10-23 — Published meals read (SQL written, not applied)
 
+- **Policy.** `supabase/meals_read_published.sql` drops `read meals` and creates `read published meals` FOR SELECT TO anon, authenticated USING (`reviewed_at is not null`). Anon loses table SELECT and is granted only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off that list. `admin read meals`, admin insert, and admin update are not changed.
+- **Why.** Production `read meals` lets any signed-in user read the unpublished drafts, including `created_by` and `source`. Anon matches no row, so the site falls back to the 8 `FALLBACK_MEALS`.
+- **Columns.** Names match `schema.sql`, `servings.sql` (`portions`), and `meals_categories_tags_ingredients_v2.sql` (`category`). No rename.
+- **Client.** `loadCatalogMeals` and `catalogMealByName` already select a subset of that allow-list (they omit `category`). No query change. `loadAdminMeals` still selects `source` and `created_at` behind `isAdmin()`.
+- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. Do not apply it from GitHub. Production behaviour is unchanged until it is pasted in the SQL editor. Manual check after that: [TESTING.md](TESTING.md). `schema.sql` still documents the old policy and points at this file as pending.
+
+## 2026-10-23 — From your cupboard means no basket line
+
+- **Label.** A day card and a Modify option say **From your cupboard** only when that dinner owns no basket line: every ingredient it uses is ticked, so the basket has nothing left for it. A share that rounds to 0p while the dinner still owns a line shows the price, including **£0.00**.
+- **Why.** A sliver of a shared jar can round to 0p without the cupboard covering that dinner.
+- **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change. `supabase/meal_ingredient_prices.sql` is not applied.
+- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+
+## 2026-10-23 — Dinner prices sum to the basket (PR #26)
+
+- **Merged:** squash commit `7f1453ea4722de15b4bdf0aae07a2f2ff681d859` on `main`. PR #26.
+- **Live:** Modify lists 4–6 other verified dinners (6 when at least 6 fit), then up to 4 more that skip the week and meals already shown. A day card is that dinner’s penny share of this week’s whole-pack basket at 2, 4, or 6 servings. The cards sum to **Basket £**. A pack only one dinner uses is that dinner’s, including what is left in the pack. A shared pack is split by ingredient-cost weight: scaled portion ÷ pack × the shop’s first priced row (lowest id with a price). Seasonings are not inside the weight. A dinner with no usable ingredient cost counts as one average-cost dinner on that pack. Leftover pennies use largest remainder, and a tie goes to the earlier day. Modify simulates the swap and shows that share. When every ingredient of a dinner is ticked, so its share is £0.00, the day card and the Modify option say **From your cupboard**. A missing shop price on a loaded shelf says **Price soon** to a customer and **incomplete** to an admin. No shop, or a shelf that has not loaded, uses the catalogue price the way the basket does. The footer is Basket £ + delivery + 5%.
+- **Pinned.** Tesco week (beef ragù, shakshuka, Spanish tortilla, salmon traybake, no cupboard ticks): basket £47.83 / £59.68 / £84.04 at 2 / 4 / 6. Shares at 2: ragù £18.52, shakshuka £13.77, tortilla £4.63, salmon £10.91. At 4: £25.96, £17.49, £5.32, £10.91. At 6: £36.20, £25.36, £9.47, £13.01. Pomodoro (meal 28) swapped in for salmon is £4.07 / £4.71 / £5.83. Its ingredient-cost weight stays £1.93 / £3.87 / £5.78.
+- **SQL.** `supabase/meal_ingredient_prices.sql` stores that ingredient-cost weight. It stayed outside `supabase/migrations/` and was not applied. No ingredient price was changed.
+- **Static:** `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`. `pay` was not redeployed. The shared `basketFor` block is byte-identical.
+
+## 2026-10-23 — Log in opens the login form (PR #25)
+
+- **Merged:** squash commit `f1f37b0e0bad5eff14912e9097b9d59e69b37e37` on `main`. PR #25.
 - **Log in.** The header **Log in** opens email and password. Under that form, **Don't have an account?** opens the existing sign-up form (name, email, password). Sign-up still offers **Already have an account? Log in**.
 - **Sign up stays sign up.** New week, choosing or swapping a dinner, meal details, the meal advisor, and checkout confirm without an account still open sign-up (**Create an account…**). The later guard **Log in so we can take the card hold** opens login. Onboarding does not ask for an account.
 - **Why.** Log in was opening the sign-up form, with only a small Log in link underneath.
-- **Unchanged.** Same Supabase email/password calls. No auth config, no edge functions, no SQL.
-- **Not deployed.** Static only when it ships. No `pay` deploy.
-
-## 2026-10-22 — Pinned basket shares, and From your cupboard
-
-- **Pinned.** The Tesco week (beef ragù, shakshuka, Spanish tortilla, salmon traybake, no cupboard ticks) is locked in a test: shares and basket £47.83 / £59.68 / £84.04 at 2 / 4 / 6. Pomodoro (meal 28) swapped in for salmon is locked at £4.07 / £4.71 / £5.83. A change to the ingredient-cost weighting fails that test.
-- **Cupboard.** When every ingredient of a dinner is ticked, so its share is £0.00, the day card and the Modify option say **From your cupboard**. A missing shop price on a loaded shelf still says Price soon or incomplete.
-- **Unchanged.** The allocation rule, the hold, `basketFor`, and `supabase/meal_ingredient_prices.sql` (still not applied).
-
-## 2026-10-22 — Dinner prices sum to the basket
-
-- **Price.** A day card is that dinner’s penny share of this week’s grocery basket at 2, 4, or 6 servings. The cards sum to **Basket £**. Half-pack rounding and cupboard ticks are the basket’s, unchanged.
-- **Shared packs.** Oil, a seasoning jar, and any pack more than one dinner draws from are split by ingredient-cost weight: each dinner’s scaled portions ÷ pack × the shop’s first priced row (lowest id with a price). Seasonings are not inside the weight. A dinner with no usable ingredient cost counts as one average-cost dinner on that pack. A pack only one dinner uses, including what is left in it, is charged to that dinner.
-- **Pennies.** Largest remainder. A tie goes to the earlier day.
-- **Modify.** Each option is priced by simulating the swap into this week (same shop, servings, half-pack rule, cupboard ticks). After the swap the card shows that figure, and the other cards and the basket move with it. The six prices are memoised.
-- **Footer.** Basket £ + delivery + 5% fee = the total. The ingredients line and the “whole packs” note under the cards are gone.
-- **Kept.** Price soon for a customer and incomplete for an admin when a loaded shelf has no price. Catalogue fallback when the shelf has not loaded or no shop is picked. First priced row. Modify paging. Hold and `basketFor` unchanged. `supabase/meal_ingredient_prices.sql` stays unapplied, outside `supabase/migrations/`, and the parity test still checks the ingredient-cost weight.
-- **Why.** Product asked for the cards to add up to the basket again. Splitting shared jars by the dinner’s own ingredient cost keeps the claim explainable: the weight does not depend on the rest of the week, so the same dinner only moves when the other dinners that share the jar change.
-- **Tesco week** (beef ragù, shakshuka, Spanish tortilla, salmon traybake), shelf prices, no cupboard ticks. Basket £47.83 / £59.68 / £84.04 at 2 / 4 / 6. Shares at 2: ragù £18.52, shakshuka £13.77, tortilla £4.63, salmon £10.91. At 4: £25.96, £17.49, £5.32, £10.91. At 6: £36.20, £25.36, £9.47, £13.01. Salmon has no portions, so its own packs do not grow with servings.
-- **Pomodoro** (meal 28) in that week in place of salmon: £4.07 / £4.71 / £5.83 at 2 / 4 / 6. Ingredient-cost weight is still £1.93 / £3.87 / £5.78. Priced alone it is £14.03 at 2 servings, because that buys the whole bottle and the jars.
-
-## 2026-10-22 — Price labels
-
-- **Note.** Under the day cards: “Dinner prices are the ingredients used; the basket buys whole packs.”
-- **Gap.** A customer sees **Price soon**. An admin sees **incomplete**. No partial sum.
-- **Fallback.** No shop, or a shelf that did not load, uses the catalogue price the way the basket does. A loaded shop still uses that shop’s first row that has a price (lowest id), the same row the SQL function uses.
-- **Parity.** The site formula and `supabase/meal_ingredient_prices.sql` agree at 2, 4, and 6 for pomodoro (meal 28), beef ragù, and a rice bowl, including a blank earlier spaghetti row. The SQL file is still not applied.
-- **Unchanged.** Hold, basket packs, and the shared `basketFor` block.
-
-## 2026-10-22 — One meal price
-
-- **Price.** A dinner’s price is the sum of its ingredient portions at 2, 4, or 6 servings in the chosen shop: scaled amount ÷ pack × that shop’s pack price. The day card and Modify show that same `~£` figure. **Ingredients ~£** under the week is the sum. **Basket £** stays the whole-pack shop (half-pack rule unchanged) plus delivery and 5%. The two can differ. Words are a proposal for Product.
-- **Why £3.55 was wrong.** Veggie spaghetti pomodoro was not a stale cache and not a missing price. The day card was that dinner’s penny share of the week’s packs, so a tin, 180g of pasta, and a few spoons of a shared £5.75 bottle of oil landed near a few pounds. Modify priced the dinner alone, which buys a whole bottle of oil and a whole jar of salt, pepper, and chilli (£14.03 at Tesco for 2 servings). Tesco ingredient cost from the live portions is £1.93 / £3.87 / £5.78 for 2 / 4 / 6.
-- **Incomplete.** A grocery with no shop price, or no usable portion, shows **incomplete** and no partial sum. No published meal is missing a price row at Tesco, Sainsbury’s, Asda, or Waitrose. **Beef & Tomato Tortilla Casserole** is the one published dinner with no portions, so it is incomplete.
-- **SQL.** `supabase/meal_ingredient_prices.sql` stores `meal_ingredient_prices` and refreshes it when a meal or an ingredient price changes. Not applied to production. No ingredient price was changed. The shared `basketFor` block is byte-identical.
-- **Not deployed.** No production SQL and no `pay` deploy.
-
-## 2026-10-22 — Modify alternatives
-
-- **List.** Tap Modify on a dinner and see 4–6 other verified dinners, 6 when at least 6 fit. The set is the published pool New week uses. Diet is a hard filter. Dinner tags use the same weights, so a preferred tag ranks higher. Meals already in the week, including the one being replaced, stay off the list.
-- **Refresh.** Show 4 more skips the current week and any alternative already shown for that slot. Fewer than 4 shows the rest. None left is a short message, the refresh button is disabled, and Start again brings the first page back. A week that already holds every matching dinner (6 vegan dinners, all in the week) shows the message and no empty grid.
-- **Swap.** Picking one replaces that slot. The basket and the week price follow the existing swap. The week does not grow.
-- **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Static:** `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. Same Supabase email/password calls. No auth config, no edge functions, no SQL. `pay` was not redeployed. PR #26 shipped after this and is the current static.
 
 ## 2026-10-21 — Cupboard pictures
 

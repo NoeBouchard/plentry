@@ -3281,6 +3281,21 @@ function dinnerHidesPrice(meal, servings, store){
   }
   return false;
 }
+// A basket line this dinner still draws from. Cupboard ticks are already out of the packs.
+function dinnerOwnsBasketLine(meals, index, servings, ticks, store){
+  const list=Array.isArray(meals)?meals:[];
+  const meal=list[index];
+  if(!meal)return false;
+  const sv=servings==null?weekServings():normServings(servings);
+  const have=Array.isArray(ticks)?ticks:cupboardTicks();
+  const packs=weekPacks(list, sv, have, store);
+  const keys=Object.keys(packs);
+  for(let i=0;i<keys.length;i++){
+    if(!(+packs[keys[i]]>0))continue;
+    if(mealLineUse(meal, keys[i], sv))return true;
+  }
+  return false;
+}
 function dinnerShownLabel(meals, index, servings, ticks, store){
   const list=Array.isArray(meals)?meals:[];
   const meal=list[index];
@@ -3290,8 +3305,9 @@ function dinnerShownLabel(meals, index, servings, ticks, store){
   const shop=store===undefined?preferredStoreObj():store;
   if(dinnerHidesPrice(meal, sv, shop))return isAdmin()?"incomplete":"Price soon";
   const pence=splitMealPence(list, sv, have, shop)[index]||0;
-  // Every ingredient ticked: the basket has nothing left to charge this dinner.
-  if(!(pence>0))return "From your cupboard";
+  // From your cupboard only when this dinner owns no basket line.
+  // A share that rounds to 0p still shows the price when a line remains.
+  if(!dinnerOwnsBasketLine(list, index, sv, have, shop))return "From your cupboard";
   return "£"+(pence/100).toFixed(2);
 }
 function modifyOptionLabel(m){
