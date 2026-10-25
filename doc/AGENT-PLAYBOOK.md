@@ -75,4 +75,5 @@ Use `doc/SECURITY.md` + this playbook. Report findings; do not add exploit PoCs 
 - Capture more than the Stripe hold.
 - Add a second front-end framework.
 - Deploy to production while `npm test` is red.
+- Never create `supabase/migrations/`. Files there would auto-apply to prod on merge via the Supabase GitHub integration.
 - Push product changes straight to `main`. A merge to `main` is not the static production ship. It auto-deployed static from 13 Oct 2026 until `git.deploymentEnabled.main` was set false. See [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).

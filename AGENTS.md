@@ -45,7 +45,7 @@ In the Kitchen planner workspace, edit root `doc/` then `npm run vault` so this 
 
 ## Deploy (only if the user asks)
 
-**Merge to main = edge functions deploy.** The Supabase GitHub integration (Deploy to production ON) redeploys all `supabase/functions/*` to prod about 40s after any push to `main`. Until it's turned off (Supabase dashboard > Project Settings > Integrations > GitHub > untick Deploy to production; needs Noé), treat merging any change under `supabase/functions/` as a production deploy. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` is not applied by that integration. `pay` was v33 after PR #10 (13 Oct 2026) and is v52 as of 25 Oct 2026 13:10:17 GMT. See [`doc/RUNBOOK.md`](doc/RUNBOOK.md).
+**Merge to main = edge functions deploy.** The Supabase GitHub integration (Deploy to production ON) redeploys all `supabase/functions/*` to prod about 40s after any push to `main`. Until it's turned off (Supabase dashboard > Project Settings > Integrations > GitHub > untick Deploy to production; needs Noé), treat any merge to `main` as a functions deploy. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` is not applied by that integration. `pay` was v33 after PR #10 (13 Oct 2026) and is v52 as of 25 Oct 2026 13:10:17 GMT. See [`doc/RUNBOOK.md`](doc/RUNBOOK.md).
 
 Static does not auto-deploy. Since PR #12 (`4699353a`, 15 Oct 2026) `git.deploymentEnabled.main` is false. Other branches still get preview deployments. Production static is a Vercel REST create with `autoAssignCustomDomains: false`, then a promote. A push to `main` is an edge-functions deploy and is not a static deploy. A `git push` of any other branch is not production.
 

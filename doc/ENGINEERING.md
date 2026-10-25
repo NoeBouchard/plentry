@@ -23,6 +23,7 @@ feature branch → PR → CI npm test → Bugbot/security if money/XSS → merge
 ## Agents
 
 - Do not push product changes straight to `main`.
+- Never create `supabase/migrations/`. Files there would auto-apply to prod on merge via the Supabase GitHub integration.
 - Do not `vercel deploy` or `supabase functions deploy` from a PR, or while `npm test` is red.
 - A merge to `main` does not auto-deploy static. It did, from 13 Oct 2026 until `git.deploymentEnabled.main` was set false. The same merge does redeploy every edge function. Do not treat the merge as the static ship, and do not follow it with a one-shot `vercel deploy --prod` that aliases getplentry.com. Do not run a second `supabase functions deploy` for that SHA. Shared basket changes: [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
 - Do not require a second GitHub human approval (solo founder).
