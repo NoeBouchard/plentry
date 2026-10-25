@@ -22,10 +22,15 @@
 --       service_role is unchanged (ai writes, pay, and newcoming use it).
 --       "admin read meals", "admin insert meals", and "admin update meals
 --       review" are not dropped. Authenticated keeps INSERT and UPDATE so
---       those policies still have a table privilege.
+--       those policies still have a table privilege. No admin path deletes
+--       a meal: the Meals screen unpublishes with an UPDATE, and ai, pay,
+--       and newcoming use the service role.
 --   (d) Revokes anon's table INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES,
---       and TRIGGER. Supabase grants those to anon by default. TRUNCATE
---       ignores row level security.
+--       and TRIGGER. Supabase grants those to anon and to authenticated by
+--       default. Also revokes DELETE, TRUNCATE, REFERENCES, and TRIGGER from
+--       authenticated. TRUNCATE ignores row level security, so a signed-in
+--       non-admin could empty the table while that privilege remains.
+--       Authenticated keeps INSERT and UPDATE.
 --
 -- Any new public catalogue column on public.meals must be added to both
 -- column grants below (anon and authenticated) and to the anon grant in
@@ -36,6 +41,7 @@
 begin;
 
 revoke insert, update, delete, truncate, references, trigger on table public.meals from anon;
+revoke delete, truncate, references, trigger on table public.meals from authenticated;
 
 revoke select on table public.meals from anon, authenticated;
 revoke select (created_by, source, created_at) on table public.meals from anon, authenticated;
@@ -112,13 +118,15 @@ commit;
 -- Rollback. Uncomment this block and run it on its own. Do not run it in the
 -- same session as the transaction above. It restores authenticated table
 -- SELECT (created_by and source are readable again on rows the policies
--- allow) and the anon write privileges Supabase grants by default. It does
--- not restore policy "read meals", and it does not grant created_by or
--- source to anon.
+-- allow), authenticated DELETE, TRUNCATE, REFERENCES, and TRIGGER, and the
+-- anon write privileges Supabase grants by default. It does not restore
+-- policy "read meals", and it does not grant created_by or source to anon.
+-- Authenticated INSERT and UPDATE were not revoked.
 -- begin;
 -- drop function if exists public.admin_read_meals();
 -- revoke select (id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category) on table public.meals from authenticated;
 -- revoke select (created_by, source, created_at) on table public.meals from authenticated;
 -- grant select on table public.meals to authenticated;
+-- grant delete, truncate, references, trigger on table public.meals to authenticated;
 -- grant insert, update, delete, truncate, references, trigger on table public.meals to anon;
 -- commit;

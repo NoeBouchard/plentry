@@ -882,6 +882,9 @@ describe("I-A14 meals follow-ups (pending SQL, not applied)", () => {
     assert.match(active, /revoke select on table public\.meals from anon, authenticated/);
     assert.match(active, /revoke select \(created_by, source, created_at\) on table public\.meals from anon, authenticated/);
     assert.match(active, /revoke insert, update, delete, truncate, references, trigger on table public\.meals from anon/);
+    assert.match(active, /revoke delete, truncate, references, trigger on table public\.meals from authenticated/);
+    assert.match(raw, /grant delete, truncate, references, trigger on table public\.meals to authenticated/);
+    assert.doesNotMatch(active, /revoke (insert|update)[^;]* from authenticated/);
     assert.match(raw, /Any new public catalogue column/);
     assert.doesNotMatch(active, /drop policy if exists "admin read meals"|drop policy if exists "admin insert meals"|drop policy if exists "admin update meals review"/);
   });

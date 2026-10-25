@@ -78,8 +78,9 @@ alter table public.meals enable row level security;
 -- PENDING, NOT APPLIED: supabase/meals_followups.sql is a loose file in
 -- supabase/, not a migration. It revokes authenticated table SELECT, grants
 -- the same 11 columns to anon and authenticated, adds admin_read_meals()
--- (is_admin_aal2()), and revokes anon INSERT, UPDATE, DELETE, TRUNCATE,
--- REFERENCES, and TRIGGER.
+-- (is_admin_aal2()), revokes anon INSERT, UPDATE, DELETE, TRUNCATE,
+-- REFERENCES, and TRIGGER, and revokes DELETE, TRUNCATE, REFERENCES, and
+-- TRIGGER from authenticated. Authenticated keeps INSERT and UPDATE.
 drop policy if exists "read meals" on public.meals;
 create policy "read meals" on public.meals
   for select using (auth.role() = 'authenticated');
