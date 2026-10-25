@@ -45,6 +45,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 - Expand cupboard beyond oils/spices when the catalog grows (e.g. flour, sugar).
 - Pepesto key if we want live supermarket quotes (still concierge-fulfil unless we switch to self-checkout bags).
 - One-time photo backfill for old AI meals that still share ingredient stock shots.
+- Apply `supabase/fix_meal_photos.sql` by hand so the three live dinners stop requesting 404 Unsplash photos. Four other seed IDs still 404 and are not in that file.
 - Expand ingredient catalog beyond 35 keys when pantry math still holds.
 - Postcode → store set / honesty that fees are typical.
 - Enable leaked-password protection in Auth (**Pro** plan; org is Free today).

@@ -2,6 +2,13 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-25 — Three dinner photos that 404
+
+- **Photos.** Chicken parm-style bake, Beef & bell pepper tacos, and Salmon tacos with lemon yoghurt used Unsplash IDs that return 404 HTML. Chrome blocks that response, so the cards failed. Each dinner now has its own working `images.unsplash.com` crop: chicken parm (`photo-1632778149955-e80f8ceca2e8`), beef tacos (`photo-1599974579688-8dbdd335c77f`), fish tacos with a white sauce and lime (`photo-1696935191484-7677e929b0dc`). The two taco dinners no longer share a photo. The tortillas ingredient fallback used the dead taco ID, so it now uses the beef taco photo (`index.html`, `supabase/meals_images.sql`, `ai`).
+- **Database.** Production `meals.image_url` still has the old URLs. `supabase/fix_meal_photos.sql` is one update per meal inside a transaction, with a commented rollback. It is not under `migrations/` and was not applied.
+- **Left.** Four other seed photo IDs still 404: tomato & parmesan baked rice, tandoori-style yoghurt chicken, beef stuffed peppers, and Spanish tortilla / the potatoes fallback.
+- **Not deployed.** No production static ship and no SQL apply. No `pay` change.
+
 ## 2026-10-23 — From your cupboard means no basket line
 
 - **Label.** A day card and a Modify option say **From your cupboard** only when that dinner owns no basket line: every ingredient it uses is ticked, so the basket has nothing left for it. A share that rounds to 0p while the dinner still owns a line shows the price, including **£0.00**.
