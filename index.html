@@ -1167,11 +1167,162 @@ function scoreMeal(m){
   }
   return s;
 }
+// Equal scores break with this week's seed. One mulberry32 key per meal id is
+// computed before the sort, then the id. New week mints a seed, or steps a
+// pinned seed (?seed= or setWeekSeed): seed, seed+1, seed+2. Modify keeps
+// the seed of the week on screen.
+const WEEK_SEED_KEY="plentry_week_seed";
+const WEEK_SEED_PIN_KEY="plentry_week_seed_pin";
+const WEEK_SEED_STEP_KEY="plentry_week_seed_step";
+let weekSeedPin=null;
+let weekSeedStep=0;
+let weekSeedCurrent=null;
+let weekSeedUsed=false;
+let weekSeedReady=false;
+function mulberry32(a){
+  a=a>>>0;
+  a=(a+0x6D2B79F5)|0;
+  let t=Math.imul(a^a>>>15,1|a);
+  t=(t+Math.imul(t^t>>>7,61|t))^t;
+  return ((t^t>>>14)>>>0)/4294967296;
+}
+function mix32(seed, text){
+  let x=seed>>>0;
+  const s=String(text);
+  for(let i=0;i<s.length;i++)x=Math.imul(x^s.charCodeAt(i),0x01000193)>>>0;
+  x^=x>>>16;x=Math.imul(x,0x7feb352d)>>>0;
+  x^=x>>>15;x=Math.imul(x,0x846ca68b)>>>0;
+  x^=x>>>16;
+  return x>>>0;
+}
+function normalizeSeed(raw){
+  if(typeof raw==="number"&&Number.isFinite(raw))return raw>>>0;
+  const s=String(raw==null?"":raw).trim();
+  if(/^(0|[1-9]\d{0,9})$/.test(s)){
+    const n=Number(s);
+    if(Number.isSafeInteger(n)&&n<=0xFFFFFFFF)return n>>>0;
+  }
+  return mix32(0x811c9dc5,s);
+}
+let weekSeedMintNonce=0;
+function mintWeekSeed(){
+  try{
+    const buf=new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0];
+  }catch(e){
+    weekSeedMintNonce=(weekSeedMintNonce+1)>>>0;
+    return mix32((Date.now()>>>0)^weekSeedMintNonce,String(weekSeedMintNonce));
+  }
+}
+function queryWeekSeed(){
+  try{
+    const q=new URLSearchParams(location.search).get("seed");
+    if(q==null||String(q).trim()==="")return null;
+    return normalizeSeed(q);
+  }catch(e){return null;}
+}
+function persistWeekSeed(){
+  try{
+    if(weekSeedCurrent!=null)sessionStorage.setItem(WEEK_SEED_KEY,String(weekSeedCurrent>>>0));
+    if(weekSeedPin!=null){
+      sessionStorage.setItem(WEEK_SEED_PIN_KEY,String(weekSeedPin>>>0));
+      sessionStorage.setItem(WEEK_SEED_STEP_KEY,String(weekSeedStep>>>0));
+    }else{
+      sessionStorage.removeItem(WEEK_SEED_PIN_KEY);
+      sessionStorage.removeItem(WEEK_SEED_STEP_KEY);
+    }
+  }catch(e){}
+}
+function loadWeekSeed(){
+  if(weekSeedReady)return;
+  weekSeedReady=true;
+  const fromQuery=queryWeekSeed();
+  if(fromQuery!=null){
+    weekSeedPin=fromQuery;
+    weekSeedStep=0;
+    weekSeedCurrent=fromQuery;
+    weekSeedUsed=false;
+    persistWeekSeed();
+    return;
+  }
+  try{
+    const pin=sessionStorage.getItem(WEEK_SEED_PIN_KEY);
+    const cur=sessionStorage.getItem(WEEK_SEED_KEY);
+    const step=sessionStorage.getItem(WEEK_SEED_STEP_KEY);
+    if(pin!=null&&String(pin).trim()!==""){
+      weekSeedPin=normalizeSeed(pin);
+      weekSeedStep=step!=null&&String(step).trim()!==""?normalizeSeed(step):0;
+      weekSeedCurrent=cur!=null&&String(cur).trim()!==""?normalizeSeed(cur):(weekSeedPin+weekSeedStep)>>>0;
+      weekSeedUsed=true;
+    }else if(cur!=null&&String(cur).trim()!==""){
+      weekSeedCurrent=normalizeSeed(cur);
+      weekSeedPin=null;
+      weekSeedUsed=true;
+    }
+  }catch(e){}
+}
+function setWeekSeed(raw){
+  loadWeekSeed();
+  const n=normalizeSeed(raw);
+  weekSeedPin=n;
+  weekSeedStep=0;
+  weekSeedCurrent=n;
+  weekSeedUsed=false;
+  persistWeekSeed();
+  return n;
+}
+function weekSeed(){
+  loadWeekSeed();
+  if(weekSeedCurrent==null){
+    weekSeedCurrent=weekSeedPin!=null?(weekSeedPin+weekSeedStep)>>>0:mintWeekSeed();
+    persistWeekSeed();
+  }
+  weekSeedUsed=true;
+  return weekSeedCurrent;
+}
+// New week only. A pin steps seed, seed+1, seed+2. Otherwise mint.
+// The first tap after a fresh pin uses that seed; a tap after this week was
+// already built with it steps once.
+function advanceWeekSeed(){
+  loadWeekSeed();
+  if(weekSeedPin!=null){
+    if(weekSeedUsed)weekSeedStep=(weekSeedStep+1)>>>0;
+    weekSeedCurrent=(weekSeedPin+weekSeedStep)>>>0;
+  }else{
+    weekSeedCurrent=mintWeekSeed();
+  }
+  weekSeedUsed=false;
+  persistWeekSeed();
+  return weekSeedCurrent;
+}
+function mealTieIdentity(m){
+  if(m&&m.id!=null&&m.id!==""&&Number.isFinite(+m.id))return "#"+Math.trunc(+m.id);
+  return "@"+String(m&&m.name||"");
+}
+function mealTieKey(seed,m){
+  return mulberry32(mix32(seed>>>0,mealTieIdentity(m)));
+}
+function mealRankId(m){
+  if(m&&m.id!=null&&m.id!==""&&Number.isFinite(+m.id))return Math.trunc(+m.id);
+  return null;
+}
+function compareRankedMeals(a,b){
+  if(a.s!==b.s)return b.s-a.s;
+  if(a.k<b.k)return -1;
+  if(a.k>b.k)return 1;
+  if(a.id!=null&&b.id!=null&&a.id!==b.id)return a.id<b.id?-1:1;
+  if(a.id!=null&&b.id==null)return -1;
+  if(a.id==null&&b.id!=null)return 1;
+  if(a.name<b.name)return -1;
+  if(a.name>b.name)return 1;
+  return 0;
+}
 function rankCatalog(list){
-  return (list||[]).slice().sort((a,b)=>{
-    const d=scoreMeal(b)-scoreMeal(a);
-    return d!==0?d:Math.random()-0.5;
-  });
+  const seed=weekSeed();
+  const rows=(list||[]).map(m=>({m:m,s:scoreMeal(m),k:mealTieKey(seed,m),id:mealRankId(m),name:String(m&&m.name||"")}));
+  rows.sort(compareRankedMeals);
+  return rows.map(r=>r.m);
 }
 // ---------- SHELF PRICES (ingredient_prices table) ----------
 // Real own-brand shelf prices per store, captured 5 Jul 2026 (see supabase/ingredient_prices.sql).
@@ -2818,7 +2969,6 @@ const normMeal=m=>{
   if(r)out.recipe=r;
   return out;
 };
-const shuffle=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
 // Customer week reads the shared catalog. Founder writes via the Meals screen
 // (RLS email gate). The `ai` function still inserts advisor drafts as newcoming.
 async function loadCatalogMeals(){
@@ -3204,6 +3354,7 @@ async function loadMenuOptions(force){
   try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
   if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
   S.menuOptions=catalog;
+  advanceWeekSeed();
   autoPickWeek();
   mealsChanged();
   renderMenu();
@@ -4672,6 +4823,7 @@ if(typeof window!=="undefined"){
     setAdvisor(proposed,idxs){advisorProposed=Array.isArray(proposed)?proposed:[];advisorPicked=new Set(idxs||[]);},
     STAPLES,CUPBOARD_ICONS,CUPBOARD_ICON_FALLBACK,cupboardIconSrc,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
     tagsFor,mealTags,MEAL_TAGS,USER_MEAL_TAGS,wantedTags,clampMeals,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,deliveryFrom,orderDeliverTo,captureChargePence,
+    setWeekSeed,weekSeed,rankCatalog,
     splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,mealIngredientQuote,mealPriceLabel,dinnerShownLabel,
   };
 }
