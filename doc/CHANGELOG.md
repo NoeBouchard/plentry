@@ -2,6 +2,19 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-25 — Four more dinner photos that 404
+
+- **Photos.** Spanish tortilla with tomato salad, Beef stuffed peppers, Tomato & parmesan baked rice, and Tandoori-style yoghurt chicken with rice used Unsplash IDs that return 404 HTML. The potatoes ingredient fallback used the tortilla ID. Each now has its own working `images.unsplash.com` crop: potato omelette (`photo-1639669794539-952631b44515`, also the potatoes fallback), baked stuffed peppers in tomato sauce (`photo-1592119747782-d8c12c2ea267`), parmesan risotto (`photo-1633964913295-ceb43826e7c9`), and tandoori chicken (`photo-1617692855027-33b14f061079`). Updated in `index.html`, `supabase/meals_images.sql`, and `ai` (potatoes).
+- **Database.** A read-only check found the old URLs on Spanish tortilla with tomato salad, Creamy Spinach & Feta Baked Potatoes, Beef stuffed peppers, Tandoori-style yoghurt chicken with rice, and Baked tomato & basil risotto. No row is named Tomato & parmesan baked rice. `supabase/fix_meal_photos.sql` adds one update per name, including that seed name, and keeps the old URLs in the commented rollback. It was not applied.
+- **Not deployed.** No production static ship and no SQL apply. No `pay` change.
+
+## 2026-10-25 — Three dinner photos that 404
+
+- **Photos.** Chicken parm-style bake, Beef & bell pepper tacos, and Salmon tacos with lemon yoghurt used Unsplash IDs that return 404 HTML. Chrome blocks that response, so the cards failed. Each dinner now has its own working `images.unsplash.com` crop: chicken parm (`photo-1632778149955-e80f8ceca2e8`), beef tacos (`photo-1599974579688-8dbdd335c77f`), fish tacos with a white sauce and lime (`photo-1696935191484-7677e929b0dc`). The two taco dinners no longer share a photo. The tortillas ingredient fallback used the dead taco ID, so it now uses the beef taco photo (`index.html`, `supabase/meals_images.sql`, `ai`).
+- **Database.** Production `meals.image_url` still has the old URLs. `supabase/fix_meal_photos.sql` is one update per meal inside a transaction, with a commented rollback. It is not under `migrations/` and was not applied.
+- **Left at this commit.** Four other seed photo IDs still 404. The next entry replaces them.
+- **Not deployed.** No production static ship and no SQL apply. No `pay` change.
+
 ## 2026-10-25 13:14 GMT — production ship (PR #27, #28, #29)
 
 - **Merged:** all squash, on 25 Oct 2026. PR #27 `fix/review-followups` `ca43eb1749a349804cb2845d639d9967e781f46e`. PR #28 `fix/meals-read-published` `31a864f2005b5a9f92ceec8b380bdbc750692a07`. PR #29 `fix/seeded-tiebreak` `7d1d53ace5ec9883802c4ca5f3bb92b7470699ec`.
