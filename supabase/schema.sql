@@ -66,12 +66,18 @@ alter table public.meals add column if not exists reviewed_at timestamptz;
 
 alter table public.meals enable row level security;
 
--- Production, applied in the SQL editor after PR #28: policy "read published
--- meals" FOR SELECT TO anon, authenticated USING (reviewed_at is not null).
--- Anon SELECT is the 11 catalogue columns (not created_by, source, or
--- created_at). This bootstrap file still creates the old "read meals" policy
--- below. Re-running THIS file recreates "read meals"; run
--- meals_read_published.sql again after that, then meals_followups.sql.
+-- Production no longer uses the policy below.
+-- APPLIED to prod 25 Oct 2026 12:59 GMT: supabase/meals_read_published.sql
+-- was applied in the SQL editor after PR #28. It is a loose file in
+-- supabase/, not a migration. It drops "read meals" and creates
+-- "read published meals" FOR SELECT TO anon, authenticated
+-- USING (reviewed_at is not null). Anon SELECT is then only id, name, emoji,
+-- time, ing, image_url, recipe, tags, reviewed_at, portions, category
+-- (not created_by, source, or created_at). "admin read meals"
+-- (is_admin_aal2()) and admin insert/update are not changed. This bootstrap
+-- file still creates the old "read meals" policy below. Re-running THIS file
+-- recreates "read meals"; run meals_read_published.sql again after that,
+-- then meals_followups.sql.
 -- Any new public catalogue column on public.meals must be added to the anon
 -- column grant and to the authenticated column grant. Do not add created_by
 -- or source.

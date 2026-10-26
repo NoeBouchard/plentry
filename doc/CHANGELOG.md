@@ -9,8 +9,33 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Anon writes.** The file revokes anon INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER. Supabase grants those by default. TRUNCATE ignores row level security.
 - **Authenticated writes.** The same file revokes DELETE, TRUNCATE, REFERENCES, and TRIGGER from authenticated, and the commented rollback grants them back. INSERT and UPDATE stay, because admin insert and unpublish need them. Nothing in `index.html` or `supabase/functions` deletes a meal. Unpublish is an update of `reviewed_at`. `ai`, `pay`, and `newcoming` use the service role.
 - **Columns.** Any new public catalogue column on `meals` must be added to both grants in this file and to the anon grant in `meals_read_published.sql`.
-- **Why.** `meals_read_published.sql` is applied (PR #28). Signed-in non-admins can still read `created_by` and `source` on published rows.
-- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. `meals_read_published.sql` is unchanged. Do not apply this from GitHub. PGlite runs both files in `npm test`. Production behaviour is unchanged until the file is pasted in the SQL editor.
+- **Why.** `meals_read_published.sql` is applied to prod (25 Oct 2026 12:59 GMT, after PR #28). Signed-in non-admins can still read `created_by` and `source` on published rows.
+- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. This follow-up does not change the SQL statements in `meals_read_published.sql`. Do not apply this from GitHub. PGlite runs both files in `npm test`. Production behaviour is unchanged until the file is pasted in the SQL editor.
+
+## 2026-10-25 — Four more dinner photos that 404
+
+- **Photos.** Spanish tortilla with tomato salad, Beef stuffed peppers, Tomato & parmesan baked rice, and Tandoori-style yoghurt chicken with rice used Unsplash IDs that return 404 HTML. The potatoes ingredient fallback used the tortilla ID. Each now has its own working `images.unsplash.com` crop: potato omelette (`photo-1639669794539-952631b44515`, also the potatoes fallback), baked stuffed peppers in tomato sauce (`photo-1592119747782-d8c12c2ea267`), parmesan risotto (`photo-1633964913295-ceb43826e7c9`), and tandoori chicken (`photo-1617692855027-33b14f061079`). Updated in `index.html`, `supabase/meals_images.sql`, and `ai` (potatoes).
+- **Database.** A read-only check found the old URLs on Spanish tortilla with tomato salad, Creamy Spinach & Feta Baked Potatoes, Beef stuffed peppers, Tandoori-style yoghurt chicken with rice, and Baked tomato & basil risotto. No row is named Tomato & parmesan baked rice. `supabase/fix_meal_photos.sql` adds one update per name, including that seed name, and keeps the old URLs in the commented rollback. It was not applied.
+- **Not deployed.** No production static ship and no SQL apply. No `pay` change.
+
+## 2026-10-25 — Three dinner photos that 404
+
+- **Photos.** Chicken parm-style bake, Beef & bell pepper tacos, and Salmon tacos with lemon yoghurt used Unsplash IDs that return 404 HTML. Chrome blocks that response, so the cards failed. Each dinner now has its own working `images.unsplash.com` crop: chicken parm (`photo-1632778149955-e80f8ceca2e8`), beef tacos (`photo-1599974579688-8dbdd335c77f`), fish tacos with a white sauce and lime (`photo-1696935191484-7677e929b0dc`). The two taco dinners no longer share a photo. The tortillas ingredient fallback used the dead taco ID, so it now uses the beef taco photo (`index.html`, `supabase/meals_images.sql`, `ai`).
+- **Database.** Production `meals.image_url` still has the old URLs. `supabase/fix_meal_photos.sql` is one update per meal inside a transaction, with a commented rollback. It is not under `migrations/` and was not applied.
+- **Left at this commit.** Four other seed photo IDs still 404. The next entry replaces them.
+- **Not deployed.** No production static ship and no SQL apply. No `pay` change.
+
+## 2026-10-25 13:14 GMT — production ship (PR #27, #28, #29)
+
+- **Merged:** all squash, on 25 Oct 2026. PR #27 `fix/review-followups` `ca43eb1749a349804cb2845d639d9967e781f46e`. PR #28 `fix/meals-read-published` `31a864f2005b5a9f92ceec8b380bdbc750692a07`. PR #29 `fix/seeded-tiebreak` `7d1d53ace5ec9883802c4ca5f3bb92b7470699ec`.
+- **Live:** A share that rounds to 0p while the dinner still owns a basket line shows the price, including £0.00. **From your cupboard** stays for a dinner that owns no basket line. Equal scores on New week and Modify break with a mulberry32 key from the week's seed and the meal id, then the id. Each New week tap mints a new seed. A `?seed=` link or `setWeekSeed` pins the sequence (`seed`, `seed+1`, `seed+2`). Modify stays on the seed of the week on screen. Anon and a signed-in non-admin read published meals only (`reviewed_at` set). Anon cannot read `created_by`, `source`, or `created_at`.
+- **SQL:** `supabase/meals_read_published.sql` was applied to prod Supabase at 12:59 GMT on 25 Oct 2026. The applied file sha256 is `3efbb68ce7adc1f613a5251d412da0a1a31b8cbe4cb93858ac4eb5f4a701ac59`. Loose file, not a migration. Post-apply checks passed: `pg_policies` shows `read published meals` plus the 3 admin policies; anon has no table-level SELECT and exactly 11 columns granted; anon and authenticated each see 52 published meals and 0 drafts; anon REST `select=*` and `select=created_by` return permission denied. The admin-with-MFA draft visibility check is untested. This vault stamps the file header `APPLIED to prod 25 Oct 2026 12:59 GMT`. SQL statements and the commented rollback are byte-identical to the applied file. The stamped file sha256 is `fe56606436014f837d6513d725c524e9bdb1a2ed5a02033cab3f7a35d51162b4`.
+- **Static:** `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp` from `7d1d53ac`. READY at 13:09:49 GMT, promoted at 13:14:43 GMT. `index.html` sha256 went from `d81025a6f85e6f23cb89bc0190fc8726773e5052ffe80e27bd4d66ca06281241` to `14fea34d522c3dbd74cbc30fdc138d1592e1b01360ccd239ea6c0a7197439c6c`.
+- **Edge functions.** Each of PR #27, #28, and #29 also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. `pay` was v33 after PR #10 on 13 Oct. Nineteen merges to `main` since then, one auto-deploy each, left `pay` at v52. v52 is the deploy at 13:10:17 GMT on 25 Oct 2026, about 40s after #29 (`7d1d53ac`) merged.
+- **Rollback:** `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`.
+- **Smoke:** passed before the promote, on the deployment, through a temporary Vercel share link (the deployment URL is SSO-protected), and after the promote on getplentry.com. A non-admin smoke test account exists for prod smoke tests. Its credentials live in box env vars `PLENTRY_SMOKE_EMAIL` and `PLENTRY_SMOKE_PASSWORD`.
+- **Known:** the checkout quote returns `{live:false}` on prod, before and after this ship, so baskets use shelf prices. It is under review.
+- **Vault only.** This entry records the ship. It does not deploy.
 
 ## 2026-10-23 — Seeded tie-break for New week and Modify
 
@@ -18,22 +43,23 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **New week.** Each tap mints a new seed, so the next week usually changes. A shared `?seed=` link pins the sequence: the first New week uses that seed, and each further tap uses the next number (`seed`, `seed+1`, `seed+2`, wrapping at 2³²). `window.__plentry.setWeekSeed(4242)` (also `window.setWeekSeed`) does the same from the console. Modify, including Show 4 more, stays on the seed of the week on screen.
 - **Smoke.** Open `https://getplentry.com/?seed=4242`. A whole number is used as-is; any other text is hashed. The value is stored for the tab (`plentry_week_seed`, plus the pin and the step). Tap **New week** to walk the sequence. `window.__plentry.weekSeed()` reads the seed of the week on screen.
 - **Unchanged.** Score weights. Modify still lists 6, then up to 4, and still stops with the same message when the pool runs out. Prices, the shared basket block, and the hold stay as they are.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Shipped** 25 Oct 2026 at 13:14:43 GMT in the production-ship entry above. Static `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp` from `7d1d53ac`. This merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. `pay` v52 is that deploy, at 13:10:17 GMT on 25 Oct 2026. No SQL in this change.
 
-## 2026-10-23 — Published meals read (SQL written, not applied)
+## 2026-10-23 — Published meals read (SQL written; applied 25 Oct 2026)
 
 - **Policy.** `supabase/meals_read_published.sql` drops `read meals` and creates `read published meals` FOR SELECT TO anon, authenticated USING (`reviewed_at is not null`). Anon loses table SELECT and is granted only `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off that list. `admin read meals`, admin insert, and admin update are not changed.
-- **Why.** Production `read meals` lets any signed-in user read the unpublished drafts, including `created_by` and `source`. Anon matches no row, so the site falls back to the 8 `FALLBACK_MEALS`.
+- **Why.** Before this file, production `read meals` let any signed-in user read the unpublished drafts, including `created_by` and `source`. Anon matched no row, so the site fell back to the 8 `FALLBACK_MEALS`.
 - **Columns.** Names match `schema.sql`, `servings.sql` (`portions`), and `meals_categories_tags_ingredients_v2.sql` (`category`). No rename.
 - **Client.** `loadCatalogMeals` and `catalogMealByName` already select a subset of that allow-list (they omit `category`). No query change. `loadAdminMeals` still selects `source` and `created_at` behind `isAdmin()`.
-- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. Do not apply it from GitHub. Production behaviour is unchanged until it is pasted in the SQL editor. Manual check after that: [TESTING.md](TESTING.md). `schema.sql` still documents the old policy and points at this file as pending.
+- **Applied** 25 Oct 2026 at 12:59 GMT. See the production-ship entry above. Loose file under `supabase/`, not `supabase/migrations/`. Do not apply it from GitHub. The header says APPLIED. `schema.sql` still recreates `read meals` if that file is re-run; run `meals_read_published.sql` again after that. Manual check: [TESTING.md](TESTING.md).
+- **Edge functions.** Merge `31a864f2005b5a9f92ceec8b380bdbc750692a07` (PR #28) also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. The integration does not apply this loose SQL file.
 
 ## 2026-10-23 — From your cupboard means no basket line
 
 - **Label.** A day card and a Modify option say **From your cupboard** only when that dinner owns no basket line: every ingredient it uses is ticked, so the basket has nothing left for it. A share that rounds to 0p while the dinner still owns a line shows the price, including **£0.00**.
 - **Why.** A sliver of a shared jar can round to 0p without the cupboard covering that dinner.
 - **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change. `supabase/meal_ingredient_prices.sql` is not applied.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Shipped** 25 Oct 2026 at 13:14:43 GMT in the production-ship entry above (PR #27, inside the static from PR #29). This merge (`ca43eb1749a349804cb2845d639d9967e781f46e`) also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. No SQL in this change. `pay` v52 is the later #29 deploy, recorded in the production-ship entry.
 
 ## 2026-10-23 — Dinner prices sum to the basket (PR #26)
 
@@ -41,7 +67,7 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Live:** Modify lists 4–6 other verified dinners (6 when at least 6 fit), then up to 4 more that skip the week and meals already shown. A day card is that dinner’s penny share of this week’s whole-pack basket at 2, 4, or 6 servings. The cards sum to **Basket £**. A pack only one dinner uses is that dinner’s, including what is left in the pack. A shared pack is split by ingredient-cost weight: scaled portion ÷ pack × the shop’s first priced row (lowest id with a price). Seasonings are not inside the weight. A dinner with no usable ingredient cost counts as one average-cost dinner on that pack. Leftover pennies use largest remainder, and a tie goes to the earlier day. Modify simulates the swap and shows that share. When every ingredient of a dinner is ticked, so its share is £0.00, the day card and the Modify option say **From your cupboard**. A missing shop price on a loaded shelf says **Price soon** to a customer and **incomplete** to an admin. No shop, or a shelf that has not loaded, uses the catalogue price the way the basket does. The footer is Basket £ + delivery + 5%.
 - **Pinned.** Tesco week (beef ragù, shakshuka, Spanish tortilla, salmon traybake, no cupboard ticks): basket £47.83 / £59.68 / £84.04 at 2 / 4 / 6. Shares at 2: ragù £18.52, shakshuka £13.77, tortilla £4.63, salmon £10.91. At 4: £25.96, £17.49, £5.32, £10.91. At 6: £36.20, £25.36, £9.47, £13.01. Pomodoro (meal 28) swapped in for salmon is £4.07 / £4.71 / £5.83. Its ingredient-cost weight stays £1.93 / £3.87 / £5.78.
 - **SQL.** `supabase/meal_ingredient_prices.sql` stores that ingredient-cost weight. It stayed outside `supabase/migrations/` and was not applied. No ingredient price was changed.
-- **Static:** `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`. `pay` was not redeployed. The shared `basketFor` block is byte-identical.
+- **Static:** `dpl_BARhEjagaW5Lbn4f4y22CheQ85Kh`. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. The shared `basketFor` block is byte-identical.
 
 ## 2026-10-23 — Log in opens the login form (PR #25)
 
@@ -49,7 +75,7 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Log in.** The header **Log in** opens email and password. Under that form, **Don't have an account?** opens the existing sign-up form (name, email, password). Sign-up still offers **Already have an account? Log in**.
 - **Sign up stays sign up.** New week, choosing or swapping a dinner, meal details, the meal advisor, and checkout confirm without an account still open sign-up (**Create an account…**). The later guard **Log in so we can take the card hold** opens login. Onboarding does not ask for an account.
 - **Why.** Log in was opening the sign-up form, with only a small Log in link underneath.
-- **Static:** `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. Same Supabase email/password calls. No auth config, no edge functions, no SQL. `pay` was not redeployed. PR #26 shipped after this and is the current static.
+- **Static:** `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. Same Supabase email/password calls. No auth config, no SQL, and this change does not edit edge-function source. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. PR #26 shipped after this. The 25 Oct ship is the current static.
 
 ## 2026-10-21 — Cupboard pictures
 
@@ -58,26 +84,26 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Lemon.** The lemon picture is the fruit and its leaf. A stray orange dot on `lemons.svg` was removed. That file is 395 bytes (was 443).
 - **Why.** The cupboard step was names only. A picture makes each oil and spice easier to scan on a phone.
 - **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted by this merge. No SQL.
 
 ## 2026-10-21 — Household postcode starts empty
 
 - **Postcode.** Onboarding and Profile start with an empty postcode and the placeholder `e.g. E2 8AA`. Continue and Save still require a valid UK postcode. A postcode already stored on the profile, including a previously saved `E2 8AA`, still shows. Load does not fill one in.
 - **Short week.** New week asks for N dinners and stops when no more published meals fit the diet. On 21 Oct 2026 the reviewed catalog is 52 of 77 rows: 21 meat, 8 fish, 17 vegetarian, 6 vegan. Vegan can fill at most 6, so a 7-dinner week is 6 dinners. Vegetarian can use those 6 as well (23). Pescatarian drops the 21 meat dinners (31). Omnivore can use all 52. The other 25 rows are unpublished and stay off New week.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted by this merge. No SQL.
 
 ## 2026-10-19 — Clearing the Profile budget turns it off
 
 - **Clear.** An empty or whitespace-only weekly budget on Profile saves `prefs.budget` as null. New week then has no ×1.2 cap, and the week screen has no under/over line. The household postcode shown in the delivery postcode box does not block that save. A real delivery edit still has to be complete.
 - **Junk.** A non-numeric value, or a number below 1, is not stored. The saved budget stays as it was. A number above 500 is still clamped to 500.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted by this merge. No SQL.
 
 ## 2026-10-19 — New accounts have no default budget
 
 - **Unset.** `prefs.budget` is null for a new account. Loading local or cloud state does not fill £60 when the blob has no number. A stored number, including a previously saved £60, stays. Junk in the blob becomes null and is not rendered.
 - **No budget.** New week fills without the ×1.2 first-pass cap. The week screen omits the under/over line, so it never shows £0 or NaN. Profile shows an empty field.
 - **Set later.** Typing a whole-pound budget on Profile (1–500) stores it. The cap and the line then apply.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted by this merge. No SQL.
 
 ## 2026-10-19 — Onboarding drops goals and budget
 
@@ -85,25 +111,30 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Diet.** Vegetarian, vegan, and pescatarian filter New week and Modify. Vegetarian keeps vegetarian and vegan. Vegan keeps vegan. Pescatarian drops meat. Omnivore still prefers meat and fish and does not hide meals.
 - **Tags.** Meal prep is not offered as a new chip on onboarding or Profile. A saved `meal_prep` tag still shows, so it can be turned off, and it still weights the week until then.
 - **Legacy prefs.** `prefs.goals` and `prefs.budget` stay on the profile blob. No schema change. New accounts have `goals: []`, so goal weighting adds nothing. If dinner tags are empty, saved goals still map (`decide` / `shop` / `waste` → quick / meal_prep). The budget goal still does not map to a tag. A stored numeric budget still soft-caps the first New week pass and the under/over line. New accounts have no budget until Profile sets one. `pay` does not read either field.
-- **Not deployed.** Static only when it ships. No `pay` deploy and no SQL.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted by this merge. No SQL.
 
 ## 2026-10-19 — Claude review runs only when asked
 
 - **CI.** `.github/workflows/claude-review.yml` no longer runs on pull_request opened, synchronize, or reopened. It runs on `pull_request` `labeled`, and the job runs only when the label name is `claude-review`. Adding that label reviews the pull request's current head once. Remove the label and add it again to run another review. The prompt, `claude_args` (`--model opus`, `--fallback-model sonnet`, `--max-turns 100`, `--json-schema`, allowed tools), `allowed_bots`, the `ANTHROPIC_API_KEY` secret, and the `APPROVE` step are unchanged. A pull request that never gets the label has no `claude-review` check. Another label skips the job. It is not a required check.
 - **Why.** A run costs about $0.50, which is too much to pay on every push. The plan is to run it once as a full check after onboarding, cupboard pictures, and Modify are done. See [RUNBOOK.md](RUNBOOK.md).
-- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted. This pull request changes the workflow file, so `claude-review` cannot approve it.
+
+## 2026-10-19 — Docs: record the 15 Oct production ship (PR #20)
+
+- **Merged:** squash commit `6833beb9de908c7b517ba77d43c09ac0d8f734c3` on `main`. PR #20.
+- **Vault.** Records the 15 Oct static ship. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted by this merge. No SQL.
 
 ## 2026-10-19 — Claude review uses a pay-per-use API key
 
 - **Merged:** squash commit `1599a417fc564fe5368fad53c96da77eeab2cd5f` on `main`. PR #19.
 - **CI.** `.github/workflows/claude-review.yml` sets `anthropic_api_key` to the `ANTHROPIC_API_KEY` secret. `--model opus` and `--fallback-model sonnet` stay. `CLAUDE_CODE_OAUTH_TOKEN` failed with a known 401 ([issue 1613](https://github.com/anthropics/claude-code-action/issues/1613), [issue 1614](https://github.com/anthropics/claude-code-action/issues/1614)). Fork pull requests still do not receive the secret, so `claude-review` fails on them by design. See [RUNBOOK.md](RUNBOOK.md).
-- **Not deployed.** CI and docs only. No static build and no `pay` deploy. This pull request changed the workflow file, so `claude-review` could not approve it.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. CI and docs only: no static build. This pull request changed the workflow file, so `claude-review` could not approve it.
 
 ## 2026-10-15 15:52 BST — production ship (PR #15)
 
 - **Merged:** squash commit `e35b087b6a7f64e6cb50e0cc8dfde10ade247ca9` on `main`. PR #15.
 - **Live:** a day card is that dinner’s penny share of the week basket (per-meal price split). The footer is groceries + delivery + 5%.
-- **Static:** static only. `pay` did not change and was not redeployed. Since PR #12 (`4699353a689e861491c056517a823a39cc15b7fe`, 15 Oct 2026) a merge to `main` does not auto-deploy production. This ship used the Vercel REST API: create with `autoAssignCustomDomains: false` and `gitSource.sha` that merge SHA, then promote. Production deployment `dpl_ByazVmgr1eDffUFhqEwwWRDdTVea`, promoted 15:52 BST on 15 Oct. The apex and www `index.html` sha256 begins `f529f335`.
+- **Static:** `pay` source did not change. Since PR #12 (`4699353a689e861491c056517a823a39cc15b7fe`, 15 Oct 2026) a merge to `main` does not auto-deploy static. This ship used the Vercel REST API: create with `autoAssignCustomDomains: false` and `gitSource.sha` that merge SHA, then promote. Production deployment `dpl_ByazVmgr1eDffUFhqEwwWRDdTVea`, promoted 15:52 BST on 15 Oct. The apex and www `index.html` sha256 begins `f529f335`. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit.
 - **Rollback:** `dpl_5sz1cse98dHJ5op3sx4JH6Nino8E` (SHA `ad12a33c63d841ee8cbeaa1e6e28603038dfd8ec`).
 - **Verified totals:** 2 servings £32.93 groceries / £37.73 total; 4 servings £43.53 / £48.86; 6 servings £54.89 / £60.78.
 - **Known:** the headline price is based on the meal basket, not a basket the user has edited.
@@ -114,43 +145,48 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Prices.** A day card is that dinner’s penny share of the real week basket (selected meals, locked servings, shop, cupboard ticks). Shared packs split by the quantity each dinner uses. Seasonings and portion-less items split evenly across the dinners that use them. A cupboard tick costs 0. The cards add up to the groceries total; leftover pennies sit on the last dinner. Pricing each dinner with its own `basketFor([meal])` had been charging a full bottle of oil, a net of onions, and a seasoning jar on every card.
 - **Footer.** Under the cards: groceries + delivery + 5% = the total, the same split `pay` uses for the hold. One line says the card hold adds a 30% buffer and only the actual amount is captured. **This shop** shows that total to the penny.
 - **Unchanged.** The shared `basketFor` block is byte-identical. `pay` is not in this change.
-- **Shipped** 15 Oct 2026 at 15:52 BST in the production-ship entry above. Static only, through the REST create and promote. `pay` was not redeployed.
+- **Shipped** 15 Oct 2026 at 15:52 BST in the production-ship entry above. Static through the REST create and promote. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit.
 
 ## 2026-10-15 — Claude review config is valid; Opus is restored
 
 - **CI.** `.github/workflows/claude-review.yml` sets `--model opus` and `--fallback-model sonnet` again. The Sonnet-only diagnostic reached the same instant `$0` `is_error` result, so the model flag was not the failure. Read, Grep, Glob, the `Bash(gh pr comment:*)` / `diff` / `view` rules, `allowed_bots: cursor`, and the `APPROVE` gate stay as they are.
 - **Why.** Claude Code 2.1.300 (the version `anthropics/claude-code-action@v1` installs) accepts this prompt, `--json-schema`, `--allowedTools`, and `--max-turns`. With a dummy `ANTHROPIC_API_KEY` the first error is API auth (`authentication_failed`, HTTP 401), not an args, schema, or tool-spec error. An invalid `--json-schema` fails earlier, on stderr, with `--json-schema is not valid JSON`. The action then reports `--json-schema was provided but Claude did not return structured_output` and hides the result text unless `show_full_output` is on. This public repo does not turn that on. See [RUNBOOK.md](RUNBOOK.md).
-- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted. This pull request changes the workflow file, so `claude-review` cannot approve it.
 
 ## 2026-10-15 — Claude review uses the opus alias
 
 - **CI.** `.github/workflows/claude-review.yml` sets `--model opus` and `--fallback-model sonnet`. On PR #15, run 38736528055, `--model claude-opus-5-5` errored in 297ms with 0 cost and empty `modelUsage`, so that id is most likely invalid or not available to the subscription token. Sonnet stays the only fallback. `opus` is not repeated on that list.
 - **Why.** The full model id failed before any tokens. The `opus` alias is what the subscription token runs. See [RUNBOOK.md](RUNBOOK.md).
-- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted. This pull request changes the workflow file, so `claude-review` cannot approve it.
 
 ## 2026-10-15 — Claude review reads the whole app on Opus 5.5
 
 - **CI.** `.github/workflows/claude-review.yml` sets `--model claude-opus-5-5` (Opus 5.5 on a Claude subscription OAuth token), `--fallback-model opus,sonnet`, `--max-turns 100`, and `allowed_bots: cursor` (that bot only; not `*`). PR #15 failed with `Workflow initiated by non-human actor: cursor (type: Bot)` because Cursor cloud-agent pull requests are pushed by that bot. Before the diff, the prompt reads AGENTS.md, `doc/ARCHITECTURE.md`, `doc/INVARIANTS.md`, `doc/CURRENT-STATE.md`, `doc/REQUIREMENTS.md`, all of `index.html`, every file under `supabase/functions/`, every SQL file under `supabase/`, and the tests. It judges the change against every feature it could affect. It checks the ×1.30 hold, the 5% fee, capture, the byte-identical `/* portions:start */`…`/* portions:end */` basket block, RLS and admin rules, XSS, and drift between those docs and the tests. The comment lists the features checked. Read, Grep, and Glob may run on the whole repo. Bash stays `gh pr comment` / `diff` / `view`. The structured `APPROVE` gate is unchanged. Job timeout is 120 minutes.
 - **Why.** A short diff-only review can miss a feature the change still reaches. `claude-opus-5-5` is the Opus 5.5 id the `opus` alias resolves to on a subscription. The `opus` alias, then Sonnet, is the documented fallback when that id is overloaded or unavailable. The CLI sets no turn limit unless `--max-turns` is passed; 100 covers a whole-app read. See [RUNBOOK.md](RUNBOOK.md).
-- **Not deployed.** Workflow and docs only. This pull request changes the workflow file, so `claude-review` cannot approve it.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted. This pull request changes the workflow file, so `claude-review` cannot approve it.
 
 ## 2026-10-15 — REST ship path for the team Vercel token
 
 - **Runbook.** `VERCEL_TOKEN` is a team `noebouchards-projects` token, stored as a box secret for the Plentry Engineering bot, created 15 Oct 2026, 90-day expiry (about 13 Jan 2027). The value is not in git. CLI 63.1.0 returns `User not found (404)` on that token. [RUNBOOK.md](RUNBOOK.md) gives the REST create (`POST /v13/deployments`, `autoAssignCustomDomains: false`, `gitSource.sha` the merge SHA), promote (`POST /v10/projects/prj_lf6RxDIun7rFk6NDUagt8Ve0lme0/promote/{deploymentId}`), and read-prod (`GET /v13/deployments/getplentry.com`), all with `teamId=team_QHpJBQejbrxZ2PhEZQlmbuhj`.
 - **Claude review gate.** The repo is public, so fork PRs do not receive `CLAUDE_CODE_OAUTH_TOKEN` and `claude-review` fails. That is intended. `claude-review` becomes a required check only after it has gone green on a real pull request.
-- **Not deployed.** Docs only.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Docs only: static was not promoted.
 
 ## 2026-10-15 — Claude review gate
 
 - **CI.** `.github/workflows/claude-review.yml` runs `anthropics/claude-code-action@v1` on pull_request opened, synchronize, and reopened. The job `claude-review` reviews the diff for bugs, security, and AGENTS.md, posts a comment ending in `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED`, and fails unless the action's `structured_output.verdict` is `APPROVE`.
 - **Why.** `npm test` does not read a diff for security or AGENTS.md. The verdict is a required check once Noé installs the Claude GitHub app, runs `claude setup-token`, sets `CLAUDE_CODE_OAUTH_TOKEN`, and adds `claude-review` next to `test` on the main ruleset. See [RUNBOOK.md](RUNBOOK.md).
-- **Not deployed.** Workflow and docs only. The action does not review a PR whose workflow file differs from `main`, so this change cannot approve itself.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Workflow and docs only: static was not promoted. The action does not review a PR whose workflow file differs from `main`, so this change cannot approve itself.
 
 ## 2026-10-15 — main no longer auto-deploys static
 
 - **Git.** `vercel.json` `git.deploymentEnabled` is `{ "main": false }`. `github.enabled` is the deprecated key; this uses the current one. Any branch left out stays enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch.
-- **Why.** From 13 Oct 2026 a merge to `main` auto-deployed static while `pay` was a separate step. The 13 Oct ship was mismatched for about 37 seconds. The default ship is now: merge on GO, build the merge SHA with the REST create (`autoAssignCustomDomains: false`; a logged-in founder CLI is `vercel deploy --prod --yes --skip-domain`) and confirm READY, deploy `pay` (Supabase `deploy_edge_function`, `verify_jwt` true, `index.ts` plus `_shared/ratelimit.ts`, `_shared/orders.ts`, `_shared/portions.ts`) and confirm the version, then promote and confirm getplentry.com and www. Static-only changes build and promote. Docs-only merges do nothing.
-- **Not deployed.** This commit turns the Git hook off once it is on `main`. It does not alias getplentry.com. Production static at that moment was still the 13 Oct deployment. The PR #15 ship the same day (entry above) is the later static. Production ships after this commit are the REST create (`autoAssignCustomDomains: false`) and a promote.
+- **Why.** From 13 Oct 2026 a merge to `main` auto-deployed static while `pay` was treated as a separate step. The 13 Oct ship was mismatched for about 37 seconds. Vercel static after this commit is the REST create (`autoAssignCustomDomains: false`; a logged-in founder CLI is `vercel deploy --prod --yes --skip-domain`) and a promote. The Supabase GitHub integration still redeploys every edge function on the merge. Do not run a second functions deploy for that SHA. A docs-only merge does not promote static and does not apply loose SQL.
+- **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. This commit turns the Vercel Git hook off once it is on `main`. It does not alias getplentry.com. Production static at that moment was still the 13 Oct deployment. The PR #15 ship the same day (entry above) is the later static. Production static after this commit is the REST create (`autoAssignCustomDomains: false`) and a promote.
+
+## 2026-10-14 — Docs: record the 13 Oct production ship (PR #11)
+
+- **Merged:** squash commit `ad12a33c63d841ee8cbeaa1e6e28603038dfd8ec` on `main`. PR #11.
+- **Vault.** Records the 13 Oct ship (PR #10, `pay` v33). The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. Static was not promoted by this merge. No SQL. The 13 Oct entry below stays the record of v33.
 
 ## 2026-10-13 14:09 BST — production ship (PR #10)
 
