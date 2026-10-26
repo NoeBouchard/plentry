@@ -920,3 +920,22 @@ describe("I-A14 meals follow-ups (applied on prod 26 Oct 2026)", () => {
     assert.match(newcoming, /ctx\.supabaseAdmin[\s\S]*\.from\('meals'\)[\s\S]*source,created_at/);
   });
 });
+
+describe("meals MAINTAIN revoke (pending, not applied)", () => {
+  const raw = sqlBody("meals_revoke_maintain.sql");
+  const active = stripSqlComments(raw);
+
+  it("revokes MAINTAIN from anon and authenticated in one transaction, with a commented rollback, and is not a migration", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.equal(existsSync(path.join(ROOT, "supabase/meals_revoke_maintain.sql")), true);
+    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /^-- grant maintain on table public\.meals to anon, authenticated;$/m);
+    assert.doesNotMatch(active, /grant maintain on table public\.meals to anon, authenticated/);
+    const begin = active.indexOf("begin;");
+    const commit = active.lastIndexOf("commit;");
+    assert.ok(begin >= 0 && commit > begin);
+    const body = active.slice(begin, commit);
+    assert.match(body, /revoke maintain on table public\.meals from anon, authenticated;/);
+    assert.equal(active.slice(commit + "commit;".length).trim(), "");
+  });
+});

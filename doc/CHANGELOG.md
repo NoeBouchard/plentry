@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-26 — Revoke MAINTAIN on meals (SQL written; not applied)
+
+- **Open.** Anon and authenticated still hold `MAINTAIN` on `public.meals`.
+- **SQL.** `supabase/meals_revoke_maintain.sql` revokes that privilege in one transaction: `revoke maintain on table public.meals from anon, authenticated`. The header says `PENDING, not applied`. The commented rollback is `grant maintain on table public.meals to anon, authenticated`. Loose file, not a migration. Not applied. Do not move it into `supabase/migrations/`. It does not change the 11-column SELECT grants.
+- **Tests.** The contract test parses the revoke and the commented rollback. PGlite is Postgres 18, so it also runs the file: afterwards anon and authenticated lack `MAINTAIN` and still have the 11-column SELECT.
+
 ## 2026-10-26 15:34 GMT — production ship (PR #31, #30, #32)
 
 - **Merged:** all squash, on 26 Oct 2026. PR #31 `4425f41134532850f5ef00d022955f7d77fa22b4` at 15:10:57 GMT. PR #30 `df0c53e00f8e9af8a734fae5daeb4944a6dec3b6` at 15:18:29 GMT. PR #32 `89c84c1beb26aec0453e76dd06aae8b0b7a85894` at 15:26:07 GMT.

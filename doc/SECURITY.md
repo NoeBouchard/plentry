@@ -110,7 +110,7 @@ See the status table above. Live (DB 17 Sep, functions 17 Sep, static 18 Sep): S
 
 ## Open
 
-- Anon and authenticated still hold `MAINTAIN` on `public.meals`.
+- Anon and authenticated still hold `MAINTAIN` on `public.meals`. `supabase/meals_revoke_maintain.sql` is written and **not applied**. Do not put it in `supabase/migrations/`.
 
 ## Known accepted risks (do not “fix” without product sign-off)
 
