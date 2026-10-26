@@ -566,6 +566,26 @@ describe("I-M10 capture split", () => {
     assert.equal(splitAssertOk(penny), true);
   });
 
+  it("£4.30 uses integer pence and does not false-alert", () => {
+    const split = captureSplit(4.3, 100);
+    assert.equal(pence(split.store_total), 430);
+    assert.equal(pence(split.amount_captured), 452);
+    assert.equal(pence(split.fee_amount), 22);
+    assert.equal(pence(split.overrun_amount), 0);
+    assert.equal(splitAssertOk(split), true);
+    // round2(£4.30 × 1.05) is £4.51. That used to alert against the 452 pence gross.
+    const floatPence = Math.round(Math.min(Math.round(4.3 * 1.05 * 100) / 100, 100) * 100);
+    assert.equal(floatPence, 451);
+    assert.notEqual(pence(split.amount_captured), floatPence);
+  });
+
+  it("no false split mismatch from 1p through £500", () => {
+    for (let p = 1; p <= 50000; p++) {
+      const split = captureSplit(p / 100, 1000);
+      assert.equal(splitAssertOk(split), true, `false mismatch at ${p}p`);
+    }
+  });
+
   function captureCalls(over = {}) {
     const calls = { gets: 0, captures: [], updates: [], alerts: [], logs: [], sleeps: [] };
     const opts = {
@@ -633,7 +653,7 @@ describe("I-M10 capture split", () => {
     const { calls, opts } = captureCalls({
       updateOrder: async (id, patch) => {
         calls.updates.push({ id, patch });
-        return { error: { code: "42703", message: "column store_total does not exist" }, rows: 0 };
+        return { error: { code: "40P01", message: "deadlock" }, rows: 0 };
       },
     });
     const res = await runCapture(opts);
@@ -650,6 +670,34 @@ describe("I-M10 capture split", () => {
     assert.equal(calls.logs.length, 1);
     assert.equal(calls.logs[0].fields.order_id, "42");
     assert.equal(calls.logs[0].fields.payment_intent, "pi_test_42");
+    const dumped = JSON.stringify(calls.logs) + calls.alerts.join("\n");
+    assert.doesNotMatch(dumped, /sk_live|sk_test|bot/);
+  });
+
+  it("on 42703, saves amount_captured without the split and alerts that the columns are missing", async () => {
+    let n = 0;
+    const { calls, opts } = captureCalls({
+      updateOrder: async (id, patch) => {
+        n += 1;
+        calls.updates.push({ id, patch });
+        if (n === 1) return { error: { code: "42703", message: "column store_total does not exist" }, rows: 0 };
+        return { error: null, rows: 1 };
+      },
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.live, true);
+    assert.equal(calls.captures.length, 1);
+    assert.equal(n, 2);
+    assert.equal(Object.prototype.hasOwnProperty.call(calls.updates[0].patch, "store_total"), true);
+    assert.deepEqual(Object.keys(calls.updates[1].patch).sort(), ["amount_captured", "payment_status"]);
+    assert.equal(pence(calls.updates[1].patch.amount_captured), 2625);
+    assert.equal(calls.updates[1].patch.payment_status, "captured");
+    assert.equal(calls.alerts.length, 1);
+    assert.match(calls.alerts[0], /order #42/);
+    assert.match(calls.alerts[0], /pi_test_42/);
+    assert.match(calls.alerts[0], /£26\.25/);
+    assert.match(calls.alerts[0], /split wasn't recorded because the columns are missing/);
     const dumped = JSON.stringify(calls.logs) + calls.alerts.join("\n");
     assert.doesNotMatch(dumped, /sk_live|sk_test|bot/);
   });

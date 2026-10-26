@@ -4,9 +4,13 @@
 -- Do not move it into supabase/migrations/. This repo has no migrations
 -- folder; a file placed there can auto-apply.
 --
--- Apply this BEFORE deploying pay. pay capture writes store_total,
--- fee_amount, and overrun_amount in the same update as amount_captured.
--- If the columns are missing, that update fails.
+-- Apply this BEFORE deploying pay and notify-order in the same GO.
+-- pay capture writes store_total, fee_amount, and overrun_amount in the
+-- same update as amount_captured. notify-order imports the same
+-- _shared/telegram.ts. Its behaviour does not change. If the columns are
+-- missing, pay retries without them so amount_captured still saves, and
+-- alerts that the split was not recorded. Apply the SQL first so the
+-- split is stored.
 --
 -- Units are pounds, the same as amount_captured and amount_held (the
 -- authorised hold). Old rows stay null. Accounts backfills those in the books.
@@ -25,13 +29,23 @@
 --
 -- Idempotent. Safe to re-run.
 --
--- Rollback — only after the previous pay is deployed, so pay no longer
--- writes these columns. Order matters: restoring the trigger first, then
--- the grants, then dropping the columns. Dropping the columns while this
--- function is still installed breaks every orders write.
+-- Rollback — redeploy the previous pay and the previous notify-order
+-- first, so pay no longer writes these columns. Then this SQL. Order
+-- matters: functions, then the trigger, then the grants, then the drops.
+-- Dropping the columns while this function or the new pay is still
+-- installed breaks every orders write.
 --   1. Re-run supabase/security_hardening_v3.sql
 --      (validate_order without store_total / fee_amount / overrun_amount).
 --   2. grant insert, update on table public.orders to anon, authenticated;
+--      This keeps the table GRANT. It puts back the grants this file
+--      removes. It does not narrow them. That also reopens client writes
+--      to any later money or email columns, including PR #34's
+--      completion_email_status, completion_email_claimed_at,
+--      completion_email_sent_at, completion_email_attempts,
+--      completion_email_error, and completion_email_message_id, until
+--      that PR's BEFORE INSERT reset and column guard are in. If those
+--      columns already exist and that guard is not in, skip this GRANT
+--      and leave the column grants from this file (browser columns only).
 --   3. alter table public.orders drop column if exists overrun_amount;
 --      alter table public.orders drop column if exists fee_amount;
 --      alter table public.orders drop column if exists store_total;

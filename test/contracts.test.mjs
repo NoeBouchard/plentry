@@ -28,7 +28,7 @@ describe("source contracts", () => {
     assert.match(pay, /import \{ COMMISSION, runCapture, runReconcile \} from '\.\.\/_shared\/capture\.ts'/);
     assert.match(html, /const HOLD_BUFFER=0\.30/);
     assert.match(pay, /const HOLD_MULTIPLIER = 1\.30/);
-    assert.match(capture, /storePence \* \(1 \+ COMMISSION\)/);
+    assert.match(capture, /storePence \* 105 \/ 100/);
     assert.match(capture, /Math\.min\(grossPence, holdPence\)/);
     assert.doesNotMatch(pay, /error: 'amount exceeds hold'/);
     assert.doesNotMatch(capture, /error: 'amount exceeds hold'/);
@@ -249,7 +249,7 @@ describe("source contracts", () => {
     assert.doesNotMatch(pay, /userClaims\?\.aal/, "aal is on jwtClaims, not the mapped userClaims");
     assert.match(pay, /error: 'mfa_required'/);
     const emailIdx = pay.indexOf("ctx.userClaims?.email !== ADMIN_EMAIL");
-    const mfaIdx = pay.indexOf("REQUIRE_ADMIN_MFA");
+    const mfaIdx = pay.indexOf("Deno.env.get('REQUIRE_ADMIN_MFA') === '1'");
     const captureIdx = pay.indexOf("payment_intents/${encodeURIComponent(pi)}/capture");
     assert.ok(emailIdx > 0 && mfaIdx > emailIdx && captureIdx > mfaIdx, "email, then MFA, then Stripe");
     const mfaSql = readFileSync(path.join(ROOT, "supabase/admin_mfa.sql"), "utf8");
@@ -959,6 +959,11 @@ describe("I-M10 capture split SQL (pending, not applied)", () => {
     assert.match(capture, /status === 'succeeded'/);
     assert.match(capture, /amount_received/);
     assert.match(capture, /capture_not_recorded/);
+    assert.match(capture, /code === '42703'/);
+    assert.match(capture, /split wasn't recorded because the columns are missing/);
+    assert.match(raw, /notify-order/);
+    assert.match(raw, /reopens client writes/);
+    assert.match(raw, /completion_email_status/);
     assert.match(notify, /sendTelegram\(text,/);
     assert.match(notify, /\.slice\(0, TELEGRAM_MAX\)/);
   });

@@ -5,17 +5,21 @@
 //   Door address comes from the app (orders.address.delivery). Stripe only
 //   collects card billing; shipping collection is a fallback if delivery is missing.
 //
-// task 'capture' (admin only, aal2): pass the exact store total as amount_gbp;
+// task 'capture' (admin email; admin MFA (aal2) is enforced only when
+//   REQUIRE_ADMIN_MFA=1): pass the exact store total as amount_gbp;
 //   the function adds the 5% Plentry fee and captures that, never above the hold.
 //   A PaymentIntent that is already succeeded is not captured again. The orders
 //   update is retried; a miss returns non-2xx and alerts ops.
-// task 'reconcile' (admin only, aal2): dryRun defaults to true. Reports orders
+// task 'reconcile' (admin email; admin MFA (aal2) is enforced only when
+//   REQUIRE_ADMIN_MFA=1): dryRun defaults to true. Reports orders
 //   whose PaymentIntent succeeded and whose amount_captured is still null.
 //   dryRun false writes amount_captured and payment_status from Stripe.
 //
 // Secrets: supabase secrets set STRIPE_SECRET_KEY=sk_test_...   (later sk_live_)
-// Deploy by hand, after supabase/orders_capture_split.sql is applied:
-//   supabase functions deploy pay
+// Deploy by hand in the same GO as notify-order, after
+// supabase/orders_capture_split.sql is applied. notify-order behaviour
+// does not change; it imports the same _shared/telegram.ts.
+//   supabase functions deploy pay notify-order
 
 import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'

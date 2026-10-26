@@ -21,6 +21,12 @@ export function round2(n: number): number {
   return Math.round(Number(n) * 100) / 100
 }
 
+// 5% of an integer pence amount, half-up. Pound floats do not match this:
+// £4.30 × 1.05 rounds to £4.51 in round2, and to 452 pence here.
+function grossPenceFromStore(storePence: number): number {
+  return Math.round(storePence * 105 / 100)
+}
+
 // store_total is the till total Ops entered, in pounds.
 // amount_captured = min(round to pence of store × 1.05, hold).
 // overrun_amount = max(0, that gross − amount_captured). Plentry covers it.
@@ -30,7 +36,7 @@ export function round2(n: number): number {
 export function captureSplit(storeGbp: number, holdGbp: number): CaptureSplit {
   const storePence = Math.round(Number(storeGbp) * 100)
   const holdPence = Math.round(Number(holdGbp) * 100)
-  const grossPence = Math.round(storePence * (1 + COMMISSION))
+  const grossPence = grossPenceFromStore(storePence)
   const capturedPence = Math.min(grossPence, holdPence)
   const store_total = storePence / 100
   const hold = holdPence / 100
@@ -41,11 +47,16 @@ export function captureSplit(storeGbp: number, holdGbp: number): CaptureSplit {
   return { store_total, amount_captured, fee_amount, overrun_amount, gross, hold }
 }
 
-// Penny check against min(store_total × 1.05, hold), not against the pence
-// helper's own intermediate. A drift alerts; it does not block the capture.
+// Penny check in integer pence: Math.round(storePence * 105 / 100), then min
+// with the hold in pence. Same rounding as captureSplit. A drift alerts; it
+// does not block the capture.
 export function splitAssertOk(split: { store_total: number; amount_captured: number; hold: number }): boolean {
-  const expected = Math.min(round2(Number(split.store_total) * (1 + COMMISSION)), Number(split.hold))
-  return Math.round(Number(split.amount_captured) * 100) === Math.round(expected * 100)
+  const storePence = Math.round(Number(split.store_total) * 100)
+  const holdPence = Math.round(Number(split.hold) * 100)
+  const capturedPence = Math.round(Number(split.amount_captured) * 100)
+  if (!Number.isFinite(storePence) || !Number.isFinite(holdPence) || !Number.isFinite(capturedPence)) return false
+  const expected = Math.min(grossPenceFromStore(storePence), holdPence)
+  return capturedPence === expected
 }
 
 export function tillGbp(amountGbp: unknown): number | null {
@@ -85,6 +96,22 @@ function money(n: number): string {
   return (Math.round(Number(n) * 100) / 100).toFixed(2)
 }
 
+const SPLIT_COLUMNS = ['store_total', 'fee_amount', 'overrun_amount'] as const
+
+function isUndefinedColumn(error: unknown): boolean {
+  return !!error && typeof error === 'object' && (error as { code?: string }).code === '42703'
+}
+
+function patchHasSplit(patch: Record<string, unknown>): boolean {
+  return SPLIT_COLUMNS.some((key) => Object.prototype.hasOwnProperty.call(patch, key))
+}
+
+function withoutSplit(patch: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...patch }
+  for (const key of SPLIT_COLUMNS) delete next[key]
+  return next
+}
+
 async function notify(alert: Alert, text: string) {
   try {
     await alert(text)
@@ -108,12 +135,35 @@ async function writeOrder(
   amountCaptured: number,
 ): Promise<{ ok: true } | { ok: false; detail: string }> {
   let last = 'update failed'
+  let writing = patch
+  let droppedSplit = false
   for (let attempt = 0; attempt < CAPTURE_DB_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(BACKOFF_MS[attempt - 1] ?? 800)
     try {
-      const res = await updateOrder(id, patch)
+      let res = await updateOrder(id, writing)
+      // Missing split columns (pay deployed before the SQL). The full patch
+      // cannot succeed. Save amount_captured and payment_status without it.
+      if (!droppedSplit && isUndefinedColumn(res.error) && patchHasSplit(writing)) {
+        writing = withoutSplit(writing)
+        droppedSplit = true
+        res = await updateOrder(id, writing)
+      }
       const missed = res.rows === 0
-      if (!res.error && !missed) return { ok: true }
+      if (!res.error && !missed) {
+        if (droppedSplit) {
+          log('pay capture: split columns missing', {
+            order_id: safeId(id),
+            payment_intent: safeId(paymentIntent),
+            amount_captured: money(amountCaptured),
+            error: '42703',
+          })
+          await notify(
+            alert,
+            `Plentry capture: order #${safeId(id)} PaymentIntent ${safeId(paymentIntent)} captured £${money(amountCaptured)} but the split wasn't recorded because the columns are missing.`,
+          )
+        }
+        return { ok: true }
+      }
       last = errText(res.error) || (missed ? 'no row updated' : 'update failed')
     } catch (e) {
       last = errText(e) || 'update failed'

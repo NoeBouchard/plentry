@@ -56,7 +56,7 @@ Always run tests first. Do not run a Vercel or functions deploy if `npm test` fa
 ```bash
 npm test
 # static: REST create + promote in doc/RUNBOOK.md
-# functions: hand deploy under a GO. Capture split: SQL first, then pay.
+# functions: hand deploy under a GO. Capture split: SQL first, then pay and notify-order together.
 # supabase functions deploy is that hand deploy, and the rollback path.
 ```
 

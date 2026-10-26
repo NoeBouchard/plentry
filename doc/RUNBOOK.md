@@ -131,21 +131,21 @@ Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner` 
 
 ## Capture split (pending)
 
-Not applied. Not deployed. `supabase/orders_capture_split.sql` is a loose file (sha256 `2b02d3126a237798cef14587c53c2dbcd6617d8e1c43ba7f36ea5dd310e8e399`). Header says **PENDING, not applied**. Do not put it in `supabase/migrations/`.
+Not applied. Not deployed. `supabase/orders_capture_split.sql` is a loose file (sha256 `d61941ce6f427a28c978742d69af3445e690712bb2b9e52c5c3413d94ab7bbec`). Header says **PENDING, not applied**. Do not put it in `supabase/migrations/`.
 
-**Order.** SQL first, then `pay` by hand, under a GO. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing, the update fails, Stripe has already captured, and Ops gets a non-2xx plus a Telegram alert.
+**Order.** Apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. `notify-order` behaviour is unchanged. It imports the changed `_shared/telegram.ts`, so the previous bundle must not stay live beside the new `pay`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing (Postgres `42703`), `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. Apply the SQL first so the split is stored.
 
 ```bash
 cd plentry
 npm test   # must be 0
 # 1. Paste supabase/orders_capture_split.sql into the Supabase SQL editor and run it.
-# 2. Only then, and only under a GO:
-supabase functions deploy pay
+# 2. Only then, and only under a GO, both functions:
+supabase functions deploy pay notify-order
 ```
 
-Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not deploy `pay`. Do not merge this change and assume the function shipped. Do not run the deploy before the SQL.
+Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not deploy `pay` or `notify-order`. Do not merge this change and assume the functions shipped. Do not run the deploy before the SQL.
 
-**Rollback.** Deploy the previous `pay` first (the one that does not write the three columns). Then, in the SQL editor: re-run `supabase/security_hardening_v3.sql` (restores `validate_order`), `grant insert, update on table public.orders to anon, authenticated;`, then drop `overrun_amount`, `fee_amount`, and `store_total`. Dropping the columns while the new function or the new `pay` is still live breaks orders writes and capture. The commented rollback in the SQL file is the same order.
+**Rollback.** Redeploy the previous `pay` and the previous `notify-order`, then roll back the SQL. In the SQL editor: re-run `supabase/security_hardening_v3.sql` (restores `validate_order`), `grant insert, update on table public.orders to anon, authenticated;`, then drop `overrun_amount`, `fee_amount`, and `store_total`. That table GRANT puts back the grants this file removes. It also reopens client writes to any later money or email columns, including PR #34's `completion_email_*` columns, until that PR's BEFORE INSERT reset and column guard are in. If those columns already exist and that guard is not in, skip the GRANT and leave this file's column grants (browser columns only). Dropping the columns while the new function or the new `pay` is still live breaks orders writes and capture. The commented rollback in the SQL file is the same order.
 
 `reconcile` is an aal2 admin task on `pay`. Omit `dryRun` or pass `true` to report only. Pass `dryRun: false` to write `amount_captured` and `payment_status` from a succeeded PaymentIntent. It does not fill the split.
 
