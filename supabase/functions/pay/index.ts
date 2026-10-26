@@ -5,19 +5,26 @@
 //   Door address comes from the app (orders.address.delivery). Stripe only
 //   collects card billing; shipping collection is a fallback if delivery is missing.
 //
-// task 'capture' (admin only): pass the exact store total as amount_gbp; the
-//   function adds the 5% Plentry fee and captures that, never above the hold.
+// task 'capture' (admin only, aal2): pass the exact store total as amount_gbp;
+//   the function adds the 5% Plentry fee and captures that, never above the hold.
+//   A PaymentIntent that is already succeeded is not captured again. The orders
+//   update is retried; a miss returns non-2xx and alerts ops.
+// task 'reconcile' (admin only, aal2): dryRun defaults to true. Reports orders
+//   whose PaymentIntent succeeded and whose amount_captured is still null.
+//   dryRun false writes amount_captured and payment_status from Stripe.
 //
 // Secrets: supabase secrets set STRIPE_SECRET_KEY=sk_test_...   (later sk_live_)
-// Deploy:  supabase functions deploy pay
+// Deploy by hand, after supabase/orders_capture_split.sql is applied:
+//   supabase functions deploy pay
 
 import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
 import { basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket } from '../_shared/orders.ts'
 import { PACKS, SEASONINGS, basketFor, normServings, storePacksFromPrices } from '../_shared/portions.ts'
+import { COMMISSION, runCapture, runReconcile } from '../_shared/capture.ts'
+import { sendTelegram } from '../_shared/telegram.ts'
 
 const ADMIN_EMAIL = 'noyouchka.bouchard@gmail.com'
-const COMMISSION = 0.05
 const HOLD_MULTIPLIER = 1.30
 const APP_URL = 'https://getplentry.com'
 const MAX_ORDER_GBP = 500
@@ -112,6 +119,39 @@ async function stripe(sk: string, path: string, params: URLSearchParams) {
   return { ok: r.ok, j }
 }
 
+async function stripeGet(sk: string, path: string) {
+  const r = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${sk}` },
+  })
+  const j = await r.json()
+  return { ok: r.ok, j }
+}
+
+// Ops alert. The token stays in the Telegram URL inside sendTelegram and is not logged.
+async function alertOps(text: string) {
+  try {
+    const sent = await sendTelegram(text, { get: (name) => Deno.env.get(name) })
+    if (!sent.ok) console.error('pay capture: telegram alert failed', { status: sent.status })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error('pay capture: telegram alert failed', { message: message.slice(0, 200) })
+  }
+}
+
+function adminDenied(ctx: { userClaims?: { email?: string }; jwtClaims?: { aal?: string } }) {
+  // Server-side admin check — the email in the verified JWT, never the payload.
+  if (ctx.userClaims?.email !== ADMIN_EMAIL) return Response.json({ error: 'forbidden' }, { status: 403 })
+  // S-06: once the founder has enrolled TOTP, flip REQUIRE_ADMIN_MFA=1 so a
+  // password-only (aal1) session can never move money.
+  // aal is on the raw JWT. @supabase/server's userClaims is only
+  // {id,role,email,appMetadata,userMetadata} — userClaims.aal is always
+  // undefined and would 403 every capture, even after a TOTP login.
+  if (Deno.env.get('REQUIRE_ADMIN_MFA') === '1' && ctx.jwtClaims?.aal !== 'aal2')
+    return Response.json({ error: 'mfa_required', detail: 'Enter your 2-step verification code, then try again.' }, { status: 403 })
+  return null
+}
+
 export default {
   fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
     const { task, payload } = await req.json().catch(() => ({}))
@@ -204,40 +244,51 @@ export default {
     }
 
     if (task === 'capture') {
-      // Server-side admin check — the email in the verified JWT, never the payload.
-      if (ctx.userClaims?.email !== ADMIN_EMAIL) return Response.json({ error: 'forbidden' }, { status: 403 })
-      // S-06: once the founder has enrolled TOTP, flip REQUIRE_ADMIN_MFA=1 so a
-      // password-only (aal1) session can never move money.
-      // aal is on the raw JWT. @supabase/server's userClaims is only
-      // {id,role,email,appMetadata,userMetadata} — userClaims.aal is always
-      // undefined and would 403 every capture, even after a TOTP login.
-      if (Deno.env.get('REQUIRE_ADMIN_MFA') === '1' && ctx.jwtClaims?.aal !== 'aal2')
-        return Response.json({ error: 'mfa_required', detail: 'Enter your 2-step verification code, then try again.' }, { status: 403 })
+      const denied = adminDenied(ctx)
+      if (denied) return denied
       if (!sk) return Response.json({ live: false })
       const { order_id, amount_gbp } = payload || {}
       const { data: o } = await ctx.supabaseAdmin.from('orders')
         .select('id,payment_intent,amount_held,payment_status').eq('id', order_id).single()
-      if (!o?.payment_intent) return Response.json({ error: 'no payment intent on order' }, { status: 400 })
-      if (o.payment_status !== 'authorized') return Response.json({ error: `status is ${o.payment_status}` }, { status: 400 })
-      // S-02: a hold we did not record is not a hold. Never fall through to
-      // Stripe with an unknown ceiling.
-      const heldPence = Math.round(Number(o.amount_held) * 100)
-      if (!Number.isFinite(heldPence) || heldPence <= 0) return Response.json({ error: 'no hold recorded on order' }, { status: 400 })
-      const storePence = Math.round(Number(amount_gbp) * 100)
-      if (!storePence || storePence <= 0) return Response.json({ error: 'bad amount' }, { status: 400 })
-      let amt = Math.round(storePence * (1 + COMMISSION))
-      // Never capture more than the authorised hold (I-M04). If the till + 5%
-      // is above it, take the whole hold — Plentry eats the rest from the float.
-      if (amt > heldPence) amt = heldPence
+      const result = await runCapture({
+        order: o,
+        amountGbp: amount_gbp,
+        stripeGet: (pi) => stripeGet(sk, `payment_intents/${encodeURIComponent(pi)}`),
+        stripeCapture: (pi, amountToCapture) => stripe(sk, `payment_intents/${encodeURIComponent(pi)}/capture`,
+          new URLSearchParams({ amount_to_capture: String(amountToCapture) })),
+        updateOrder: async (id, patch) => {
+          const { data, error } = await ctx.supabaseAdmin.from('orders').update(patch).eq('id', id).select('id')
+          return { error, rows: Array.isArray(data) ? data.length : 0 }
+        },
+        alert: alertOps,
+      })
+      return Response.json(result.body, { status: result.status })
+    }
 
-      const { ok, j } = await stripe(sk, `payment_intents/${o.payment_intent}/capture`,
-        new URLSearchParams({ amount_to_capture: String(amt) }))
-      if (!ok) return Response.json({ error: 'stripe', detail: j.error?.message }, { status: 502 })
-
-      await ctx.supabaseAdmin.from('orders')
-        .update({ payment_status: 'captured', amount_captured: amt / 100 })
-        .eq('id', order_id)
-      return Response.json({ live: true, captured_gbp: amt / 100, store_gbp: storePence / 100, fee_gbp: (amt - storePence) / 100 })
+    if (task === 'reconcile') {
+      const denied = adminDenied(ctx)
+      if (denied) return denied
+      if (!sk) return Response.json({ live: false })
+      // Default is report-only. A caller must pass boolean false to write.
+      const dryRun = payload?.dryRun !== false
+      const { data, error } = await ctx.supabaseAdmin.from('orders')
+        .select('id,payment_intent,amount_captured,payment_status')
+        .not('payment_intent', 'is', null)
+        .is('amount_captured', null)
+        .in('payment_status', ['authorized', 'captured'])
+        .order('id', { ascending: false })
+        .limit(50)
+      if (error) return Response.json({ error: 'db', detail: 'could not list orders' }, { status: 500 })
+      const result = await runReconcile({
+        rows: data || [],
+        dryRun,
+        stripeGet: (pi) => stripeGet(sk, `payment_intents/${encodeURIComponent(pi)}`),
+        updateOrder: async (id, patch) => {
+          const { data: updated, error: updateError } = await ctx.supabaseAdmin.from('orders').update(patch).eq('id', id).select('id')
+          return { error: updateError, rows: Array.isArray(updated) ? updated.length : 0 }
+        },
+      })
+      return Response.json(result.body, { status: result.status })
     }
 
     return Response.json({ error: 'unknown task' }, { status: 400 })

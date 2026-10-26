@@ -15,7 +15,7 @@ Browser  index.html (vanilla JS)
         └─ newcoming        Fortnight Telegram of unreviewed meals (cron, not the browser)
 ```
 
-From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), merging to `main` auto-deployed static to production through Vercel’s Git integration. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy static from `main`. Other branches still get preview deployments. The Supabase GitHub integration redeploys `pay` and the other edge functions on that merge. Never create `supabase/migrations/`. Files there would auto-apply to prod on merge via the Supabase GitHub integration. Static ships from the merge SHA through the Vercel REST API (`autoAssignCustomDomains: false`, then promote). A logged-in founder session can use `vercel deploy --prod --yes --skip-domain --scope team_QHpJBQejbrxZ2PhEZQlmbuhj`, confirm READY, then `vercel promote`. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together). Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`.
+From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), merging to `main` auto-deployed static to production through Vercel’s Git integration. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy static from `main`. Other branches still get preview deployments. Until 26 Oct 2026 the Supabase GitHub integration redeployed `pay` and the other edge functions on that merge. Accounts says Deploy to production is now off, so edge functions are a hand deploy under a GO. Never create `supabase/migrations/`. Files there would auto-apply to prod on merge via the Supabase GitHub integration. Static ships from the merge SHA through the Vercel REST API (`autoAssignCustomDomains: false`, then promote). A logged-in founder session can use `vercel deploy --prod --yes --skip-domain --scope team_QHpJBQejbrxZ2PhEZQlmbuhj`, confirm READY, then `vercel promote`. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together). Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`.
 
 ## Front end
 
@@ -43,7 +43,7 @@ All under `plentry/supabase/functions/`. Shared rate limiter: `_shared/ratelimit
 |---|---|---|
 | `ai` | user or publishable | `recipe`, `advisor`. `parse_pantry` and `meal_options` remain in the function; the UI does not call them (pantry is a Have list; Modify uses the meals catalog). Writes meals via **service role** with **tags**; new rows leave `reviewed_at` null. New meals get `image_url` via TheMealDB name search (once at insert). |
 | `checkout` | user or publishable | `quote` / `bag` via Pepesto. No key or logged out → `{live:false}` |
-| `pay` | user | `checkout` session (hold). `capture` **admin email only**. Server recomputes grocery total from `ingredient_prices`. Adds 5% on hold and capture. |
+| `pay` | user | `checkout` session (hold). `capture` **admin email + aal2**. Server recomputes grocery total from `ingredient_prices`. Adds 5% on hold and capture, capped at the hold. Writes `amount_captured`, `store_total`, `fee_amount`, `overrun_amount` after the capture-split SQL is applied. `reconcile` reports (dry run unless `dryRun: false`). |
 | `stripe-webhook` | none (signature) | Sets `payment_status=authorized` + address |
 | `notify-order` | webhook secret | Telegram |
 | `newcoming` | webhook secret | Telegram list of meals with `reviewed_at` null; no-op if empty |
@@ -55,7 +55,7 @@ An old `orders` example function is **not** deployed (confirmed 13 Sep 2026). Do
 1. Client inserts `orders` row (`payment_status=unpaid`, `total` = grocery+delivery estimate, `address.delivery` = door).
 2. `pay` `checkout` recomputes total, opens Stripe Checkout (manual capture, **card billing** + PI shipping from `address.delivery`). Stripe `shipping_address_collection` only if delivery is missing.
 3. Webhook → `authorized` (keeps `address.delivery`) → DB trigger → Telegram.
-4. Ops shops from the founder float. Status New/Ordered/Delivered (toggle; reversible). Capture = store £ + 5%, never above hold. Stripe payouts are **not** Tesco cash (days later).
+4. Ops shops from the founder float. Status New/Ordered/Delivered (toggle; reversible). Capture = store £ + 5%, never above hold. The orders update is retried; a miss is a non-2xx and a Telegram alert, not Money received. A PaymentIntent already `succeeded` is not captured again. Stripe payouts are **not** Tesco cash (days later). The split columns and this `pay` are not live until the SQL is applied and `pay` is deployed by hand.
 
 ## Ingredient catalog
 

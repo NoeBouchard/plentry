@@ -27,7 +27,7 @@ Confirm shows **Deliver to this address?** (name, address, **phone**) when Profi
 1. Founder email only (`noyouchka.bouchard@gmail.com`). Once 2-step verification is on (Profile → **Security**), each login asks for the 6-digit code **before** Ops / Meals appear. The code sheet stays up until the code succeeds (tapping the dimmed area does not close it). Nav **Ops**.
 2. Unpaid: faded, status locked, **do not shop**.
 3. Authorized: **Phone** (the number the driver will call) then **Deliver to** the door address. Copy list / Open {store}. Shop with the **Wise (or other) float** — Stripe balance is not a Tesco card. Start a **new** supermarket checkout for this row; paste **this order’s** name, address, and **customer phone**. Do not rewrite the account-default home address.
-4. Type till £ → preview customer charge (till + 5%) → **Charge £X** → **Confirm £X**.
+4. Type till £ → preview customer charge (till + 5%) → **Charge £X** → **Confirm £X**. If Stripe captured but the order row did not save, Ops sees the error and the card stays on the charge step. A retry does not capture again once the PaymentIntent has succeeded.
 5. Captured: **Money received — £X is in Stripe**. If the supermarket has the **promised window**, **Confirm this window** (marks **Ordered**; customer sees “{store} delivers {window}”). If it does not, **Message customer** (Inbox thread, `issue_status=open`) and wait — do not book a different slot. Later tap **Delivered**.
 6. Never type a till whose +5% is above `amount_held` unless you mean to — in that case Ops charges the **hold** and Plentry covers the rest from the float.
 

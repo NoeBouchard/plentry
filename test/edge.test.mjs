@@ -11,6 +11,14 @@ import { fileURLToPath } from "node:url";
 
 import { allow, clientIdent, clientIp } from "../supabase/functions/_shared/ratelimit.ts";
 import {
+  CAPTURE_DB_ATTEMPTS,
+  captureSplit,
+  runCapture,
+  runReconcile,
+  splitAssertOk,
+} from "../supabase/functions/_shared/capture.ts";
+import { sendTelegram } from "../supabase/functions/_shared/telegram.ts";
+import {
   CATALOG,
   basketTotal,
   cleanMeals,
@@ -521,5 +529,279 @@ describe("S-01/S-03 rate-limit fail policy", () => {
     assert.deepEqual(seen.args, { p_bucket: "pay", p_ident: "user-1", p_max: 15, p_window_seconds: 60 });
     assert.equal(await allow(rpcOver, "ai", "ip:1", 40, 60), false);
     assert.equal(await allow(rpcOk, "ai", "ip:1", 40, 60), true);
+  });
+});
+
+describe("I-M10 capture split", () => {
+  function pence(n) {
+    return Math.round(Number(n) * 100);
+  }
+
+  it("normal, overrun, till above the hold, and pence rounding", () => {
+    const normal = captureSplit(25, 40);
+    assert.equal(pence(normal.store_total), 2500);
+    assert.equal(pence(normal.amount_captured), 2625);
+    assert.equal(pence(normal.fee_amount), 125);
+    assert.equal(pence(normal.overrun_amount), 0);
+    assert.equal(splitAssertOk(normal), true);
+
+    const overrun = captureSplit(10, 10.2);
+    assert.equal(pence(overrun.amount_captured), 1020);
+    assert.equal(pence(overrun.fee_amount), 20);
+    assert.equal(pence(overrun.overrun_amount), 30);
+    assert.equal(splitAssertOk(overrun), true);
+
+    const above = captureSplit(10, 4.58);
+    assert.equal(pence(above.amount_captured), 458);
+    assert.equal(pence(above.store_total), 1000);
+    assert.equal(pence(above.fee_amount), -542);
+    assert.equal(pence(above.overrun_amount), 592);
+    assert.equal(splitAssertOk(above), true);
+
+    const penny = captureSplit(19.99, 100);
+    assert.equal(pence(penny.amount_captured), 2099);
+    assert.equal(pence(penny.fee_amount), 100);
+    assert.equal(pence(captureSplit(0.1, 10).amount_captured), 11);
+    assert.equal(pence(captureSplit(1, 10).amount_captured), 105);
+    assert.equal(splitAssertOk(penny), true);
+  });
+
+  function captureCalls(over = {}) {
+    const calls = { gets: 0, captures: [], updates: [], alerts: [], logs: [], sleeps: [] };
+    const opts = {
+      order: { id: 42, payment_intent: "pi_test_42", amount_held: 40, payment_status: "authorized" },
+      amountGbp: 25,
+      stripeGet: async () => {
+        calls.gets += 1;
+        return { ok: true, j: { id: "pi_test_42", status: "requires_capture" } };
+      },
+      stripeCapture: async (pi, amountToCapturePence) => {
+        calls.captures.push({ pi, amountToCapturePence });
+        return { ok: true, j: { status: "succeeded", amount_received: amountToCapturePence } };
+      },
+      updateOrder: async (id, patch) => {
+        calls.updates.push({ id, patch });
+        return { error: null, rows: 1 };
+      },
+      alert: async (text) => {
+        calls.alerts.push(text);
+      },
+      log: (message, fields) => {
+        calls.logs.push({ message, fields });
+      },
+      sleep: async (ms) => {
+        calls.sleeps.push(ms);
+      },
+      ...over,
+    };
+    return { calls, opts };
+  }
+
+  it("retries an orders update that fails once, then succeeds, and does not capture twice", async () => {
+    let n = 0;
+    const { calls, opts } = captureCalls({
+      updateOrder: async (id, patch) => {
+        n += 1;
+        calls.updates.push({ id, patch });
+        if (n === 1) return { error: { code: "40P01", message: "deadlock" }, rows: 0 };
+        return { error: null, rows: 1 };
+      },
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.live, true);
+    assert.equal(n, 2);
+    assert.equal(calls.captures.length, 1);
+    assert.equal(calls.captures[0].amountToCapturePence, 2625);
+    assert.deepEqual(Object.keys(calls.updates[1].patch).sort(), [
+      "amount_captured",
+      "fee_amount",
+      "overrun_amount",
+      "payment_status",
+      "store_total",
+    ]);
+    assert.equal(pence(calls.updates[1].patch.store_total), 2500);
+    assert.equal(pence(calls.updates[1].patch.amount_captured), 2625);
+    assert.equal(pence(calls.updates[1].patch.fee_amount), 125);
+    assert.equal(pence(calls.updates[1].patch.overrun_amount), 0);
+    assert.equal(calls.updates[1].patch.payment_status, "captured");
+    assert.equal(calls.alerts.length, 0);
+    assert.equal(calls.sleeps.length, 1);
+  });
+
+  it("alerts and returns non-2xx when the orders update never succeeds", async () => {
+    const { calls, opts } = captureCalls({
+      updateOrder: async (id, patch) => {
+        calls.updates.push({ id, patch });
+        return { error: { code: "42703", message: "column store_total does not exist" }, rows: 0 };
+      },
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 500);
+    assert.equal(res.body.error, "capture_not_recorded");
+    assert.equal(res.body.live, undefined);
+    assert.equal(calls.updates.length, CAPTURE_DB_ATTEMPTS);
+    assert.equal(calls.captures.length, 1);
+    assert.equal(calls.sleeps.length, CAPTURE_DB_ATTEMPTS - 1);
+    assert.equal(calls.alerts.length, 1);
+    assert.match(calls.alerts[0], /order #42/);
+    assert.match(calls.alerts[0], /pi_test_42/);
+    assert.match(calls.alerts[0], /£26\.25/);
+    assert.equal(calls.logs.length, 1);
+    assert.equal(calls.logs[0].fields.order_id, "42");
+    assert.equal(calls.logs[0].fields.payment_intent, "pi_test_42");
+    const dumped = JSON.stringify(calls.logs) + calls.alerts.join("\n");
+    assert.doesNotMatch(dumped, /sk_live|sk_test|bot/);
+  });
+
+  it("does not capture a PaymentIntent that already succeeded, and writes amount_received", async () => {
+    const { calls, opts } = captureCalls({
+      amountGbp: undefined,
+      stripeGet: async () => {
+        calls.gets += 1;
+        return { ok: true, j: { status: "succeeded", amount_received: 2625 } };
+      },
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.already_captured, true);
+    assert.equal(pence(res.body.captured_gbp), 2625);
+    assert.equal(calls.captures.length, 0);
+    assert.equal(calls.updates.length, 1);
+    assert.deepEqual(Object.keys(calls.updates[0].patch).sort(), ["amount_captured", "payment_status"]);
+    assert.equal(pence(calls.updates[0].patch.amount_captured), 2625);
+    assert.equal(calls.updates[0].patch.payment_status, "captured");
+    assert.equal(calls.alerts.length, 0);
+  });
+
+  it("writes the split on an already-succeeded PaymentIntent when the till is supplied", async () => {
+    const { calls, opts } = captureCalls({
+      stripeGet: async () => ({ ok: true, j: { status: "succeeded", amount_received: 2625 } }),
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 200);
+    assert.equal(calls.captures.length, 0);
+    assert.equal(pence(calls.updates[0].patch.amount_captured), 2625);
+    assert.equal(pence(calls.updates[0].patch.store_total), 2500);
+    assert.equal(pence(calls.updates[0].patch.fee_amount), 125);
+    assert.equal(pence(calls.updates[0].patch.overrun_amount), 0);
+  });
+
+  it("alerts on an assertion mismatch and still captures", async () => {
+    const { calls, opts } = captureCalls({
+      computeSplit: () => ({
+        store_total: 25,
+        amount_captured: 26.26,
+        fee_amount: 1.26,
+        overrun_amount: 0,
+        gross: 26.25,
+        hold: 40,
+      }),
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 200);
+    assert.equal(calls.captures.length, 1);
+    assert.equal(calls.captures[0].amountToCapturePence, 2626);
+    assert.equal(calls.alerts.length, 1);
+    assert.match(calls.alerts[0], /does not match min\(store/);
+    assert.match(calls.alerts[0], /pi_test_42/);
+    assert.match(calls.alerts[0], /order #42/);
+  });
+
+  it("alerts when the fee is negative and still captures the hold", async () => {
+    const { calls, opts } = captureCalls({
+      order: { id: 42, payment_intent: "pi_test_42", amount_held: 4.58, payment_status: "authorized" },
+      amountGbp: 10,
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 200);
+    assert.equal(calls.captures[0].amountToCapturePence, 458);
+    assert.equal(pence(calls.updates[0].patch.fee_amount), -542);
+    assert.match(calls.alerts.join("\n"), /fee is negative/);
+  });
+
+  it("keeps the status guard and does not retrieve Stripe for a non-authorized row", async () => {
+    const { calls, opts } = captureCalls({
+      order: { id: 42, payment_intent: "pi_test_42", amount_held: 40, payment_status: "captured" },
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /status is captured/);
+    assert.equal(calls.gets, 0);
+    assert.equal(calls.captures.length, 0);
+  });
+
+  it("reconcile reports a succeeded PaymentIntent and writes only when dryRun is false", async () => {
+    const rows = [
+      { id: 7, payment_intent: "pi_ok", amount_captured: null, payment_status: "authorized" },
+      { id: 8, payment_intent: "pi_open", amount_captured: null, payment_status: "authorized" },
+    ];
+    const updates = [];
+    const stripeGet = async (pi) => ({
+      ok: true,
+      j: pi === "pi_ok"
+        ? { status: "succeeded", amount_received: 1050 }
+        : { status: "requires_capture" },
+    });
+    const dry = await runReconcile({
+      rows,
+      dryRun: true,
+      stripeGet,
+      updateOrder: async (id, patch) => {
+        updates.push({ id, patch });
+        return { error: null, rows: 1 };
+      },
+    });
+    assert.equal(dry.body.dryRun, true);
+    assert.equal(updates.length, 0);
+    assert.equal(dry.body.updates.length, 1);
+    assert.equal(dry.body.updates[0].id, 7);
+    assert.equal(pence(dry.body.updates[0].amount_captured), 1050);
+    assert.equal(dry.body.updates[0].wrote, false);
+
+    const wrote = await runReconcile({
+      rows,
+      dryRun: false,
+      stripeGet,
+      updateOrder: async (id, patch) => {
+        updates.push({ id, patch });
+        return { error: null, rows: 1 };
+      },
+    });
+    assert.equal(wrote.body.dryRun, false);
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].id, 7);
+    assert.equal(pence(updates[0].patch.amount_captured), 1050);
+    assert.equal(updates[0].patch.payment_status, "captured");
+    assert.equal(updates[0].patch.store_total, undefined);
+  });
+});
+
+describe("telegram send", () => {
+  it("uses the bot token and chat id and does not send when they are missing", async () => {
+    let called = 0;
+    const missing = await sendTelegram("hi", { get: () => undefined }, async () => {
+      called += 1;
+      return new Response("no");
+    });
+    assert.equal(missing.status, 500);
+    assert.equal(called, 0);
+    let seen = null;
+    const ok = await sendTelegram("x".repeat(5000), {
+      get: (name) => (name === "TELEGRAM_BOT_TOKEN" ? "123:ABC" : "99"),
+    }, async (url, init) => {
+      seen = { url, body: JSON.parse(init.body) };
+      return new Response("{}", { status: 200 });
+    });
+    assert.equal(ok.ok, true);
+    assert.equal(seen.url, "https://api.telegram.org/bot123:ABC/sendMessage");
+    assert.equal(seen.body.chat_id, "99");
+    assert.equal(seen.body.disable_web_page_preview, true);
+    assert.equal(seen.body.text.length, 4000);
+    const bad = await sendTelegram("hi", {
+      get: (name) => (name === "TELEGRAM_BOT_TOKEN" ? "123:ABC" : "99"),
+    }, async () => new Response("y".repeat(400), { status: 500 }));
+    assert.equal(bad.status, 502);
+    assert.equal(bad.detail.length, 200);
   });
 });

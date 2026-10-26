@@ -29,7 +29,7 @@ That is the automated gate. It loads `index.html` in jsdom with a fake Supabase 
 
 **Merge gate:** GitHub Actions job **test** runs the same `npm test` on every PR and on `main`. Do not merge a red PR.
 
-**Production:** `npm test` must exit 0 before a merge to `main`, and again on the merge SHA before a static ship. From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), merging to `main` auto-deployed static to production. Production static is the REST create and promote. `git.deploymentEnabled.main` is now false, so the merge does not deploy static. The merge does redeploy every edge function. A red suite means stop. Do not ship, do not “deploy anyway and fix later”. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
+**Production:** `npm test` must exit 0 before a merge to `main`, and again on the merge SHA before a static ship. From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), merging to `main` auto-deployed static to production. Production static is the REST create and promote. `git.deploymentEnabled.main` is now false, so the merge does not deploy static. Until 26 Oct 2026 the merge redeployed every edge function. Accounts says Deploy to production is now off, so functions are a hand deploy under a GO. A red suite means stop. Do not ship, do not “deploy anyway and fix later”. When `_shared/portions.ts` or the basket block changes, follow [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
 
 If you change behaviour the tests encode, **update the tests in the same change**. If tests fail, you are not done.
 
@@ -52,7 +52,7 @@ Do not leave the vault describing the old product (e.g. “no payments”).
 
 ## Deploy (only if asked)
 
-Never deploy from a PR branch. From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), merging to `main` auto-deployed static to production. `git.deploymentEnabled.main` is now false, so the merge does not deploy static. The merge does redeploy every edge function. After merge, only if the founder asks, ship static from the merge SHA as in [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together): REST create with `autoAssignCustomDomains: false` (founder CLI: `vercel deploy --prod --yes --skip-domain`), confirm READY, confirm the function redeploy, then promote. Do not run a second functions deploy for that SHA. A one-shot `vercel deploy --prod` aliases getplentry.com as soon as the upload finishes.
+Never deploy from a PR branch. From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), merging to `main` auto-deployed static to production. `git.deploymentEnabled.main` is now false, so the merge does not deploy static. Until 26 Oct 2026 the merge redeployed every edge function. Accounts says Deploy to production is now off, so functions are a hand deploy under a GO. After merge, only if the founder asks, ship static from the merge SHA as in [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together): REST create with `autoAssignCustomDomains: false` (founder CLI: `vercel deploy --prod --yes --skip-domain`), confirm READY, confirm the function version, then promote. Do not deploy functions from a PR. A one-shot `vercel deploy --prod` aliases getplentry.com as soon as the upload finishes.
 
 ```bash
 cd plentry
@@ -60,7 +60,7 @@ npm test                                # MUST be 0. Stop if not.
 # Then the RUNBOOK sequence for this change (static-only, docs-only, or pay + static).
 ```
 
-Never run a Vercel or functions deploy if `npm test` failed. A merge to `main` does not auto-deploy static. It does redeploy every edge function. A `git push` of a feature branch does not deploy either. Shared basket changes: [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
+Never run a Vercel or functions deploy if `npm test` failed. A merge to `main` does not auto-deploy static and does not deploy edge functions. A `git push` of a feature branch does not deploy either. Hand-deploy functions under a GO. Shared basket changes: [Shipping pay and static together](RUNBOOK.md#shipping-pay-and-static-together).
 
 Money, XSS, RLS, `pay/`, `stripe-webhook`, or capture PRs: `/review-bugbot` and `/review-security` before merge.
 

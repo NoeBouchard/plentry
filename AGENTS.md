@@ -11,7 +11,7 @@ This GitHub repo **is** the app (`index.html` + Supabase Edge Functions). In the
 3. [`doc/FLOWS.md`](doc/FLOWS.md) — checkout / Ops / Meals  
 4. [`doc/CURRENT-STATE.md`](doc/CURRENT-STATE.md) — what is live  
 5. [`doc/AGENT-PLAYBOOK.md`](doc/AGENT-PLAYBOOK.md) — how to change the app  
-6. [`doc/ENGINEERING.md`](doc/ENGINEERING.md) — branch → PR → CI → merge (static is not live; edge functions deploy on merge)  
+6. [`doc/ENGINEERING.md`](doc/ENGINEERING.md) — branch → PR → CI → merge (static is not live; edge functions are a hand deploy under a GO)  
 7. Security work: [`doc/SECURITY.md`](doc/SECURITY.md)  
 8. There is no React/Next app. Do not add a bundler.
 
@@ -45,19 +45,19 @@ In the Kitchen planner workspace, edit root `doc/` then `npm run vault` so this 
 
 ## Deploy (only if the user asks)
 
-**Merge to main = edge functions deploy.** The Supabase GitHub integration (Deploy to production ON) redeploys all `supabase/functions/*` to prod about 40s after any push to `main`. Until it's turned off (Supabase dashboard > Project Settings > Integrations > GitHub > untick Deploy to production; needs Noé), treat any merge to `main` as a functions deploy. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` is not applied by that integration. `pay` was v33 after PR #10 (13 Oct 2026) and is v52 as of 25 Oct 2026 13:10:17 GMT. See [`doc/RUNBOOK.md`](doc/RUNBOOK.md).
+**Edge functions are a hand deploy under a GO.** As of 26 Oct 2026 Accounts says the Supabase GitHub integration's Deploy to production is off. A merge to `main` does not deploy `supabase/functions/*`. Until that date the integration (Deploy to production ON) redeployed them about 40s after any push to `main`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` is not applied by that integration. `pay` was v33 after PR #10 (13 Oct 2026) and is v52 as of 25 Oct 2026 13:10:17 GMT. See [`doc/RUNBOOK.md`](doc/RUNBOOK.md).
 
-Static does not auto-deploy. Since PR #12 (`4699353a`, 15 Oct 2026) `git.deploymentEnabled.main` is false. Other branches still get preview deployments. Production static is a Vercel REST create with `autoAssignCustomDomains: false`, then a promote. A push to `main` is an edge-functions deploy and is not a static deploy. A `git push` of any other branch is not production.
+Static does not auto-deploy. Since PR #12 (`4699353a`, 15 Oct 2026) `git.deploymentEnabled.main` is false. Other branches still get preview deployments. Production static is a Vercel REST create with `autoAssignCustomDomains: false`, then a promote. A push to `main` is not a static deploy and is not a functions deploy. A `git push` of any other branch is not production.
 
-Do not run `supabase functions deploy` for a SHA the integration just deployed. That is a second deploy.
+Do not run `supabase functions deploy` twice for the same SHA. A second deploy bumps the version again.
 
 Always run tests first. Do not run a Vercel or functions deploy if `npm test` failed.
 
 ```bash
 npm test
 # static: REST create + promote in doc/RUNBOOK.md
-# functions already redeploy on merge to main.
-# supabase functions deploy is a rollback, or the path after Deploy to production is turned off.
+# functions: hand deploy under a GO. Capture split: SQL first, then pay.
+# supabase functions deploy is that hand deploy, and the rollback path.
 ```
 
 ## Never
@@ -66,4 +66,4 @@ npm test
 - Capture more than the Stripe hold  
 - Add a second front-end framework  
 - Skip `npm test`, or ship to production while tests are red  
-- Push product changes straight to `main` (that deploys edge functions), or treat a merge as the static ship  
+- Push product changes straight to `main`, or treat a merge as the static ship or the functions ship  

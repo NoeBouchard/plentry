@@ -2,6 +2,15 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-26 — Capture integrity and the store/fee split (not deployed)
+
+- **Capture.** After Stripe captures, `pay` checks the `orders` update and retries it three times (four tries, short backoff). If it still fails, it logs the order id, PaymentIntent id, and amount with no secrets, sends a Telegram ops alert (`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`, shared `_shared/telegram.ts`), and returns 500 `capture_not_recorded`. Ops already shows `detail` from a non-2xx `payApi` response, so the card does not flip to Money received. A PaymentIntent that is already `succeeded` is not captured again; `amount_received` (pence → pounds) is written so a retry repairs the row. Status guards are unchanged (authorized, hold recorded, aal2 admin).
+- **Split.** Pure helper `_shared/capture.ts`. `store_total` is the till total. `amount_captured` is min(till × 1.05, hold), rounded to pence. `overrun_amount` is the part above the hold. `fee_amount` is `amount_captured − store_total` (the 5% when there is no overrun, smaller under an overrun, negative when the till itself is above the hold — allowed, and Telegram is told). The same update writes all four. If the penny check against min(till × 1.05, hold) fails, Telegram is told and the capture is not blocked. On the already-succeeded path with no till total, the split stays null.
+- **Reconcile.** aal2-admin task `reconcile`. `dryRun` defaults to true and only reports. `dryRun: false` fills `amount_captured` and `payment_status` from a succeeded PaymentIntent when `amount_captured` is null. It does not invent the split. Limited to 50 authorized or captured rows.
+- **SQL.** `supabase/orders_capture_split.sql` is **PENDING, not applied**. sha256 `2b02d3126a237798cef14587c53c2dbcd6617d8e1c43ba7f36ea5dd310e8e399`. Not a migration. Apply it before deploying `pay`. Rollback is commented in the file: restore `validate_order` from `security_hardening_v3.sql`, restore table INSERT/UPDATE for anon and authenticated, then drop the three columns. Do that only after the previous `pay` is what is deployed.
+- **Grants.** Live today, anon and authenticated have table UPDATE, including `amount_captured`. Customers still cannot update `orders` (no customer UPDATE policy). The pending file revokes table INSERT and UPDATE from anon and authenticated and grants back only the columns the browser writes (`status`, `delivery_slot`, `issue_status`, and the checkout INSERT list). Money columns stay on `service_role`. A negative `fee_amount` is allowed down to -1000.
+- **Not live.** No SQL applied. `pay` not deployed. `npm test` **208** (was **194** on `89c84c1`).
+
 ## 2026-10-25 — Meals column follow-ups (SQL written, not applied)
 
 - **Grants.** `supabase/meals_followups.sql` revokes table SELECT from authenticated and grants the same 11 catalogue columns as anon: `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off both grants. A column revoke does not stick while table SELECT remains, so the table grant is revoked.

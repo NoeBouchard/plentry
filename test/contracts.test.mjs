@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(path.join(ROOT, "index.html"), "utf8");
 const pay = readFileSync(path.join(ROOT, "supabase/functions/pay/index.ts"), "utf8");
+const capture = readFileSync(path.join(ROOT, "supabase/functions/_shared/capture.ts"), "utf8");
 const ai = readFileSync(path.join(ROOT, "supabase/functions/ai/index.ts"), "utf8");
 const checkout = readFileSync(path.join(ROOT, "supabase/functions/checkout/index.ts"), "utf8");
 const webhook = readFileSync(path.join(ROOT, "supabase/functions/stripe-webhook/index.ts"), "utf8");
@@ -23,12 +24,14 @@ const revokeNotify = readFileSync(path.join(ROOT, "supabase/revoke_notify_rpc.sq
 describe("source contracts", () => {
   it("keeps 5% commission in the client and pay function", () => {
     assert.match(html, /const COMMISSION=0\.05/);
-    assert.match(pay, /const COMMISSION = 0\.05/);
+    assert.match(capture, /export const COMMISSION = 0\.05/);
+    assert.match(pay, /import \{ COMMISSION, runCapture, runReconcile \} from '\.\.\/_shared\/capture\.ts'/);
     assert.match(html, /const HOLD_BUFFER=0\.30/);
     assert.match(pay, /const HOLD_MULTIPLIER = 1\.30/);
-    assert.match(pay, /storePence \* \(1 \+ COMMISSION\)/);
-    assert.match(pay, /if \(amt > heldPence\) amt = heldPence/);
+    assert.match(capture, /storePence \* \(1 \+ COMMISSION\)/);
+    assert.match(capture, /Math\.min\(grossPence, holdPence\)/);
     assert.doesNotMatch(pay, /error: 'amount exceeds hold'/);
+    assert.doesNotMatch(capture, /error: 'amount exceeds hold'/);
     assert.match(pay, /const MAX_ORDER_GBP = 500/);
     assert.match(harden, /new\.total > 500/);
   });
@@ -60,9 +63,9 @@ describe("source contracts", () => {
     // Legacy rows: total/postcode/store/items only re-validated when they change.
     assert.match(harden3, /check_total := is_insert or new\.total is distinct from old\.total/);
     assert.match(harden3, /check_items := is_insert or new\.items is distinct from old\.items/);
-    assert.match(pay, /no hold recorded on order/);
-    assert.match(pay, /if \(amt > heldPence\)/);
-    assert.doesNotMatch(pay, /if \(o\.amount_held && amt >/);
+    assert.match(capture, /no hold recorded on order/);
+    assert.match(capture, /Math\.min\(grossPence, holdPence\)/);
+    assert.doesNotMatch(capture, /if \(o\.amount_held && amt >/);
   });
 
   it("I-O12 pay rebuilds items.basket server-side and Telegram links come from the store whitelist", () => {
@@ -247,7 +250,7 @@ describe("source contracts", () => {
     assert.match(pay, /error: 'mfa_required'/);
     const emailIdx = pay.indexOf("ctx.userClaims?.email !== ADMIN_EMAIL");
     const mfaIdx = pay.indexOf("REQUIRE_ADMIN_MFA");
-    const captureIdx = pay.indexOf("payment_intents/${o.payment_intent}/capture");
+    const captureIdx = pay.indexOf("payment_intents/${encodeURIComponent(pi)}/capture");
     assert.ok(emailIdx > 0 && mfaIdx > emailIdx && captureIdx > mfaIdx, "email, then MFA, then Stripe");
     const mfaSql = readFileSync(path.join(ROOT, "supabase/admin_mfa.sql"), "utf8");
     assert.match(mfaSql, /\(auth\.jwt\(\)->>'aal'\) = 'aal2'/);
@@ -916,5 +919,47 @@ describe("I-A14 meals follow-ups (pending SQL, not applied)", () => {
     assert.match(aiSrc, /ctx\.supabaseAdmin\.from\('meals'\)/);
     assert.match(paySrc, /admin\.from\('meals'\)\.select\('name,emoji,time,ing,recipe,portions'\)/);
     assert.match(newcoming, /ctx\.supabaseAdmin[\s\S]*\.from\('meals'\)[\s\S]*source,created_at/);
+  });
+});
+
+describe("I-M10 capture split SQL (pending, not applied)", () => {
+  const raw = sqlBody("orders_capture_split.sql");
+  const active = stripSqlComments(raw);
+
+  it("I-M10 is a loose pending file, not a migration, and keeps the orders guard", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.equal(existsSync(path.join(ROOT, "supabase/orders_capture_split.sql")), true);
+    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /Rollback/);
+    assert.match(raw, /security_hardening_v3\.sql/);
+    assert.match(raw, /drop column if exists store_total/);
+    assert.match(raw, /drop column if exists fee_amount/);
+    assert.match(raw, /drop column if exists overrun_amount/);
+    assert.match(active, /add column if not exists store_total numeric/);
+    assert.match(active, /add column if not exists fee_amount numeric/);
+    assert.match(active, /add column if not exists overrun_amount numeric/);
+    assert.match(active, /new\.store_total := null;/);
+    assert.match(active, /new\.fee_amount := null;/);
+    assert.match(active, /new\.overrun_amount := null;/);
+    assert.match(active, /new\.amount_captured := null;/);
+    assert.match(active, /invalid fee_amount/);
+    assert.match(active, /new\.fee_amount < -1000 or new\.fee_amount > 1000/);
+    assert.doesNotMatch(active, /new\.fee_amount < 0/);
+    assert.match(active, /revoke insert, update on table public\.orders from anon/);
+    assert.match(active, /revoke insert, update on table public\.orders from authenticated/);
+    assert.match(active, /grant update \(\s*status,\s*delivery_slot,\s*issue_status\s*\) on table public\.orders to authenticated/);
+    assert.doesNotMatch(active, /grant update \([^)]*store_total/);
+    assert.doesNotMatch(active, /grant insert \([^)]*fee_amount/);
+    assert.match(pay, /runCapture/);
+    assert.match(pay, /alertOps/);
+    assert.match(pay, /sendTelegram/);
+    assert.match(pay, /payload\?\.dryRun !== false/);
+    assert.match(pay, /task === 'reconcile'/);
+    assert.match(capture, /CAPTURE_DB_ATTEMPTS = 4/);
+    assert.match(capture, /status === 'succeeded'/);
+    assert.match(capture, /amount_received/);
+    assert.match(capture, /capture_not_recorded/);
+    assert.match(notify, /sendTelegram\(text,/);
+    assert.match(notify, /\.slice\(0, TELEGRAM_MAX\)/);
   });
 });
