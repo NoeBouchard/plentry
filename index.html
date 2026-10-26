@@ -2336,6 +2336,21 @@ async function loadAdminMeals(){
   };
   window.__adminMealsErr="";
   if(!sb){window.__adminMeals=fallback();return window.__adminMeals;}
+  // meals_followups.sql takes table SELECT off authenticated, so source,
+  // created_by, and created_at are not on that grant. admin_read_meals()
+  // returns them only when is_admin_aal2(). Before the file is applied the
+  // function is missing and the table select below still works.
+  if(sb.rpc){
+    try{
+      const rpc=await sb.rpc("admin_read_meals");
+      if(rpc&&!rpc.error&&Array.isArray(rpc.data)&&rpc.data.length){
+        const rows=rpc.data.map(coerceMealRow);
+        window.__adminMeals=rows;
+        window.__adminMealsErr="";
+        return rows;
+      }
+    }catch(e){}
+  }
   const tries=[
     "id,name,emoji,time,category,ing,image_url,recipe,tags,portions,source,created_at,reviewed_at",
     "id,name,emoji,time,category,ing,recipe,tags,source,created_at,reviewed_at",

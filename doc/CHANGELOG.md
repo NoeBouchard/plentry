@@ -2,6 +2,16 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-25 — Meals column follow-ups (SQL written, not applied)
+
+- **Grants.** `supabase/meals_followups.sql` revokes table SELECT from authenticated and grants the same 11 catalogue columns as anon: `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off both grants. A column revoke does not stick while table SELECT remains, so the table grant is revoked.
+- **Admin read.** The Meals card shows `source` and `created_at`. `created_by` on advisor drafts is a customer id. Column grants are per role, so an aal2 admin cannot be given extra columns on `authenticated`. `admin_read_meals()` is security definer, checks `is_admin_aal2()`, and returns those columns plus the catalogue, including drafts. The Meals screen calls it when the function exists and otherwise keeps the table select. The card does not print `created_by`. `pay`, `newcoming`, and advisor writes use the service role and are unchanged. `ai`'s user-scoped read is `name, emoji, time, ing, tags`.
+- **Anon writes.** The file revokes anon INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER. Supabase grants those by default. TRUNCATE ignores row level security.
+- **Authenticated writes.** The same file revokes DELETE, TRUNCATE, REFERENCES, and TRIGGER from authenticated, and the commented rollback grants them back. INSERT and UPDATE stay, because admin insert and unpublish need them. Nothing in `index.html` or `supabase/functions` deletes a meal. Unpublish is an update of `reviewed_at`. `ai`, `pay`, and `newcoming` use the service role.
+- **Columns.** Any new public catalogue column on `meals` must be added to both grants in this file and to the anon grant in `meals_read_published.sql`.
+- **Why.** `meals_read_published.sql` is applied to prod (25 Oct 2026 12:59 GMT, after PR #28). Signed-in non-admins can still read `created_by` and `source` on published rows.
+- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. This follow-up does not change the SQL statements in `meals_read_published.sql`. Do not apply this from GitHub. PGlite runs both files in `npm test`. Production behaviour is unchanged until the file is pasted in the SQL editor.
+
 ## 2026-10-25 — Four more dinner photos that 404
 
 - **Photos.** Spanish tortilla with tomato salad, Beef stuffed peppers, Tomato & parmesan baked rice, and Tandoori-style yoghurt chicken with rice used Unsplash IDs that return 404 HTML. The potatoes ingredient fallback used the tortilla ID. Each now has its own working `images.unsplash.com` crop: potato omelette (`photo-1639669794539-952631b44515`, also the potatoes fallback), baked stuffed peppers in tomato sauce (`photo-1592119747782-d8c12c2ea267`), parmesan risotto (`photo-1633964913295-ceb43826e7c9`), and tandoori chicken (`photo-1617692855027-33b14f061079`). Updated in `index.html`, `supabase/meals_images.sql`, and `ai` (potatoes).

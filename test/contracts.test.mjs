@@ -749,6 +749,10 @@ describe("I-A13 published meals read (applied on prod 25 Oct 2026)", () => {
     assert.match(raw, /create policy "read meals" on public\.meals/);
     assert.match(raw, /using \(auth\.role\(\) = 'authenticated'\)/);
     assert.match(raw, /grant select on public\.meals to anon;/);
+    assert.match(schema, /applied in the SQL editor after PR #28/);
+    assert.match(schema, /Any new public catalogue column on public\.meals must be added to the anon/);
+    assert.match(schema, /PENDING, NOT APPLIED: supabase\/meals_followups\.sql/);
+    assert.doesNotMatch(schema, /PENDING, NOT APPLIED: supabase\/meals_read_published\.sql/);
     assert.match(schema, /APPLIED to prod 25 Oct 2026 12:59 GMT/);
     assert.match(schema, /supabase\/meals_read_published\.sql/);
     assert.match(schema, /create policy "read meals" on public\.meals/);
@@ -835,5 +839,82 @@ describe("I-A13 published meals read (applied on prod 25 Oct 2026)", () => {
     assert.match(adminFn, /if\(!isAdmin\(\)\)/);
     assert.match(adminFn, /source,created_at/);
     assert.match(adminFn, /\.from\("meals"\)\.select\(cols\)/);
+  });
+});
+
+describe("I-A14 meals follow-ups (pending SQL, not applied)", () => {
+  const raw = sqlBody("meals_followups.sql");
+  const published = sqlBody("meals_read_published.sql");
+  const active = stripSqlComments(raw);
+  const aiSrc = readFileSync(path.join(ROOT, "supabase/functions/ai/index.ts"), "utf8");
+  const paySrc = readFileSync(path.join(ROOT, "supabase/functions/pay/index.ts"), "utf8");
+  const newcoming = readFileSync(path.join(ROOT, "supabase/functions/newcoming/index.ts"), "utf8");
+
+  function grantColumns(src) {
+    const grants = [...src.matchAll(/grant select\s*\(([^)]+)\)\s*on table public\.meals\s+to anon,\s*authenticated/gi)];
+    assert.equal(grants.length, 1);
+    return grants[0][1].split(",").map((s) => s.trim().replace(/"/g, "")).filter(Boolean);
+  }
+
+  it("I-A14 is one pending transaction, not a migration, and does not edit the published-read file", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.equal(existsSync(path.join(ROOT, "supabase/meals_followups.sql")), true);
+    assert.match(raw, /PENDING/);
+    assert.match(raw, /Not applied/);
+    assert.match(raw, /Rollback/);
+    const begin = active.indexOf("begin;");
+    const commit = active.lastIndexOf("commit;");
+    assert.ok(begin >= 0 && commit > begin);
+    assert.equal(active.slice(commit + "commit;".length).trim(), "");
+    assert.doesNotMatch(active, /grant select on (table )?public\.meals to (anon|authenticated)/i);
+    assert.match(published, /grant select \(/);
+    assert.doesNotMatch(published, /admin_read_meals/);
+  });
+
+  it("I-A14 grants anon and authenticated the same 11 columns and revokes anon writes", () => {
+    const cols = grantColumns(active);
+    assert.deepEqual(cols, [
+      "id", "name", "emoji", "time", "ing", "image_url", "recipe", "tags",
+      "reviewed_at", "portions", "category",
+    ]);
+    const publishedCols = [...stripSqlComments(published).matchAll(/grant select\s*\(([^)]+)\)\s*on\s+public\.meals\s+to\s+anon/gi)];
+    assert.equal(publishedCols.length, 1);
+    const anonPublished = publishedCols[0][1].split(",").map((s) => s.trim()).filter(Boolean);
+    assert.deepEqual(cols, anonPublished);
+    assert.match(active, /revoke select on table public\.meals from anon, authenticated/);
+    assert.match(active, /revoke select \(created_by, source, created_at\) on table public\.meals from anon, authenticated/);
+    assert.match(active, /revoke insert, update, delete, truncate, references, trigger on table public\.meals from anon/);
+    assert.match(active, /revoke delete, truncate, references, trigger on table public\.meals from authenticated/);
+    assert.match(raw, /grant delete, truncate, references, trigger on table public\.meals to authenticated/);
+    assert.doesNotMatch(active, /revoke (insert|update)[^;]* from authenticated/);
+    assert.match(raw, /Any new public catalogue column/);
+    assert.doesNotMatch(active, /drop policy if exists "admin read meals"|drop policy if exists "admin insert meals"|drop policy if exists "admin update meals review"/);
+  });
+
+  it("I-A14 admin_read_meals is security definer and the client uses it only for admins", () => {
+    const begin = active.indexOf("begin;");
+    const commit = active.lastIndexOf("commit;");
+    const body = active.slice(begin, commit);
+    assert.match(body, /create function public\.admin_read_meals\(\)/);
+    assert.match(body, /security definer/);
+    assert.match(body, /set row_security = off/);
+    assert.match(body, /where public\.is_admin_aal2\(\)/);
+    assert.match(body, /created_by/);
+    assert.match(body, /revoke all on function public\.admin_read_meals\(\) from public/);
+    assert.match(body, /revoke all on function public\.admin_read_meals\(\) from anon, authenticated/);
+    assert.match(body, /grant execute on function public\.admin_read_meals\(\) to authenticated/);
+    assert.doesNotMatch(body, /grant execute on function public\.admin_read_meals\(\) to anon/);
+    const adminStart = html.indexOf("async function loadAdminMeals(");
+    const adminEnd = html.indexOf("function renderMeals(");
+    const adminFn = html.slice(adminStart, adminEnd);
+    assert.match(adminFn, /sb\.rpc\("admin_read_meals"\)/);
+    assert.match(adminFn, /if\(!isAdmin\(\)\)/);
+    const cardStart = html.indexOf("function mealCardOpsHtml(");
+    const card = html.slice(cardStart, adminStart);
+    assert.doesNotMatch(card, /created_by/);
+    assert.match(aiSrc, /ctx\.supabase\.from\('meals'\)\.select\('name,emoji,time,ing,tags'\)/);
+    assert.match(aiSrc, /ctx\.supabaseAdmin\.from\('meals'\)/);
+    assert.match(paySrc, /admin\.from\('meals'\)\.select\('name,emoji,time,ing,recipe,portions'\)/);
+    assert.match(newcoming, /ctx\.supabaseAdmin[\s\S]*\.from\('meals'\)[\s\S]*source,created_at/);
   });
 });

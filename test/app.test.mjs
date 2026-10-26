@@ -2894,6 +2894,77 @@ describe("ops", () => {
     assert.equal(JSON.stringify(Array.from(added.recipe.steps).slice(0, 2)), JSON.stringify(["Fry onions.", "Add beef and spices."]));
   });
 
+  it("I-A14 admin meals use admin_read_meals when it returns rows", async () => {
+    const secret = "22222222-2222-4222-8222-222222222222";
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: {
+        meals: [{ id: 99, name: "Table only dinner", emoji: "🍲", time: 20, source: "seed", reviewed_at: "2026-09-01T00:00:00.000Z", ing: ["rice"], tags: ["dinner", "vegetarian"], category: "rice_bowl", recipe: { steps: ["Boil."] } }],
+        profiles: [],
+        ingredient_prices: [],
+        orders: [],
+      },
+    });
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__mockSb.rpc = async (fn) => {
+      if (fn !== "admin_read_meals") return { data: null, error: { message: "missing" } };
+      return {
+        data: [{
+          id: 11,
+          name: "Draft keema",
+          emoji: "🍛",
+          time: 30,
+          ing: ["minced beef", "rice", "onions", "garlic", "curry paste", "salt", "black pepper"],
+          recipe: { steps: ["Brown the beef."], tip: "" },
+          tags: ["dinner", "meat"],
+          category: "curry_stew",
+          source: "advisor",
+          created_by: secret,
+          created_at: "2026-09-14T10:00:00.000Z",
+          reviewed_at: null,
+        }],
+        error: null,
+      };
+    };
+    await window.showMealsScreen();
+    const neu = document.getElementById("meals-new").textContent;
+    assert.ok(neu.includes("Draft keema"));
+    assert.ok(neu.includes("advisor"));
+    assert.ok(neu.includes("2026-09-14"));
+    assert.equal(neu.includes(secret), false);
+    assert.equal(document.getElementById("scr-meals").textContent.includes(secret), false);
+    assert.equal(document.getElementById("scr-meals").textContent.includes("Table only dinner"), false);
+  });
+
+  it("I-A14 admin meals still read the table when admin_read_meals is missing", async () => {
+    const draft = {
+      id: 11,
+      name: "Draft keema",
+      emoji: "🍛",
+      time: 30,
+      ing: ["minced beef", "rice", "onions", "garlic", "curry paste", "salt", "black pepper"],
+      recipe: { steps: ["Brown the beef."], tip: "" },
+      tags: ["dinner", "meat"],
+      category: "curry_stew",
+      source: "advisor",
+      created_at: "2026-09-14T10:00:00.000Z",
+      reviewed_at: null,
+    };
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: { meals: [draft], profiles: [], ingredient_prices: [], orders: [] },
+    });
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__mockSb.rpc = async () => ({ data: null, error: { message: "function admin_read_meals() does not exist" } });
+    await window.showMealsScreen();
+    const neu = document.getElementById("meals-new").textContent;
+    assert.ok(neu.includes("Draft keema"));
+    assert.ok(neu.includes("advisor"));
+    assert.ok(neu.includes("2026-09-14"));
+  });
+
   it("Live catalog lists every verified dinner from the week if the admin fetch is empty", async () => {
     const liveRows = extraMeals().map((m, i) => ({
       ...m,
