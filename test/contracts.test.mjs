@@ -751,7 +751,8 @@ describe("I-A13 published meals read (applied on prod 25 Oct 2026)", () => {
     assert.match(raw, /grant select on public\.meals to anon;/);
     assert.match(schema, /applied in the SQL editor after PR #28/);
     assert.match(schema, /Any new public catalogue column on public\.meals must be added to the anon/);
-    assert.match(schema, /PENDING, NOT APPLIED: supabase\/meals_followups\.sql/);
+    assert.match(schema, /APPLIED to prod 26 Oct 2026 ~15:42 GMT: supabase\/meals_followups\.sql/);
+    assert.doesNotMatch(schema, /PENDING, NOT APPLIED: supabase\/meals_followups\.sql/);
     assert.doesNotMatch(schema, /PENDING, NOT APPLIED: supabase\/meals_read_published\.sql/);
     assert.match(schema, /APPLIED to prod 25 Oct 2026 12:59 GMT/);
     assert.match(schema, /supabase\/meals_read_published\.sql/);
@@ -842,7 +843,7 @@ describe("I-A13 published meals read (applied on prod 25 Oct 2026)", () => {
   });
 });
 
-describe("I-A14 meals follow-ups (pending SQL, not applied)", () => {
+describe("I-A14 meals follow-ups (applied on prod 26 Oct 2026)", () => {
   const raw = sqlBody("meals_followups.sql");
   const published = sqlBody("meals_read_published.sql");
   const active = stripSqlComments(raw);
@@ -856,11 +857,12 @@ describe("I-A14 meals follow-ups (pending SQL, not applied)", () => {
     return grants[0][1].split(",").map((s) => s.trim().replace(/"/g, "")).filter(Boolean);
   }
 
-  it("I-A14 is one pending transaction, not a migration, and does not edit the published-read file", () => {
+  it("I-A14 is one transaction, not a migration, and does not edit the published-read file", () => {
     assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
     assert.equal(existsSync(path.join(ROOT, "supabase/meals_followups.sql")), true);
-    assert.match(raw, /PENDING/);
-    assert.match(raw, /Not applied/);
+    assert.match(raw, /APPLIED to prod 26 Oct 2026 ~15:42 GMT/);
+    assert.doesNotMatch(raw, /PENDING/);
+    assert.doesNotMatch(raw, /Not applied/);
     assert.match(raw, /Rollback/);
     const begin = active.indexOf("begin;");
     const commit = active.lastIndexOf("commit;");

@@ -1,4 +1,4 @@
--- Unapplied on purpose. Not a migration: keep this file out of supabase/migrations/.
+-- APPLIED to prod 26 Oct 2026 ~15:42 GMT. Not a migration: keep this file out of supabase/migrations/.
 -- Production public.meals.image_url still stores Unsplash IDs that return 404.
 -- Chrome blocks that HTML, so the dinner cards fail.
 -- Run by hand in the SQL editor. One update per meal name. Does not touch other rows.

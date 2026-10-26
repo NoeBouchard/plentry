@@ -1,4 +1,4 @@
--- Plentry — meals catalogue follow-ups. PENDING. Not applied to any database.
+-- Plentry — meals catalogue follow-ups. APPLIED to prod 26 Oct 2026 ~15:42 GMT.
 -- Paste this file in the Supabase SQL editor and run it there.
 -- Do not move it into supabase/migrations/. This repo has no migrations
 -- folder; the Supabase GitHub integration can auto-apply a file placed there.

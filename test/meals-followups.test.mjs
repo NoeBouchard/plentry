@@ -1,5 +1,5 @@
 // I-A14 — meals_read_published.sql plus meals_followups.sql, on PGlite.
-// Not applied to any database. The SQL files run only inside this process.
+// The SQL files run only inside this process.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -119,7 +119,7 @@ async function setMealSession(db, { admin, aal }) {
   await db.exec("set role authenticated");
 }
 
-describe("I-A14 meals follow-ups (PGlite, SQL not applied)", () => {
+describe("I-A14 meals follow-ups (PGlite)", () => {
   it("I-A14 anon is denied created_by, sees 0 drafts, and can read the catalogue columns", async () => {
     const db = await openMealsDb();
 

@@ -100,13 +100,17 @@ See the status table above. Live (DB 17 Sep, functions 17 Sep, static 18 Sep): S
 
 - `supabase/meals_read_published.sql` — **applied** to prod at 12:59 GMT on 25 Oct 2026. Do not put it in `supabase/migrations/`.
 
-## Open — SQL written, not applied
+## Closed on 26 Oct 2026 (production)
 
 | ID | Sev | Where | Finding | Status | Fix / test |
 |---|---|---|---|---|---|
-| S-19 | Medium | `public.meals` grants | After S-18, authenticated still has table SELECT, so a signed-in non-admin can read `created_by` and `source` on published rows. Advisor drafts store a customer id in `created_by`. Anon still has table INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER, and authenticated still has DELETE, TRUNCATE, REFERENCES, and TRIGGER. TRUNCATE ignores RLS, so a signed-in non-admin could empty `meals`. | **Open — file written, not applied** | `supabase/meals_followups.sql` (loose file, not `supabase/migrations/`). Same 11-column SELECT for authenticated. `admin_read_meals()` returns `source`, `created_by`, and `created_at` only when `is_admin_aal2()`. Anon write privileges revoked. Authenticated loses DELETE, TRUNCATE, REFERENCES, and TRIGGER and keeps INSERT and UPDATE. Any new public catalogue column must be added to the anon and authenticated column grants. Apply by pasting it in the SQL editor, then the check in [TESTING.md](TESTING.md). `I-A14` runs both SQL files on PGlite. |
+| ~~S-19~~ | Medium | `public.meals` grants | After S-18, authenticated still had table SELECT, so a signed-in non-admin could read `created_by` and `source` on published rows. Advisor drafts store a customer id in `created_by`. Anon still had table INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER, and authenticated still had DELETE, TRUNCATE, REFERENCES, and TRIGGER. TRUNCATE ignores RLS, so a signed-in non-admin could empty `meals`. | **Closed — applied 26 Oct 2026 ~15:42 GMT** | `supabase/meals_followups.sql` (loose file, not `supabase/migrations/`). Same 11-column SELECT for authenticated. `admin_read_meals()` returns `source`, `created_by`, and `created_at` only when `is_admin_aal2()`. Anon write privileges revoked. Authenticated loses DELETE, TRUNCATE, REFERENCES, and TRIGGER and keeps INSERT and UPDATE. Grants were as reviewed. Anon and authenticated each see 52 published meals and 0 drafts. The aal2 admin path is untested. `I-A14` still parses the file and runs it on PGlite. |
 
-- `supabase/meals_followups.sql` — **not applied**. Do not put it in `supabase/migrations/`. Never create `supabase/migrations/`. Treat any merge to `main` as a functions deploy.
+- `supabase/meals_followups.sql` — **applied** to prod at about 15:42 GMT on 26 Oct 2026. Do not put it in `supabase/migrations/`. Never create `supabase/migrations/`. Deploy to production is OFF. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If that setting is re-enabled, every merge redeploys all functions.
+
+## Open
+
+- Anon and authenticated still hold `MAINTAIN` on `public.meals`.
 
 ## Known accepted risks (do not “fix” without product sign-off)
 
