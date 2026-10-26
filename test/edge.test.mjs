@@ -702,6 +702,47 @@ describe("I-M10 capture split", () => {
     assert.doesNotMatch(dumped, /sk_live|sk_test|bot/);
   });
 
+  it("on PGRST204, saves amount_captured without the split and alerts that the columns are missing", async () => {
+    let n = 0;
+    const { calls, opts } = captureCalls({
+      updateOrder: async (id, patch) => {
+        n += 1;
+        calls.updates.push({ id, patch });
+        if (n === 1) {
+          return {
+            error: {
+              code: "PGRST204",
+              message: "Could not find the 'store_total' column of 'orders' in the schema cache",
+              details: null,
+              hint: null,
+            },
+            rows: 0,
+          };
+        }
+        return { error: null, rows: 1 };
+      },
+    });
+    const res = await runCapture(opts);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.live, true);
+    assert.equal(calls.captures.length, 1);
+    assert.equal(n, 2);
+    assert.equal(Object.prototype.hasOwnProperty.call(calls.updates[0].patch, "store_total"), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(calls.updates[0].patch, "fee_amount"), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(calls.updates[0].patch, "overrun_amount"), true);
+    assert.deepEqual(Object.keys(calls.updates[1].patch).sort(), ["amount_captured", "payment_status"]);
+    assert.equal(pence(calls.updates[1].patch.amount_captured), 2625);
+    assert.equal(calls.updates[1].patch.payment_status, "captured");
+    assert.equal(calls.alerts.length, 1);
+    assert.match(calls.alerts[0], /order #42/);
+    assert.match(calls.alerts[0], /pi_test_42/);
+    assert.match(calls.alerts[0], /£26\.25/);
+    assert.match(calls.alerts[0], /split wasn't recorded because the columns are missing/);
+    assert.equal(calls.logs[0].fields.error, "PGRST204");
+    const dumped = JSON.stringify(calls.logs) + calls.alerts.join("\n");
+    assert.doesNotMatch(dumped, /sk_live|sk_test|bot/);
+  });
+
   it("does not capture a PaymentIntent that already succeeded, and writes amount_received", async () => {
     const { calls, opts } = captureCalls({
       amountGbp: undefined,

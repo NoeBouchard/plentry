@@ -99,7 +99,11 @@ function money(n: number): string {
 const SPLIT_COLUMNS = ['store_total', 'fee_amount', 'overrun_amount'] as const
 
 function isUndefinedColumn(error: unknown): boolean {
-  return !!error && typeof error === 'object' && (error as { code?: string }).code === '42703'
+  if (!error || typeof error !== 'object') return false
+  const code = (error as { code?: string }).code
+  // 42703 is Postgres undefined_column. supabase-js hits PostgREST first:
+  // PGRST204, HTTP 400, "Could not find the '…' column … in the schema cache".
+  return code === '42703' || code === 'PGRST204'
 }
 
 function patchHasSplit(patch: Record<string, unknown>): boolean {
@@ -143,7 +147,8 @@ async function writeOrder(
       let res = await updateOrder(id, writing)
       // Missing split columns (pay deployed before the SQL). The full patch
       // cannot succeed. Save amount_captured and payment_status without it.
-      if (!droppedSplit && isUndefinedColumn(res.error) && patchHasSplit(writing)) {
+      const missingCode = isUndefinedColumn(res.error) ? (res.error as { code?: string }).code : ''
+      if (!droppedSplit && missingCode && patchHasSplit(writing)) {
         writing = withoutSplit(writing)
         droppedSplit = true
         res = await updateOrder(id, writing)
@@ -155,7 +160,7 @@ async function writeOrder(
             order_id: safeId(id),
             payment_intent: safeId(paymentIntent),
             amount_captured: money(amountCaptured),
-            error: '42703',
+            error: missingCode,
           })
           await notify(
             alert,

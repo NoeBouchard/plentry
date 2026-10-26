@@ -131,9 +131,9 @@ Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner` 
 
 ## Capture split (pending)
 
-Not applied. Not deployed. `supabase/orders_capture_split.sql` is a loose file (sha256 `d61941ce6f427a28c978742d69af3445e690712bb2b9e52c5c3413d94ab7bbec`). Header says **PENDING, not applied**. Do not put it in `supabase/migrations/`.
+Not applied. Not deployed. `supabase/orders_capture_split.sql` is a loose file (sha256 `15146e29c11c273cf5a3d2bc653091e4a243aa36f96a4bb18b6abca78636a022`). Header says **PENDING, not applied**. Do not put it in `supabase/migrations/`.
 
-**Order.** Apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. `notify-order` behaviour is unchanged. It imports the changed `_shared/telegram.ts`, so the previous bundle must not stay live beside the new `pay`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing (Postgres `42703`), `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. Apply the SQL first so the split is stored.
+**Order.** Apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. `notify-order` behaviour is unchanged. It imports the changed `_shared/telegram.ts`, so the previous bundle must not stay live beside the new `pay`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing, `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. supabase-js reports that as PostgREST `PGRST204` (HTTP 400, schema cache: could not find the column) before Postgres `42703`. Both codes take that fallback. Apply the SQL first so the split is stored.
 
 ```bash
 cd plentry

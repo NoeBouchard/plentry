@@ -960,10 +960,13 @@ describe("I-M10 capture split SQL (pending, not applied)", () => {
     assert.match(capture, /amount_received/);
     assert.match(capture, /capture_not_recorded/);
     assert.match(capture, /code === '42703'/);
+    assert.match(capture, /code === 'PGRST204'/);
     assert.match(capture, /split wasn't recorded because the columns are missing/);
     assert.match(raw, /notify-order/);
     assert.match(raw, /reopens client writes/);
     assert.match(raw, /completion_email_status/);
+    assert.match(raw, /PGRST204/);
+    assert.match(raw, /42703/);
     assert.match(notify, /sendTelegram\(text,/);
     assert.match(notify, /\.slice\(0, TELEGRAM_MAX\)/);
   });

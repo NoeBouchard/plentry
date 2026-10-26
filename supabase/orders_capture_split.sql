@@ -9,8 +9,10 @@
 -- same update as amount_captured. notify-order imports the same
 -- _shared/telegram.ts. Its behaviour does not change. If the columns are
 -- missing, pay retries without them so amount_captured still saves, and
--- alerts that the split was not recorded. Apply the SQL first so the
--- split is stored.
+-- alerts that the split was not recorded. supabase-js reports a missing
+-- column as PostgREST PGRST204 (HTTP 400, schema cache) before Postgres
+-- 42703. Both are the same fallback. Apply the SQL first so the split
+-- is stored.
 --
 -- Units are pounds, the same as amount_captured and amount_held (the
 -- authorised hold). Old rows stay null. Accounts backfills those in the books.
