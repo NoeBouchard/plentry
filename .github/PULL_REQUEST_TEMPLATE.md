@@ -9,7 +9,7 @@
 - [ ] **Security** — if this touches `pay/`, `stripe-webhook`, RLS/SQL, capture, XSS, or the `index.html` money path: `/review-security` (and `/review-bugbot`) before merge. Secrets stay out of git and `doc/`.
 - [ ] **Tests** — `npm test` exits 0 locally.
 - [ ] **Vault** — if behaviour changed: `CURRENT-STATE.md`, `CHANGELOG.md`, and `npm run vault` (workspace `doc/` → `plentry/doc/`).
-- [ ] **Deploy** — this PR does **not** ship production. Since PR #12 (15 Oct 2026) a merge to `main` does not auto-deploy production (it did from 13 Oct until `git.deploymentEnabled.main` was set false). Founder asks after merge: follow [doc/RUNBOOK.md](doc/RUNBOOK.md) (REST create with `autoAssignCustomDomains: false`, confirm READY, then promote; `pay` only if it changed).
+- [ ] **Deploy** — this PR does not ship static. A merge to `main` does redeploy every edge function about 40s later (Supabase GitHub integration, Deploy to production on), with code identical to that commit. Static stays on the REST create (`autoAssignCustomDomains: false`) and promote in [doc/RUNBOOK.md](doc/RUNBOOK.md). Do not add `supabase/migrations/`. Since PR #12 (15 Oct 2026) `git.deploymentEnabled.main` is false, so static does not auto-deploy (it did from 13 Oct until then).
 
 ## Test plan
 

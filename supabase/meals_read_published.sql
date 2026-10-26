@@ -1,4 +1,4 @@
--- Plentry — published-meals read. PENDING. Not applied to any database.
+-- Plentry — published-meals read. APPLIED to prod 25 Oct 2026 12:59 GMT.
 -- Paste this file in the Supabase SQL editor and run it there.
 -- Do not move it into supabase/migrations/. This repo has no migrations
 -- folder; the Supabase GitHub integration can auto-apply a file placed there.
