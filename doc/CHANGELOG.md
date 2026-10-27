@@ -2,28 +2,46 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
-## 2026-10-25 — Meals column follow-ups (SQL written, not applied)
+## 2026-10-26 — Revoke MAINTAIN on meals (SQL written; not applied)
+
+- **Open.** Anon and authenticated still hold `MAINTAIN` on `public.meals`.
+- **SQL.** `supabase/meals_revoke_maintain.sql` revokes that privilege in one transaction: `revoke maintain on table public.meals from anon, authenticated`. The header says `PENDING, not applied`. The commented rollback is `grant maintain on table public.meals to anon, authenticated`. Loose file, not a migration. Not applied. Do not move it into `supabase/migrations/`. It does not change the 11-column SELECT grants.
+- **Tests.** The contract test parses the revoke and the commented rollback. PGlite is Postgres 18, so it also runs the file: afterwards anon and authenticated lack `MAINTAIN` and still have the 11-column SELECT.
+
+## 2026-10-26 15:34 GMT — production ship (PR #31, #30, #32)
+
+- **Merged:** all squash, on 26 Oct 2026. PR #31 `4425f41134532850f5ef00d022955f7d77fa22b4` at 15:10:57 GMT. PR #30 `df0c53e00f8e9af8a734fae5daeb4944a6dec3b6` at 15:18:29 GMT. PR #32 `89c84c1beb26aec0453e76dd06aae8b0b7a85894` at 15:26:07 GMT.
+- **Deploy to production:** Noé turned the Supabase GitHub integration setting off on 25/26 Oct 2026. After these three merges all 6 edge functions were unchanged and the Supabase Preview check was skipped.
+- **Static:** `dpl_4DarVmBySV9ujJq3Lrdn7MJgDx93` from `89c84c1b`. Promoted at 15:34:52 GMT.
+- **Rollback:** `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp`.
+- **SQL:** `supabase/fix_meal_photos.sql` was applied to prod at about 15:42 GMT (8 rows). Applied file sha256 `199130acc9e977f7f068adbd6538509b67b50be723ce4c8d8964d7b9fc2e2729`. `supabase/meals_followups.sql` was applied to prod at about 15:42 GMT. Applied file sha256 `af014769bf7444bb464a7fb37448f278c67ea5872fa6801aa5bc818e05907fb8`. Both are loose files, not migrations. This vault stamps each header `APPLIED to prod 26 Oct 2026 ~15:42 GMT`. SQL statements are byte-identical to the applied files. Stamped sha256 `2f8957c2bee8e0b0d343b7aa5f8a5403a653b38e71436ff1cfe2388ec3139f78` (`fix_meal_photos.sql`) and `9d0b16af6e63c43e9ef4d26d4a662155800c7b56dd3332bfc6892ca04761be15` (`meals_followups.sql`).
+- **Checks:** 52 of 52 photos return 200. Grants were as reviewed. Anon and authenticated each see 52 published meals and 0 drafts. The aal2 admin path is untested.
+- **Open:** anon and authenticated still hold `MAINTAIN` on `public.meals`.
+- **Edge functions:** `ai` was hand-deployed from v51 to v52 at 15:44:08 GMT on 26 Oct 2026 (`supabase functions deploy ai`, under a GO). `pay` v52, `checkout` v44, `notify-order` v45, `stripe-webhook` v43, and `newcoming` v37 are unchanged. These merges did not redeploy functions.
+- **Vault only.** This entry records the ship. It does not deploy.
+
+## 2026-10-25 — Meals column follow-ups (SQL written; applied 26 Oct 2026)
 
 - **Grants.** `supabase/meals_followups.sql` revokes table SELECT from authenticated and grants the same 11 catalogue columns as anon: `id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category`. `created_by`, `source`, and `created_at` stay off both grants. A column revoke does not stick while table SELECT remains, so the table grant is revoked.
 - **Admin read.** The Meals card shows `source` and `created_at`. `created_by` on advisor drafts is a customer id. Column grants are per role, so an aal2 admin cannot be given extra columns on `authenticated`. `admin_read_meals()` is security definer, checks `is_admin_aal2()`, and returns those columns plus the catalogue, including drafts. The Meals screen calls it when the function exists and otherwise keeps the table select. The card does not print `created_by`. `pay`, `newcoming`, and advisor writes use the service role and are unchanged. `ai`'s user-scoped read is `name, emoji, time, ing, tags`.
 - **Anon writes.** The file revokes anon INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER. Supabase grants those by default. TRUNCATE ignores row level security.
 - **Authenticated writes.** The same file revokes DELETE, TRUNCATE, REFERENCES, and TRIGGER from authenticated, and the commented rollback grants them back. INSERT and UPDATE stay, because admin insert and unpublish need them. Nothing in `index.html` or `supabase/functions` deletes a meal. Unpublish is an update of `reviewed_at`. `ai`, `pay`, and `newcoming` use the service role.
 - **Columns.** Any new public catalogue column on `meals` must be added to both grants in this file and to the anon grant in `meals_read_published.sql`.
-- **Why.** `meals_read_published.sql` is applied to prod (25 Oct 2026 12:59 GMT, after PR #28). Signed-in non-admins can still read `created_by` and `source` on published rows.
-- **Not applied.** Loose file under `supabase/`, not `supabase/migrations/`. This follow-up does not change the SQL statements in `meals_read_published.sql`. Do not apply this from GitHub. PGlite runs both files in `npm test`. Production behaviour is unchanged until the file is pasted in the SQL editor.
+- **Why.** `meals_read_published.sql` is applied to prod (25 Oct 2026 12:59 GMT, after PR #28). Signed-in non-admins could still read `created_by` and `source` on published rows until this file was applied.
+- **Applied** 26 Oct 2026 at about 15:42 GMT. See the production-ship entry above. Loose file under `supabase/`, not `supabase/migrations/`. This follow-up does not change the SQL statements in `meals_read_published.sql`. Do not apply this from GitHub. The header says APPLIED. PGlite still runs both files in `npm test`. Grants were as reviewed. Anon and authenticated each see 52 published meals and 0 drafts. The aal2 admin path is untested. Anon and authenticated still hold `MAINTAIN` on `public.meals`.
 
 ## 2026-10-25 — Four more dinner photos that 404
 
 - **Photos.** Spanish tortilla with tomato salad, Beef stuffed peppers, Tomato & parmesan baked rice, and Tandoori-style yoghurt chicken with rice used Unsplash IDs that return 404 HTML. The potatoes ingredient fallback used the tortilla ID. Each now has its own working `images.unsplash.com` crop: potato omelette (`photo-1639669794539-952631b44515`, also the potatoes fallback), baked stuffed peppers in tomato sauce (`photo-1592119747782-d8c12c2ea267`), parmesan risotto (`photo-1633964913295-ceb43826e7c9`), and tandoori chicken (`photo-1617692855027-33b14f061079`). Updated in `index.html`, `supabase/meals_images.sql`, and `ai` (potatoes).
-- **Database.** A read-only check found the old URLs on Spanish tortilla with tomato salad, Creamy Spinach & Feta Baked Potatoes, Beef stuffed peppers, Tandoori-style yoghurt chicken with rice, and Baked tomato & basil risotto. No row is named Tomato & parmesan baked rice. `supabase/fix_meal_photos.sql` adds one update per name, including that seed name, and keeps the old URLs in the commented rollback. It was not applied.
-- **Not deployed.** No production static ship and no SQL apply. No `pay` change.
+- **Database.** A read-only check found the old URLs on Spanish tortilla with tomato salad, Creamy Spinach & Feta Baked Potatoes, Beef stuffed peppers, Tandoori-style yoghurt chicken with rice, and Baked tomato & basil risotto. No row is named Tomato & parmesan baked rice. `supabase/fix_meal_photos.sql` adds one update per name, including that seed name, and keeps the old URLs in the commented rollback. Applied to prod 26 Oct 2026 at about 15:42 GMT (8 rows). See the production-ship entry.
+- **Shipped** 26 Oct 2026. Static `dpl_4DarVmBySV9ujJq3Lrdn7MJgDx93` from `89c84c1b`, promoted 15:34:52 GMT. No `pay` change.
 
 ## 2026-10-25 — Three dinner photos that 404
 
 - **Photos.** Chicken parm-style bake, Beef & bell pepper tacos, and Salmon tacos with lemon yoghurt used Unsplash IDs that return 404 HTML. Chrome blocks that response, so the cards failed. Each dinner now has its own working `images.unsplash.com` crop: chicken parm (`photo-1632778149955-e80f8ceca2e8`), beef tacos (`photo-1599974579688-8dbdd335c77f`), fish tacos with a white sauce and lime (`photo-1696935191484-7677e929b0dc`). The two taco dinners no longer share a photo. The tortillas ingredient fallback used the dead taco ID, so it now uses the beef taco photo (`index.html`, `supabase/meals_images.sql`, `ai`).
-- **Database.** Production `meals.image_url` still has the old URLs. `supabase/fix_meal_photos.sql` is one update per meal inside a transaction, with a commented rollback. It is not under `migrations/` and was not applied.
+- **Database.** `supabase/fix_meal_photos.sql` is one update per meal inside a transaction, with a commented rollback. It is not under `migrations/`. Applied to prod 26 Oct 2026 at about 15:42 GMT (8 rows). See the production-ship entry.
 - **Left at this commit.** Four other seed photo IDs still 404. The next entry replaces them.
-- **Not deployed.** No production static ship and no SQL apply. No `pay` change.
+- **Shipped** 26 Oct 2026 in the production-ship entry above. No `pay` change.
 
 ## 2026-10-25 13:14 GMT — production ship (PR #27, #28, #29)
 
@@ -75,7 +93,7 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Log in.** The header **Log in** opens email and password. Under that form, **Don't have an account?** opens the existing sign-up form (name, email, password). Sign-up still offers **Already have an account? Log in**.
 - **Sign up stays sign up.** New week, choosing or swapping a dinner, meal details, the meal advisor, and checkout confirm without an account still open sign-up (**Create an account…**). The later guard **Log in so we can take the card hold** opens login. Onboarding does not ask for an account.
 - **Why.** Log in was opening the sign-up form, with only a small Log in link underneath.
-- **Static:** `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. Same Supabase email/password calls. No auth config, no SQL, and this change does not edit edge-function source. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. PR #26 shipped after this. The 25 Oct ship is the current static.
+- **Static:** `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. Same Supabase email/password calls. No auth config, no SQL, and this change does not edit edge-function source. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. PR #26 shipped after this. The 26 Oct ship is the current static.
 
 ## 2026-10-21 — Cupboard pictures
 
@@ -180,7 +198,7 @@ Vault history of **functional** product changes. Newest first. Agents append her
 ## 2026-10-15 — main no longer auto-deploys static
 
 - **Git.** `vercel.json` `git.deploymentEnabled` is `{ "main": false }`. `github.enabled` is the deprecated key; this uses the current one. Any branch left out stays enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch.
-- **Why.** From 13 Oct 2026 a merge to `main` auto-deployed static while `pay` was treated as a separate step. The 13 Oct ship was mismatched for about 37 seconds. Vercel static after this commit is the REST create (`autoAssignCustomDomains: false`; a logged-in founder CLI is `vercel deploy --prod --yes --skip-domain`) and a promote. The Supabase GitHub integration still redeploys every edge function on the merge. Do not run a second functions deploy for that SHA. A docs-only merge does not promote static and does not apply loose SQL.
+- **Why.** From 13 Oct 2026 a merge to `main` auto-deployed static while `pay` was treated as a separate step. The 13 Oct ship was mismatched for about 37 seconds. Vercel static after this commit is the REST create (`autoAssignCustomDomains: false`; a logged-in founder CLI is `vercel deploy --prod --yes --skip-domain`) and a promote. From 15 Oct until 25/26 Oct the Supabase GitHub integration redeployed every edge function on a merge to `main`. Deploy to production is now off. Functions deploy by hand with `supabase functions deploy <name>` or MCP, under a GO. If that setting is re-enabled, every merge redeploys all functions. A docs-only merge does not promote static and does not apply loose SQL. Never create `supabase/migrations/`.
 - **Edge functions.** The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. This commit turns the Vercel Git hook off once it is on `main`. It does not alias getplentry.com. Production static at that moment was still the 13 Oct deployment. The PR #15 ship the same day (entry above) is the later static. Production static after this commit is the REST create (`autoAssignCustomDomains: false`) and a promote.
 
 ## 2026-10-14 — Docs: record the 13 Oct production ship (PR #11)

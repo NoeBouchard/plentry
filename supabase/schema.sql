@@ -81,7 +81,7 @@ alter table public.meals enable row level security;
 -- Any new public catalogue column on public.meals must be added to the anon
 -- column grant and to the authenticated column grant. Do not add created_by
 -- or source.
--- PENDING, NOT APPLIED: supabase/meals_followups.sql is a loose file in
+-- APPLIED to prod 26 Oct 2026 ~15:42 GMT: supabase/meals_followups.sql is a loose file in
 -- supabase/, not a migration. It revokes authenticated table SELECT, grants
 -- the same 11 columns to anon and authenticated, adds admin_read_meals()
 -- (is_admin_aal2()), revokes anon INSERT, UPDATE, DELETE, TRUNCATE,
