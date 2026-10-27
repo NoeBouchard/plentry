@@ -110,7 +110,7 @@ curl -sS \
   -H "Authorization: Bearer $VERCEL_TOKEN"
 ```
 
-Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. A one-shot `vercel deploy --prod` without `--skip-domain` aliases getplentry.com as soon as the upload finishes. Do not use it when `pay` also changes. From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), a merge to `main` auto-deployed static to production through Vercel's Git integration. Production ships after that are the REST create and promote in this section. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy static from `main`. Other branches still get preview deployments. Edge functions do not deploy on that merge. See [Functions](#functions). Shared-basket, static, and docs-only merges are in [Shipping pay and static together](#shipping-pay-and-static-together). `--skip-domain` is the current flag (it must be used with `--prod`). It builds the production deployment and leaves the domains on the previous one until `vercel promote`.
+Bare `vercel deploy --prod --yes` can return **Not authorized**; the team scope is required. A one-shot `vercel deploy --prod` without `--skip-domain` aliases getplentry.com as soon as the upload finishes. Do not use it when `pay` also changes. From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), a merge to `main` auto-deployed static to production through Vercel's Git integration. Production ships after that are the REST create and promote in this section. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`, so a merge does not deploy static from `main`. Other branches still get preview deployments. Edge functions do not deploy on that merge. Deploy to production is OFF. See [Functions](#functions). Shared-basket, static, and docs-only merges are in [Shipping pay and static together](#shipping-pay-and-static-together). `--skip-domain` is the current flag (it must be used with `--prod`). It builds the production deployment and leaves the domains on the previous one until `vercel promote`.
 
 **Logged out?** Vercel CLI 59 keeps its session in `~/Library/Application Support/com.vercel.cli/auth.json`; when it is missing, `vercel whoami` prints *Logged out* and the scoped deploy fails with *You do not have access to the specified account*. Fix: `vercel login` (device flow — opens vercel.com, approve, back to the terminal), confirm `vercel whoami` → `noebouchard`, re-run the deploy. Never run `vercel teams list` / `vercel login` from an unattended agent: it blocks on the browser step.
 
@@ -151,13 +151,15 @@ Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not dep
 
 ## Functions
 
-**Hand deploy under a GO.** As of 26 Oct 2026 Accounts says the Supabase GitHub integration's Deploy to production is off (project `ucciqthwxnlkjalwlhvh`). A merge to `main` does not deploy edge functions. Until that date the integration (Deploy to production ON, production branch `main`) redeployed all `supabase/functions/*` about 40s after any push to `main`, even when the commit did not touch those files. GitHub shows it as the **Supabase Preview** check on `main` commits. `pay` was v33 after PR #10 on 13 Oct 2026. Nineteen merges to `main` since then, each with one auto-deploy, left `pay` at v52 (25 Oct 2026, 13:10:17 GMT, the deploy after #29). Ship functions with the command below, under a GO, after `npm test` exits 0. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` files are not auto-applied. Static does not ride along: `git.deploymentEnabled.main` is false.
+**Deploy to production is OFF.** Noé turned the Supabase GitHub integration setting off on 25/26 Oct 2026 (project `ucciqthwxnlkjalwlhvh`, production branch `main`). A merge to `main` does not deploy edge functions. After the #31, #30, and #32 merges, all 6 functions were unchanged and the Supabase Preview check was skipped. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If Deploy to production is ever re-enabled, every merge to `main` redeploys all `supabase/functions/*`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` files are not auto-applied. Static does not ride along: `git.deploymentEnabled.main` is false.
 
-That command is the deploy. It is also the rollback path. Do not run it twice for the same SHA: a second deploy bumps the version again.
+From 13 Oct 2026 until that setting was turned off, the integration redeployed all functions about 40s after any push to `main`, even when the commit did not touch those files. GitHub showed it as the **Supabase Preview** check. `pay` was v33 after PR #10 on 13 Oct 2026. Nineteen merges to `main` in that period, each with one auto-deploy, left `pay` at v52 (25 Oct 2026, 13:10:17 GMT, the deploy after #29). The 26 Oct merges did not move it.
+
+A hand deploy is the only deploy while the setting is off. `npm test` has to exit 0 first. The same command is the rollback path. Capture split is a separate order: apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` together. See [Capture split (pending)](#capture-split-pending).
 
 ```bash
 cd plentry
-npm test && supabase functions deploy ai checkout pay stripe-webhook notify-order newcoming
+npm test && supabase functions deploy <name>
 ```
 
 CLI needs `supabase-go` on PATH if the shim complains. `_shared/ratelimit.ts` and `_shared/orders.ts` are bundled into every function that imports them — redeploy **all** importers when a shared file changes (`ai`, `checkout`, `pay`, `stripe-webhook`, `notify-order`). `_shared/capture.ts` is imported by `pay`. `_shared/telegram.ts` is imported by `pay` and `notify-order`. The CLI bundles those imports. A dashboard upload has to pass each file.
@@ -183,9 +185,9 @@ Use the full sequence when a change edits the shared basket: `supabase/functions
 
 From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), a merge to `main` auto-deployed static immediately through Vercel's Git integration, and `pay` was a separate `supabase functions deploy pay`. The new static was already on https://getplentry.com while `pay` was still the previous version. On 13 Oct 2026 that gap was about 37 seconds. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`. A merge does not deploy static from `main`. Branches left out of that object stay enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch. `github.enabled` is the deprecated switch; do not use it.
 
-The Supabase GitHub integration is a different switch. Until 26 Oct 2026 it was on: every push to `main` redeployed all six edge functions about 40s later. Accounts says Deploy to production is now off. See [Functions](#functions). `pay` was v33 after the 13 Oct ship and is v52 after the 25 Oct #29 deploy (13:10:17 GMT).
+The Supabase GitHub integration is a different switch, and Deploy to production is OFF (Noé, 25/26 Oct 2026). A merge does not redeploy edge functions. See [Functions](#functions). `pay` was v33 after the 13 Oct ship and is still v52 from the 25 Oct #29 deploy (13:10:17 GMT). `ai` was hand-deployed from v51 to v52 at 15:44:08 GMT on 26 Oct 2026.
 
-The default ship is below. Merge on GO does not deploy functions or static. Deploy the changed functions by hand under a GO (`npm test`, then `supabase functions deploy` for those functions), then build static from the merge SHA without moving the domains, confirm the function version, then promote straight away. When the functions changed, the customer-facing gap is new functions with the previous static, from the hand deploy until the promote.
+The default ship is below. Merge on GO. When a function changed, deploy that function by hand (`supabase functions deploy <name>` or MCP) under a GO, after `npm test` on the merge SHA. Do not deploy functions that did not change. Build static from the merge SHA without moving the domains, confirm the hand deploy, then promote straight away. When the functions changed, the customer-facing gap is new functions with the previous static, from the hand deploy until the promote.
 
 ### What a mismatch does
 
@@ -221,7 +223,7 @@ curl -sS \
 # readyState READY, readySubstate STAGED. getplentry.com still points at the previous deployment.
 ```
 
-Deploy `pay` from that same SHA by hand under a GO before you promote. Do not call `deploy_edge_function` twice for this SHA. A second deploy bumps the version again. `deploy_edge_function` is the hand-deploy path and the rollback path:
+When `pay` changed, deploy it by hand from that same SHA before you promote. `supabase functions deploy pay` or MCP, under a GO. `npm test` has to be green. A deploy bumps the version. `deploy_edge_function` is that same hand path, and the rollback path:
 
 - project `ucciqthwxnlkjalwlhvh`
 - name `pay`
@@ -232,7 +234,8 @@ Deploy `pay` from that same SHA by hand under a GO before you promote. Do not ca
 ```bash
 supabase functions list --project-ref ucciqthwxnlkjalwlhvh
 # pay: ACTIVE, verify_jwt true. Read the version. Do not invent it.
-# v52 is only the 25 Oct 2026 13:10:17 GMT deploy. A later hand deploy moves it by one.
+# v52 is the 25 Oct 2026 13:10:17 GMT deploy. The 26 Oct merges did not move it.
+# ai was hand-deployed from v51 to v52 at 15:44:08 GMT on 26 Oct 2026.
 ```
 
 Straight away:
@@ -254,15 +257,15 @@ curl -sS \
   -H "Authorization: Bearer $VERCEL_TOKEN"
 ```
 
-Then the smoke checks below. Until the promote, the live site is the previous static. After the hand deploy, `pay` is this SHA. Promote as soon as the version check passes.
+Then the smoke checks below. Until the promote, the live site is the previous static. When `pay` changed, the hand deploy is this SHA. Promote as soon as the version check passes.
 
 ### Static-only
 
-The change is `index.html` outside the shared basket block, `sw.js`, `manifest.json`, `icons/`, `vendor/`, or the security headers in `vercel.json`, and `pay` and `_shared` did not change. Merge on GO. A merge does not deploy edge functions. From the merge SHA: `npm test`, then the REST create (`autoAssignCustomDomains: false`) or the founder CLI `vercel deploy --prod --yes --skip-domain`, confirm READY, then promote and confirm the aliases. With `VERCEL_TOKEN`, use the REST create, READY poll, promote, and `GET /v13/deployments/getplentry.com` from [Production static](#production-static). There is no pay/static code mismatch. The 15 Oct 2026 PR #15 ship is that REST path. See [Ship log](#ship-log).
+The change is `index.html` outside the shared basket block, `sw.js`, `manifest.json`, `icons/`, `vendor/`, or the security headers in `vercel.json`, and `pay` and `_shared` did not change. Merge on GO. Do not deploy functions when they did not change. Deploy to production is OFF, so the merge does not redeploy them. From the merge SHA: `npm test`, then the REST create (`autoAssignCustomDomains: false`) or the founder CLI `vercel deploy --prod --yes --skip-domain`, confirm READY, then promote and confirm the aliases. With `VERCEL_TOKEN`, use the REST create, READY poll, promote, and `GET /v13/deployments/getplentry.com` from [Production static](#production-static). There is no pay/static code mismatch. The 15 Oct 2026 PR #15 ship is that REST path. See [Ship log](#ship-log).
 
 ### Docs-only
 
-The merge only changes `doc/`, the README, or other files `.vercelignore` already excludes, and it does not change `pay`, `_shared`, or the static allow-list (`index.html`, `sw.js`, `manifest.json`, `icons/`, `vendor/`, `vercel.json`). Nothing to build or promote, and loose SQL is not applied. A merge does not deploy edge functions. Never create `supabase/migrations/`.
+The merge only changes `doc/`, the README, or other files `.vercelignore` already excludes, and it does not change `pay`, `_shared`, or the static allow-list (`index.html`, `sw.js`, `manifest.json`, `icons/`, `vendor/`, `vercel.json`). Nothing to build, promote, or deploy. Deploy to production is OFF, so the merge does not redeploy edge functions. Loose SQL is not applied. Never create `supabase/migrations/`.
 
 ### Rollback
 
@@ -277,9 +280,9 @@ Before you ship, note the deployment id getplentry.com already points at, and th
 
 `vercel rollback` with no id rolls back to the previous production deployment. Passing an older id than that previous one needs a Pro plan; promoting the recorded previous deployment id works on either plan. Confirm `vercel inspect` aliases and `supabase functions list` (`pay` version, ACTIVE, `verify_jwt` true), then the smoke checks.
 
-A static ship whose function source did not change has nothing to roll back on the functions. If you have not promoted, do nothing to the domains. If you have, `vercel rollback` or promote the previous deployment id. A docs-only merge changes no function behaviour and does not deploy functions.
+A static ship whose function source did not change has nothing to roll back on the functions: they were not deployed. If you have not promoted, do nothing to the domains. If you have, `vercel rollback` or promote the previous deployment id. A docs-only merge changes no function behaviour and deploys nothing, so there is nothing to roll back.
 
-While Vercel auto-deploy of static was on, the interim orders were: deploy `pay` from the PR head and then merge, when the new hold was lower or equal; or merge first and then deploy `pay`, when the new hold was higher. The 13 Oct garam masala ship was the second of those (about 37s). Those orders are not the ship anymore. Until 26 Oct 2026 the Supabase integration redeployed functions on the merge itself. Accounts says that switch is now off, so functions are a hand deploy under a GO.
+While Vercel auto-deploy of static was on, the interim orders were: deploy `pay` from the PR head and then merge, when the new hold was lower or equal; or merge first and then deploy `pay`, when the new hold was higher. The 13 Oct garam masala ship was the second of those (about 37s). Those orders are not the ship anymore. Deploy to production is OFF. A function moves only when someone runs `supabase functions deploy <name>` or MCP under a GO. If that setting is re-enabled, every merge redeploys all functions.
 
 ### Post-ship checks
 
@@ -312,6 +315,17 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 
 Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
 
+### 2026-10-26 15:34 GMT — PR #31, #30, #32, static + SQL + ai
+
+All squash, on 26 Oct 2026. PR #31 `4425f41134532850f5ef00d022955f7d77fa22b4` at 15:10:57 GMT. PR #30 `df0c53e00f8e9af8a734fae5daeb4944a6dec3b6` at 15:18:29 GMT. PR #32 `89c84c1beb26aec0453e76dd06aae8b0b7a85894` at 15:26:07 GMT. Deploy to production is OFF. After these three merges all 6 edge functions were unchanged and the Supabase Preview check was skipped.
+
+- **Static:** `dpl_4DarVmBySV9ujJq3Lrdn7MJgDx93` from `89c84c1b`. Promoted at 15:34:52 GMT.
+- **Rollback:** `dpl_E3gKjdssEyFx6NXbaNsLQo5Zvrbp`.
+- **SQL:** `supabase/fix_meal_photos.sql` applied to prod at about 15:42 GMT (8 rows). Applied file sha256 `199130acc9e977f7f068adbd6538509b67b50be723ce4c8d8964d7b9fc2e2729`. `supabase/meals_followups.sql` applied to prod at about 15:42 GMT. Applied file sha256 `af014769bf7444bb464a7fb37448f278c67ea5872fa6801aa5bc818e05907fb8`. Both are loose files, not migrations. The repo headers say `APPLIED to prod 26 Oct 2026 ~15:42 GMT`. SQL statements are byte-identical to the applied files. Stamped sha256 `2f8957c2bee8e0b0d343b7aa5f8a5403a653b38e71436ff1cfe2388ec3139f78` (`fix_meal_photos.sql`) and `9d0b16af6e63c43e9ef4d26d4a662155800c7b56dd3332bfc6892ca04761be15` (`meals_followups.sql`).
+- **Checks:** 52 of 52 photos return 200. Grants were as reviewed. Anon and authenticated each see 52 published meals and 0 drafts. The aal2 admin path is untested.
+- **Open:** anon and authenticated still hold `MAINTAIN` on `public.meals`.
+- **Edge functions:** `ai` was hand-deployed from v51 to v52 at 15:44:08 GMT (`supabase functions deploy ai`, under a GO). `pay` v52, `checkout` v44, `notify-order` v45, `stripe-webhook` v43, and `newcoming` v37 are unchanged. These merges did not redeploy functions.
+
 ### 2026-10-25 13:14 GMT — PR #27, #28, #29, static + SQL + edge functions
 
 All squash, on 25 Oct 2026. PR #27 `fix/review-followups` `ca43eb1749a349804cb2845d639d9967e781f46e`. PR #28 `fix/meals-read-published` `31a864f2005b5a9f92ceec8b380bdbc750692a07`. PR #29 `fix/seeded-tiebreak` `7d1d53ace5ec9883802c4ca5f3bb92b7470699ec`. A 0p share that still owns a basket line shows the price. **From your cupboard** stays for a dinner with no basket line. New week and Modify break equal scores with the week's seed. Anon and a signed-in non-admin read published meals only.
@@ -329,7 +343,7 @@ Squash `7f1453ea4722de15b4bdf0aae07a2f2ff681d859`. Dinner prices are each dinner
 
 ### 2026-10-23 — PR #25, static
 
-Squash `f1f37b0e0bad5eff14912e9097b9d59e69b37e37`. Header **Log in** opens the login form. Production deployment `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. No SQL. The 25 Oct ship is the current static.
+Squash `f1f37b0e0bad5eff14912e9097b9d59e69b37e37`. Header **Log in** opens the login form. Production deployment `dpl_69A69HuoPVqFbH22V1GggvgR9rdX`. The merge also auto-redeployed all edge functions through the Supabase GitHub integration, with code identical to `main` at that commit. No SQL. The 26 Oct ship is the current static.
 
 ### 2026-10-19 — PR #19, CI and docs
 

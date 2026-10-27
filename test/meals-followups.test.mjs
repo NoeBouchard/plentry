@@ -1,5 +1,5 @@
 // I-A14 — meals_read_published.sql plus meals_followups.sql, on PGlite.
-// Not applied to any database. The SQL files run only inside this process.
+// The SQL files run only inside this process.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -7,6 +7,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 const publishedSql = readFileSync(new URL("../supabase/meals_read_published.sql", import.meta.url), "utf8");
 const followupsSql = readFileSync(new URL("../supabase/meals_followups.sql", import.meta.url), "utf8");
+const maintainSql = readFileSync(new URL("../supabase/meals_revoke_maintain.sql", import.meta.url), "utf8");
 
 const CATALOGUE = [
   "id", "name", "emoji", "time", "ing", "image_url", "recipe", "tags",
@@ -119,7 +120,7 @@ async function setMealSession(db, { admin, aal }) {
   await db.exec("set role authenticated");
 }
 
-describe("I-A14 meals follow-ups (PGlite, SQL not applied)", () => {
+describe("I-A14 meals follow-ups (PGlite)", () => {
   it("I-A14 anon is denied created_by, sees 0 drafts, and can read the catalogue columns", async () => {
     const db = await openMealsDb();
 
@@ -293,6 +294,46 @@ describe("I-A14 meals follow-ups (PGlite, SQL not applied)", () => {
       { id: 2, name: "Draft stew" },
       { id: 3, name: "Admin stew" },
     ]);
+    await db.close();
+  });
+
+  it("anon and authenticated lack MAINTAIN after meals_revoke_maintain.sql and keep the 11 catalogue columns", async () => {
+    const db = await openMealsDb();
+    await db.exec(publishedSql);
+    await db.exec(followupsSql);
+    await db.exec(SEED_MEALS);
+    for (const role of ["anon", "authenticated"]) {
+      assert.equal(
+        await privilege(db, `select has_table_privilege('${role}','public.meals','MAINTAIN') as ok`),
+        true,
+        `${role} starts with MAINTAIN`,
+      );
+    }
+
+    await db.exec(maintainSql);
+
+    for (const role of ["anon", "authenticated"]) {
+      assert.equal(
+        await privilege(db, `select has_table_privilege('${role}','public.meals','MAINTAIN') as ok`),
+        false,
+        role,
+      );
+      for (const col of CATALOGUE) {
+        assert.equal(
+          await privilege(db, `select has_column_privilege('${role}','public.meals','${col}','SELECT') as ok`),
+          true,
+          `${role} ${col}`,
+        );
+      }
+    }
+
+    await db.exec("set role anon");
+    const published = await db.query(`
+      select id, name, emoji, time, ing, image_url, recipe, tags, reviewed_at, portions, category
+      from public.meals
+    `);
+    assert.equal(published.rows.length, 1);
+    assert.equal(published.rows[0].name, "Published stew");
     await db.close();
   });
 });
