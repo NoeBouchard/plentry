@@ -186,6 +186,19 @@ function sleep(ms) {
  * @param {object} [opts.mfa] fake `sb.auth.mfa` (see mockMfa); omitted = no MFA surface
  * @param {function} [opts.confirm] replaces window.confirm before the app script runs
  */
+// A saved week in these tests is the catalog the customer already had.
+// An empty meals table is a successful read, so the app no longer fills it
+// with built-in dinners. Publish the saved menu so boot does not wipe the week.
+function publishSavedMeals(tables, localState) {
+  const saved = localState && Array.isArray(localState.menuOptions) ? localState.menuOptions : [];
+  if (!saved.length || !Array.isArray(tables.meals) || tables.meals.length) return;
+  tables.meals = saved.filter((m) => m && m.name).map((m, i) => ({
+    ...m,
+    id: m.id == null ? 1000 + i : m.id,
+    reviewed_at: m.reviewed_at || "2026-09-01T00:00:00.000Z",
+  }));
+}
+
 export async function loadApp(opts = {}) {
   const tables = opts.tables || {
     meals: [],
@@ -193,6 +206,7 @@ export async function loadApp(opts = {}) {
     profiles: [],
     ingredient_prices: [],
   };
+  publishSavedMeals(tables, opts.localState);
   let html = readFileSync(INDEX, "utf8");
   // Drop the vendored supabase-js tag; the fake client is injected in beforeParse.
   html = html.replace(/<script src="\/vendor\/supabase-js-[0-9.]+\.js"><\/script>\s*/, "");

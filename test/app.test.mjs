@@ -588,14 +588,23 @@ describe("week and modify", () => {
   });
 
   it("addAdvisorMeals cannot grow the week past prefs.meals", async () => {
-    const { window } = await loadApp({ localState: weekState() });
+    const published = extraMeals().map((m, i) => ({
+      ...m,
+      id: 300 + i,
+      reviewed_at: "2026-09-01T00:00:00.000Z",
+      tags: ["dinner", "meat"],
+    }));
+    const { window } = await loadApp({
+      localState: weekState(),
+      tables: { meals: published, orders: [], profiles: [], ingredient_prices: [] },
+    });
     const S = window.__plentry.state();
     const n = S.prefs.meals;
     assert.equal(S.selected.length, n);
     const extras = extraMeals().filter((m) => !S.selected.includes(m.name)).slice(0, 3);
     assert.ok(extras.length >= 2);
     window.__plentry.setAdvisor(extras, extras.map((_, i) => i));
-    window.addAdvisorMeals();
+    await window.addAdvisorMeals();
     assert.equal(S.selected.length, n);
     assert.ok(S.selected.includes(extras[0].name));
   });
@@ -800,6 +809,265 @@ describe("week and modify", () => {
   });
 });
 
+describe("I-W09 hidden meals", () => {
+  const ING = ["chicken thighs", "rice", "onions", "garlic"];
+  function row(id, name, category, reviewed) {
+    return {
+      id,
+      name,
+      emoji: "🍽️",
+      time: 30,
+      ing: ING.slice(),
+      tags: ["dinner", "meat"],
+      category,
+      reviewed_at: reviewed,
+    };
+  }
+
+  it("I-W09 ensureWeek swaps hidden and unknown dinners and shows the notice", async () => {
+    const liveCurry = row(20, "Live curry", "curry_stew", "2026-09-08T12:00:00.000Z");
+    const livePasta = row(21, "Live pasta", "pasta", "2026-09-08T12:00:00.000Z");
+    const liveBake = row(22, "Live bake", "oven_bake", "2026-09-08T12:00:00.000Z");
+    const hiddenCurry = row(151, "Hidden curry", "curry_stew", null);
+    const hiddenTray = row(162, "Hidden traybake", "oven_bake", null);
+    const meals = [liveCurry, livePasta, liveBake, hiddenCurry, hiddenTray];
+    const state = weekState();
+    state.selected = ["Live bake"];
+    state.menuOptions = [liveBake];
+    state.prefs.diet = "omnivore";
+    state.prefs.tags = [];
+    state.prefs.goals = [];
+    const { window } = await loadApp({
+      localState: state,
+      tables: { meals, orders: [], profiles: [], ingredient_prices: [] },
+    });
+    await window.ensureWeek();
+    const S = window.__plentry.state();
+    assert.deepEqual(Array.from(S.selected), ["Live bake"]);
+    assert.equal(S.menuOptions.some((m) => m.name === "Hidden curry"), false);
+    assert.equal(S.menuOptions.some((m) => m.name === "Hidden traybake"), false);
+    assert.equal(window.__plentry.isPublished(hiddenCurry), false);
+    assert.deepEqual(Array.from(window.__plentry.publishedPool([hiddenCurry]).map((m) => m.name)), []);
+
+    const selects = [];
+    const orig = window.__mockSb.from.bind(window.__mockSb);
+    window.__mockSb.from = (table) => {
+      if (table !== "meals") return orig(table);
+      const q = {
+        _cols: "",
+        select(cols) { this._cols = String(cols); selects.push(this._cols); return this; },
+        eq() { return this; },
+        order() { return this; },
+        limit() { return this; },
+        then(ok, err) {
+          const cols = this._cols;
+          if (cols.includes("recipe")) {
+            return Promise.resolve({ data: null, error: { message: "column recipe does not exist" } }).then(ok, err);
+          }
+          const keep = cols.split(",").map((s) => s.trim());
+          const data = meals.map((meal) => {
+            const out = {};
+            for (const c of keep) if (Object.prototype.hasOwnProperty.call(meal, c)) out[c] = meal[c];
+            return out;
+          });
+          return Promise.resolve({ data, error: null }).then(ok, err);
+        },
+      };
+      return q;
+    };
+
+    S.selected = ["Hidden curry", "Lemon chicken & parmesan rice", "Live bake"];
+    await window.ensureWeek();
+    const fallback = selects.find((cols) => !cols.includes("recipe"));
+    assert.ok(fallback, "fallback catalog query ran");
+    assert.equal(fallback.includes("id"), true, fallback);
+    assert.equal(fallback.includes("reviewed_at"), true, fallback);
+    assert.equal(S.selected[0], "Live curry");
+    assert.equal(S.selected[2], "Live bake");
+    assert.equal(S.selected.length, 3);
+    assert.equal(S.selected.includes("Hidden curry"), false);
+    assert.equal(S.selected.includes("Hidden traybake"), false);
+    assert.equal(S.selected.includes("Lemon chicken & parmesan rice"), false);
+    S.selected.forEach((name) => {
+      const meal = S.menuOptions.find((m) => m.name === name);
+      assert.ok(meal, name);
+      assert.equal(window.__plentry.isPublished(meal), true, name);
+    });
+    assert.equal(S.menuOptions.some((m) => m.id === 151 || m.id === 162), false);
+    const notice = window.document.getElementById("week-swap-notice");
+    assert.ok(notice);
+    assert.equal(notice.textContent, "We swapped 2 meals that are no longer available.");
+    const saved = JSON.parse(window.localStorage.getItem("plentry_v1"));
+    assert.deepEqual(saved.selected, Array.from(S.selected));
+    assert.equal(saved.selected.includes("Hidden curry"), false);
+    assert.equal(saved.selected.includes("Lemon chicken & parmesan rice"), false);
+
+    const kept = Array.from(S.selected);
+    await window.ensureWeek();
+    assert.deepEqual(Array.from(S.selected), kept);
+    assert.equal(window.document.getElementById("week-swap-notice").textContent, "We swapped 2 meals that are no longer available.");
+  });
+
+  it("I-W09 placeOrder refuses a hidden or unknown dinner and does not insert", async () => {
+    const liveBake = row(22, "Live bake", "oven_bake", "2026-09-08T12:00:00.000Z");
+    const hiddenCurry = row(151, "Hidden curry", "curry_stew", null);
+    const state = weekState();
+    state.user = { id: "u1", email: "t@t.com", name: "T" };
+    state.selected = ["Live bake"];
+    state.menuOptions = [liveBake];
+    state.prefs.delivery = null;
+    const { window, document } = await loadApp({
+      localState: state,
+      session: { id: "u1", email: "t@t.com", name: "T" },
+      tables: {
+        meals: [liveBake, hiddenCurry, row(162, "Hidden traybake", "oven_bake", null)],
+        orders: [],
+        profiles: [],
+        ingredient_prices: [],
+      },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    S.selected = ["Hidden curry", "Lemon chicken & parmesan rice", "Live bake"];
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    assert.ok(window.__plentry.getBasket().length > 0);
+    window.confirmOrder();
+    window.__chosenSlot = { date: window.slotDays()[0], start: "08:00" };
+    document.getElementById("del-name").value = "Noe";
+    document.getElementById("del-phone").value = "07123456789";
+    document.getElementById("del-line1").value = "1 Test Street";
+    document.getElementById("del-city").value = "London";
+    document.getElementById("del-postcode").value = "E2 8AA";
+    await window.placeOrder();
+    assert.equal(window.__sbTables.orders.length, 0);
+    assert.match(document.getElementById("del-err").textContent, /Refresh your week/);
+    assert.match(document.getElementById("del-err").textContent, /no longer available/);
+
+    S.selected = ["Live bake"];
+    window.syncBasketFromMeals();
+    await window.placeOrder();
+    assert.equal(window.__sbTables.orders.length, 1);
+    assert.deepEqual(Array.from(window.__sbTables.orders[0].items.meals), ["Live bake"]);
+  });
+
+  it("I-W09 an advisor draft stays off the week and shows the review message", async () => {
+    const liveBake = row(22, "Live bake", "oven_bake", "2026-09-08T12:00:00.000Z");
+    const liveCurry = row(20, "Live curry", "curry_stew", "2026-09-08T12:00:00.000Z");
+    const draft = row(401, "Advisor chilli", "curry_stew", null);
+    const state = weekState();
+    state.selected = ["Live bake"];
+    state.menuOptions = [liveBake];
+    state.prefs.meals = 3;
+    state.prefs.diet = "omnivore";
+    state.prefs.tags = [];
+    state.prefs.goals = [];
+    const { window, document } = await loadApp({
+      localState: state,
+      tables: { meals: [liveBake, liveCurry, draft], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    await window.ensureWeek();
+    const S = window.__plentry.state();
+    assert.deepEqual(Array.from(S.selected), ["Live bake"]);
+    const idea = { name: "Advisor chilli", emoji: "🌶️", time: 30, ing: ING.slice(), tags: ["dinner", "meat"] };
+    const known = { name: "Live curry", emoji: "🍛", time: 30, ing: ING.slice(), tags: ["dinner", "meat"] };
+    window.__plentry.setAdvisor([idea, known], [0, 1]);
+    await window.addAdvisorMeals();
+    assert.equal(S.selected.includes("Advisor chilli"), false);
+    assert.equal(S.menuOptions.some((m) => m.name === "Advisor chilli"), false);
+    assert.equal(S.selected.includes("Live curry"), true);
+    assert.equal(S.selected.includes("Live bake"), true);
+    const notice = document.getElementById("advisor-review-notice");
+    assert.ok(notice);
+    assert.equal(notice.textContent, "We've sent this idea to our kitchen to review.");
+  });
+
+  it("I-W09 placeOrder refusal swaps the week and shows the notice", async () => {
+    const liveCurry = row(20, "Live curry", "curry_stew", "2026-09-08T12:00:00.000Z");
+    const livePasta = row(21, "Live pasta", "pasta", "2026-09-08T12:00:00.000Z");
+    const liveBake = row(22, "Live bake", "oven_bake", "2026-09-08T12:00:00.000Z");
+    const hiddenCurry = row(151, "Hidden curry", "curry_stew", null);
+    const state = weekState();
+    state.user = { id: "u1", email: "t@t.com", name: "T" };
+    state.selected = ["Live bake"];
+    state.menuOptions = [liveBake];
+    state.prefs.delivery = null;
+    state.prefs.diet = "omnivore";
+    state.prefs.tags = [];
+    state.prefs.goals = [];
+    const { window, document } = await loadApp({
+      localState: state,
+      session: { id: "u1", email: "t@t.com", name: "T" },
+      tables: {
+        meals: [liveCurry, livePasta, liveBake, hiddenCurry],
+        orders: [],
+        profiles: [],
+        ingredient_prices: [],
+      },
+    });
+    const S = window.__plentry.state();
+    await window.ensureWeek();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    S.selected = ["Hidden curry", "Lemon chicken & parmesan rice", "Live bake"];
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    window.confirmOrder();
+    window.__chosenSlot = { date: window.slotDays()[0], start: "08:00" };
+    document.getElementById("del-name").value = "Noe";
+    document.getElementById("del-phone").value = "07123456789";
+    document.getElementById("del-line1").value = "1 Test Street";
+    document.getElementById("del-city").value = "London";
+    document.getElementById("del-postcode").value = "E2 8AA";
+    await window.placeOrder();
+    assert.equal(window.__sbTables.orders.length, 0);
+    assert.equal(S.selected.includes("Hidden curry"), false);
+    assert.equal(S.selected.includes("Lemon chicken & parmesan rice"), false);
+    assert.equal(S.selected.includes("Live bake"), true);
+    assert.equal(S.selected[0], "Live curry");
+    assert.equal(S.selected.length, 3);
+    const notice = document.getElementById("week-swap-notice");
+    assert.ok(notice);
+    assert.equal(notice.textContent, "We swapped 2 meals that are no longer available.");
+    window.syncBasketFromMeals();
+    window.confirmOrder();
+    window.__chosenSlot = { date: window.slotDays()[0], start: "08:00" };
+    document.getElementById("del-name").value = "Noe";
+    document.getElementById("del-phone").value = "07123456789";
+    document.getElementById("del-line1").value = "1 Test Street";
+    document.getElementById("del-city").value = "London";
+    document.getElementById("del-postcode").value = "E2 8AA";
+    await window.placeOrder();
+    assert.equal(window.__sbTables.orders.length, 1);
+    assert.equal(window.__sbTables.orders[0].items.meals.includes("Hidden curry"), false);
+    assert.equal(window.__sbTables.orders[0].items.meals.includes("Lemon chicken & parmesan rice"), false);
+  });
+
+  it("I-W09 a successful catalog read leaves out built-ins that are not in the database", async () => {
+    const liveBake = row(22, "Live bake", "oven_bake", "2026-09-08T12:00:00.000Z");
+    const hiddenSalmon = row(151, "Salmon traybake", "oven_bake", null);
+    const state = weekState();
+    state.selected = ["Live bake"];
+    state.menuOptions = [liveBake];
+    state.prefs.diet = "omnivore";
+    state.prefs.tags = [];
+    state.prefs.goals = [];
+    const { window } = await loadApp({
+      localState: state,
+      tables: { meals: [liveBake, hiddenSalmon], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    await window.ensureWeek();
+    const S = window.__plentry.state();
+    const names = S.menuOptions.map((m) => m.name);
+    assert.equal(names.includes("Live bake"), true);
+    assert.equal(names.includes("Salmon traybake"), false);
+    assert.equal(names.includes("Chicken & chickpea curry"), false);
+    assert.equal(names.includes("Shakshuka"), false);
+    assert.equal(window.mealByName("Chicken & chickpea curry"), null);
+    assert.equal(window.mealByName("Salmon traybake"), null);
+    assert.deepEqual(Array.from(S.selected), ["Live bake"]);
+  });
+});
+
 describe("seeded tie-break", () => {
   const ING = ["minced beef", "spaghetti", "onions", "garlic", "passata"];
   function tied(id, tags) {
@@ -861,9 +1129,12 @@ describe("seeded tie-break", () => {
   it("I-W08 a pinned seed repeats the New week sequence, and Modify stays on that week", async () => {
     const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((id) => tied(id));
     async function run(seed, how) {
+      const state = weekState();
+      state.menuOptions = pool.map((m) => ({ ...m, ing: m.ing.slice(), tags: m.tags.slice() }));
+      state.selected = state.menuOptions.slice(0, state.prefs.meals).map((m) => m.name);
       const { window } = await loadApp({
         url: how === "query" ? "https://getplentry.com/?seed=" + seed : "https://getplentry.com/",
-        localState: weekState(),
+        localState: state,
         tables: { meals: pool, orders: [], profiles: [], ingredient_prices: [] },
       });
       signIn(window);
@@ -1092,6 +1363,20 @@ describe("Modify alternatives", () => {
     if (opts.meals) S.prefs.meals = opts.meals;
     S.selected = (opts.selected || FALLBACK_WEEK).slice();
     if (opts.menuOptions) S.menuOptions = opts.menuOptions;
+    else {
+      const have = new Set((S.menuOptions || []).map((m) => m.name));
+      S.selected.forEach((name) => {
+        if (!name || have.has(name)) return;
+        S.menuOptions.push({
+          name,
+          emoji: "🍽️",
+          time: 30,
+          ing: ["chicken thighs", "rice", "onions", "garlic"],
+          tags: ["dinner", "meat"],
+        });
+        have.add(name);
+      });
+    }
     return S;
   }
   function pickNames(window) {
