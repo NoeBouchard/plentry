@@ -164,6 +164,22 @@ describe("source contracts", () => {
     assert.match(notify, /function fmtIssue/);
   });
 
+  it("I-O16 the slot step, its render, and the insert payload stay, with no default day", () => {
+    assert.match(html, /id="slot-days"/);
+    assert.match(html, /id="slot-wins"/);
+    assert.match(html, /class="slot-step"/);
+    assert.match(html, /\$\{slotPickerHtml\(\)\}/);
+    assert.match(html, /from\("orders"\)\.insert\(\{[\s\S]*?slot_date:slot\.slot_date,slot_start:slot\.slot_start,slot_end:slot\.slot_end,/);
+    assert.doesNotMatch(html, /chosen\.date\|\|days\[0\]/);
+    assert.match(html, /id="confirm-btn" \$\{slotReady\?"":"disabled"\}/);
+    assert.match(html, /if\(startNorm&&!date\)/);
+    assert.match(html, /aria-describedby="slot-prompt"/);
+    assert.match(html, /Choose a delivery day and time to continue/);
+    assert.match(html, /aria-pressed="\$\{day===ymd\?"true":"false"\}"/);
+    assert.match(html, /aria-pressed="\$\{on\?"true":"false"\}"/);
+    assert.match(html, /if\(date&&!slotDays\(\)\.includes\(date\)\)window\.__chosenSlot=null/);
+  });
+
   it("I-A04 supabase-js is vendored and pinned; no third-party script at runtime (S-07)", () => {
     const tag = html.match(/<script src="(\/vendor\/supabase-js-([0-9.]+)\.js)"><\/script>/);
     assert.ok(tag, "vendored script tag present");

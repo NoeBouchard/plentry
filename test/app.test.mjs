@@ -2921,6 +2921,90 @@ describe("ops", () => {
     assert.ok(form.includes("Address line 1"));
   });
 
+  it("I-O16 a time tap does not invent a day, and a day tap keeps the typed address", async () => {
+    const { window, document } = await loadApp({
+      localState: { ...weekState(), user: { id: "u1", email: "t@t.com", name: "T" } },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    S.prefs.delivery = null;
+    window.__chosenSlot = null;
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    window.confirmOrder();
+    assert.equal(document.getElementById("confirm-btn").disabled, true);
+    assert.equal(document.getElementById("confirm-btn").getAttribute("aria-describedby"), "slot-prompt");
+    assert.equal(document.getElementById("slot-prompt").textContent, "Choose a delivery day and time to continue");
+    assert.match(document.getElementById("slot-hint").textContent, /day/i);
+    assert.ok(document.getElementById("slot-days"));
+    assert.ok(document.getElementById("slot-wins"));
+    const timeBtn = document.querySelector("#slot-wins button");
+    assert.equal(timeBtn.disabled, true);
+    assert.doesNotMatch(timeBtn.getAttribute("onclick") || "", new RegExp(window.slotDays()[0]));
+    timeBtn.click();
+    window.pickSlot("", "08:00");
+    const invented = window.__chosenSlot || {};
+    assert.notEqual(invented.date, window.slotDays()[0]);
+    assert.ok(!invented.date, "a time without a day must not store a date");
+    assert.equal(document.getElementById("confirm-btn").disabled, true);
+    assert.match(document.getElementById("slot-hint").textContent, /does not pick a day/);
+    assert.equal(document.getElementById("slot-prompt").textContent, "Choose a delivery day and time to continue");
+
+    document.getElementById("del-line1").value = "99 Half Typed Road";
+    document.getElementById("del-phone").value = "07123";
+    window.pickSlot(window.slotDays()[0], "");
+    assert.equal(document.getElementById("del-line1").value, "99 Half Typed Road");
+    assert.equal(document.getElementById("del-phone").value, "07123");
+    assert.equal(document.getElementById("confirm-btn").disabled, true, "a day alone is not a window");
+    assert.equal(document.getElementById("slot-prompt").textContent, "Choose a delivery day and time to continue");
+    assert.equal(document.querySelector("#slot-days button.sel").getAttribute("aria-pressed"), "true");
+    assert.equal(document.querySelector("#slot-wins button").disabled, false);
+    assert.equal(document.querySelector("#slot-wins button").getAttribute("aria-pressed"), "false");
+    window.pickSlot(window.slotDays()[0], "10:00");
+    assert.equal(document.getElementById("del-line1").value, "99 Half Typed Road");
+    assert.equal(document.getElementById("del-phone").value, "07123");
+    assert.equal(document.getElementById("confirm-btn").disabled, false);
+    assert.equal(document.getElementById("confirm-btn").getAttribute("aria-describedby"), null);
+    assert.equal(document.getElementById("slot-prompt"), null);
+    assert.equal(document.querySelector("#slot-wins button.sel").getAttribute("aria-pressed"), "true");
+    assert.match(document.getElementById("modal").textContent, /Be in for this window/);
+    assert.equal(window.__chosenSlot.date, window.slotDays()[0]);
+    assert.equal(window.__chosenSlot.start, "10:00");
+  });
+
+  it("I-O16 a day outside the window is cleared, with its time", async () => {
+    const { window, document } = await loadApp({
+      localState: { ...weekState(), user: { id: "u1", email: "t@t.com", name: "T" } },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    S.prefs.delivery = null;
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    const live = window.slotDays()[0];
+    window.__chosenSlot = { date: live, start: "10:00" };
+    window.confirmOrder();
+    assert.equal(window.__chosenSlot.date, live);
+    assert.equal(window.__chosenSlot.start, "10:00");
+    assert.equal(document.getElementById("confirm-btn").disabled, false);
+
+    const stale = window.addYmd(live, -1);
+    assert.ok(!window.slotDays().includes(stale));
+    window.__chosenSlot = { date: stale, start: "08:00" };
+    window.confirmOrder();
+    assert.equal(window.__chosenSlot, null);
+    assert.equal(document.querySelector("#slot-days button.sel"), null);
+    assert.equal(document.querySelector("#slot-days button[aria-pressed='true']"), null);
+    assert.equal(document.querySelector("#slot-wins button").disabled, true);
+    assert.equal(document.querySelector("#slot-wins button[aria-pressed='true']"), null);
+    assert.equal(document.getElementById("confirm-btn").disabled, true);
+    assert.equal(document.getElementById("slot-prompt").textContent, "Choose a delivery day and time to continue");
+    window.pickSlot(stale, "10:00");
+    assert.equal(window.__chosenSlot, null);
+    assert.equal(document.querySelector("#slot-wins button").disabled, true);
+    assert.equal(document.getElementById("confirm-btn").disabled, true);
+  });
+
   it("I-O09 first checkout with no saved address shows the door form only", async () => {
     const { window, document } = await loadApp({
       localState: { ...weekState(), user: { id: "u1", email: "t@t.com", name: "T" } },
