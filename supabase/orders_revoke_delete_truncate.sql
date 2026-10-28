@@ -1,4 +1,4 @@
--- Plentry — revoke DELETE and TRUNCATE on public.orders. PENDING, not applied.
+-- Plentry — revoke DELETE and TRUNCATE on public.orders. APPLIED to prod 28 Oct 2026 ~15:41:55 GMT.
 -- Apply with Supabase SQL (execute_sql). Not a migration.
 -- Do not move it into supabase/migrations/. This repo has no migrations
 -- folder; a file placed there auto-applies to prod on merge.

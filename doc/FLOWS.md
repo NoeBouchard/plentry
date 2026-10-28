@@ -35,7 +35,7 @@ Confirm shows **Deliver to this address?** (name, address, **phone**) when Profi
 
 ## Customer receipt — did it all arrive? (written, not live)
 
-`supabase/order_received.sql` is **PENDING, not applied**. Status values stay new, ordered, delivered. An order is complete when `received_confirmed_at` is set. After that file is applied and this static is promoted:
+`supabase/order_received.sql` was **applied to prod on 28 Oct 2026 at ~15:35:50 GMT**. Status values stay new, ordered, delivered. An order is complete when `received_confirmed_at` is set. After that file is applied and this static is promoted:
 
 1. The Orders badge counts only the signed-in customer's own delivered orders that are not yet confirmed.
 2. Those cards ask **Did it all arrive?** **Yes, complete** calls `confirm_order_received` (`received_confirmed_by = 'customer'`, and the row must be that customer's). The button disables while the request is in flight. A failure says **We couldn't confirm this just now, please try again**, enables the button, and reloads the list. **Something's wrong** opens the existing issue thread. The line says auto-completes in X hours, counted from `delivered_at` plus 48. An open issue replaces that line with **Paused while an issue is open**.

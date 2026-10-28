@@ -1,4 +1,4 @@
-// I-O19 — order_received.sql on PGlite. Not applied to any database.
+// I-O19 — order_received.sql on PGlite only. The file was applied to prod on 28 Oct 2026 ~15:35:50 GMT; this test never touches prod.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -45,7 +45,7 @@ async function flagUpdate(db, statement) {
   }
 }
 
-describe("I-O19 order receipt (PGlite, SQL not applied)", () => {
+describe("I-O19 order receipt (PGlite)", () => {
   it("I-O19 backfill is generic, insert resets, the stamp and guard hold, and a confirmed order cannot leave delivered", async () => {
     const db = new PGlite();
     await db.exec(FIXTURE);
