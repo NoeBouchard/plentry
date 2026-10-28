@@ -63,7 +63,7 @@ async function denied(db, statement) {
   assert.fail(`expected permission denied: ${statement}`);
 }
 
-describe("I-M10 capture split columns (PGlite, SQL not applied)", () => {
+describe("I-M10 capture split columns (PGlite)", () => {
   it("I-M10 old rows stay null, INSERT forces the split null, and a negative fee is allowed", async () => {
     const db = new PGlite();
     await db.exec(FIXTURE);

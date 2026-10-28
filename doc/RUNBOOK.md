@@ -129,25 +129,38 @@ Then open the app, DevTools console: no `Refused to …` CSP lines while loading
 
 Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner` (then `cd plentry`).
 
-## Capture split (pending)
+## Capture split (applied)
 
-Not applied. Not deployed. `supabase/orders_capture_split.sql` is a loose file (sha256 `15146e29c11c273cf5a3d2bc653091e4a243aa36f96a4bb18b6abca78636a022`). Header says **PENDING, not applied**. Do not put it in `supabase/migrations/`.
+Applied and deployed on 28 Oct 2026. PR #35 squash-merged to main as `ea90a314bbe55af000e41d3bc0f34bd9569ad151` at 12:02:45 GMT. `supabase/orders_capture_split.sql` was applied to prod at about 12:04 GMT. The header says **APPLIED to prod 28 Oct 2026 ~12:04 GMT**. SQL statements are unchanged from the pending file (sha256 `15146e29c11c273cf5a3d2bc653091e4a243aa36f96a4bb18b6abca78636a022`). Stamped sha256 `e7f214da066d0205bfa6ea734e62b157cadbfd0c3207e7c3773a4ffead96b139`. Loose file, not a migration. Do not put it in `supabase/migrations/`. Do not apply it again.
 
-**Order.** Apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. `notify-order` behaviour is unchanged. It imports the changed `_shared/telegram.ts`, so the previous bundle must not stay live beside the new `pay`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing, `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. supabase-js reports that as PostgREST `PGRST204` (HTTP 400, schema cache: could not find the column) before Postgres `42703`. Both codes take that fallback. Apply the SQL first so the split is stored.
+`notify-order` was hand-deployed as v46 at 12:04 GMT. `pay` was hand-deployed as v53 at 12:05 GMT. No static deploy. Other functions were unchanged: `ai` v52, `checkout` v44, `stripe-webhook` v43, `newcoming` v37. `notify-order` behaviour is unchanged. It imports `_shared/telegram.ts`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing, `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. supabase-js reports that as PostgREST `PGRST204` (HTTP 400, schema cache: could not find the column) before Postgres `42703`. Both codes take that fallback.
+
+Deploy to production is off, so this ship was a hand apply and two hand deploys. The merge itself did not deploy the functions.
+
+**Rollback.** Redeploy `pay` v52 and `notify-order` v45 (code from `985a4511`, full `985a451199b74c30e904fb607a6c03cfb70a098f`), then roll back the SQL. In the SQL editor: re-run `supabase/security_hardening_v3.sql` (restores `validate_order`), then drop `overrun_amount`, `fee_amount`, and `store_total`. Once `guard_completion_email_columns` exists, skip re-granting table-wide INSERT and UPDATE on `public.orders` (`grant insert, update on table public.orders to anon, authenticated`) and leave the column grants (browser columns only). That table GRANT would reopen client writes to `completion_email_*`. Dropping the split columns while `pay` v53 is still live breaks capture writes. The SQL file's rollback comment still says to skip that GRANT when the email columns exist and the guard is not in. Follow this note.
+
+`reconcile` is a founder-email task on `pay`. Admin MFA (aal2) is enforced only when `REQUIRE_ADMIN_MFA=1`. Omit `dryRun` or pass `true` to report only. Pass `dryRun: false` to write `amount_captured` and `payment_status` from a succeeded PaymentIntent. It does not fill the split.
+
+## Order receipt (pending)
+
+Not applied. Not a function deploy. `supabase/order_received.sql` is a loose file (sha256 `1928d917b970240aa6255da5b40362ac6a8e741286b30e0b96ca558a12719b9e`). Header says **PENDING, not applied**. Paste it into the Supabase SQL editor, or run it with `execute_sql`. Do not put it in `supabase/migrations/`.
+
+The static that shows the Orders badge, **Did it all arrive?**, and the Ops chips is a separate promote. Until the columns exist, the client select fails and retries without them, so the badge and the card stay hidden. Apply the SQL before promoting that static if both should go live together. This PR does not promote static.
+
+**Open issues.** The only open value is `issue_status = 'open'` (`orders_issue_status_sane` allows null, `open`, and `resolved`). `auto_complete_orders()` requires `issue_status is distinct from 'open'`. null and `resolved` do not pause the sweep. Resolving an issue does not change `delivered_at` and does not restart the 48 hour clock. There is no issue-resolved timestamp.
+
+**Backfill.** In the same transaction, every row with `status = 'delivered'` and `received_confirmed_at` null is set to `received_confirmed_by = 'backfill'` and `received_confirmed_at = now()`. That includes historic #31, #38, and #39 when they are still delivered and unconfirmed. Ids are not hardcoded. PR #34's completion-email backfill must treat these rows as already emailed or skipped, so that file does not send a surprise email.
+
+**Who can write.** `confirm_order_received` and `admin_mark_received` are EXECUTE for `authenticated` only. The customer function also requires `user_id = auth.uid()`, status `delivered`, and a null confirmation. The ops function checks `is_admin_aal2()` inside the body. `auto_complete_orders()` is revoked from `public`, `anon`, and `authenticated`. pg_cron job `plentry_auto_complete` (`*/15 * * * *`) calls it as the role that scheduled the job. This file grants no table or column privileges. A BEFORE UPDATE trigger on the three new columns raises unless `plentry.receipt_write` is `'1'` in that transaction. Until `orders_capture_split.sql` revokes table UPDATE, a table-level UPDATE would include the new columns; the guard still rejects the write.
 
 ```bash
 cd plentry
 npm test   # must be 0
-# 1. Paste supabase/orders_capture_split.sql into the Supabase SQL editor and run it.
-# 2. Only then, and only under a GO, both functions:
-supabase functions deploy pay notify-order
+# Paste supabase/order_received.sql into the Supabase SQL editor and run it.
+# No supabase functions deploy for this file.
 ```
 
-Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not deploy `pay` or `notify-order`. Do not merge this change and assume the functions shipped. Do not run the deploy before the SQL.
-
-**Rollback.** Redeploy the previous `pay` and the previous `notify-order`, then roll back the SQL. In the SQL editor: re-run `supabase/security_hardening_v3.sql` (restores `validate_order`), `grant insert, update on table public.orders to anon, authenticated;`, then drop `overrun_amount`, `fee_amount`, and `store_total`. That table GRANT puts back the grants this file removes. It also reopens client writes to any later money or email columns, including PR #34's `completion_email_*` columns, until that PR's BEFORE INSERT reset and column guard are in. If those columns already exist and that guard is not in, skip the GRANT and leave this file's column grants (browser columns only). Dropping the columns while the new function or the new `pay` is still live breaks orders writes and capture. The commented rollback in the SQL file is the same order.
-
-`reconcile` is an aal2 admin task on `pay`. Omit `dryRun` or pass `true` to report only. Pass `dryRun: false` to write `amount_captured` and `payment_status` from a succeeded PaymentIntent. It does not fill the split.
+**Rollback.** The commented block at the bottom of the file: `cron.unschedule('plentry_auto_complete')`, drop the three triggers, drop the six functions, drop the two checks, then drop `received_confirmed_by`, `received_confirmed_at`, and `delivered_at`. Dropping the columns while a static build still selects them makes that select fail; the client then loads orders without the receipt columns and hides the card.
 
 ## Functions
 
@@ -155,7 +168,7 @@ Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not dep
 
 From 13 Oct 2026 until that setting was turned off, the integration redeployed all functions about 40s after any push to `main`, even when the commit did not touch those files. GitHub showed it as the **Supabase Preview** check. `pay` was v33 after PR #10 on 13 Oct 2026. Nineteen merges to `main` in that period, each with one auto-deploy, left `pay` at v52 (25 Oct 2026, 13:10:17 GMT, the deploy after #29). The 26 Oct merges did not move it.
 
-A hand deploy is the only deploy while the setting is off. `npm test` has to exit 0 first. The same command is the rollback path. Capture split is a separate order: apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` together. See [Capture split (pending)](#capture-split-pending).
+A hand deploy is the only deploy while the setting is off. `npm test` has to exit 0 first. The same command is the rollback path. Capture split shipped on 28 Oct 2026: SQL at about 12:04 GMT, `notify-order` v46, `pay` v53. See [Capture split (applied)](#capture-split-applied).
 
 ```bash
 cd plentry
@@ -179,13 +192,85 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' $B/notify-order     # 4
 
 Then `supabase functions list --project-ref ucciqthwxnlkjalwlhvh` (versions bumped, ACTIVE, `verify_jwt` only true for `pay`) and the dashboard logs: only `booted (time: …ms)` lines, no `Uncaught`.
 
+## Order completion email (step 1) — not live
+
+`order-email` is deployed by hand under a GO. Deploy to production is off, so a merge does not deploy it. Loose SQL is not applied by a merge, and static is a separate promote. `_shared/email.ts` is imported only by `order-email`. `pay` and `notify-order` are not part of this change. The admin Orders list retries without `completion_email_*` if those columns are missing, and then hides the badge and the test button. Deploy static after the SQL so that fallback is only the rollback path.
+
+The loose file is `supabase/order_completion_email.sql`. Header: `PENDING, not applied`. It requires `supabase/order_received.sql` applied first (`delivered_at`, `received_confirmed_at`, `received_confirmed_by`). This file does not add those columns. One transaction, commented rollback at the bottom. Paste it in the SQL editor after the receipt file. Do not use the Supabase CLI, the GitHub integration, or `supabase/migrations/`. Never create that folder. File sha256 `37e603b6b8f6bbd6e479439047ab7e25341e35c3857bb3a901d3221fae58b4a2` (not applied).
+
+**Ship order under a GO**, after `npm test` exits 0:
+
+1. **Noé, verify the Resend domain.** Create the Resend account and add `getplentry.com`. Resend shows the records. It puts MX and SPF on `send.getplentry.com`, and DKIM on `resend._domainkey`. Copy those values from the Resend dashboard into Cloudflare DNS. Do not invent the record contents here. Wait until Resend says the domain is verified. `_dmarc.getplentry.com` is the one hostname Email Routing shares with Resend, so keep a single DMARC record there.
+2. **Noé, turn on Cloudflare Email Routing** for the root domain `getplentry.com`, before the secrets. Replies to order emails land at `hello@getplentry.com` and are then forwarded.
+
+   a. In Cloudflare: Email → Email Routing → enable it, and let Cloudflare add its root MX records (`route1.mx.cloudflare.net`, `route2.mx.cloudflare.net`, `route3.mx.cloudflare.net`) and the root SPF TXT `v=spf1 include:_spf.mx.cloudflare.net ~all`. If a root SPF TXT already exists, merge that `include:` into that one record. Do not add a second SPF TXT on the root.
+   b. Destination addresses: add Noé's Gmail and click the verification link in the email Cloudflare sends.
+   c. Routing rules: create the custom address `hello@getplentry.com` that forwards to that Gmail.
+   d. Test it by sending an email to `hello@getplentry.com` from another account.
+
+   This does not clash with Resend. Resend's MX and SPF records live on the `send.getplentry.com` subdomain, and its DKIM on `resend._domainkey`. Routing uses the root `getplentry.com` MX and SPF. Those are different hostnames, so both work. The only shared hostname is `_dmarc.getplentry.com`, so keep a single DMARC record.
+3. **Noé, set the secrets.** From `plentry/`, Noé himself runs:
+
+```bash
+supabase secrets set RESEND_API_KEY=re_... ORDER_EMAIL_FROM='Plentry <orders@getplentry.com>'
+supabase secrets set ORDER_EMAIL_REPLY_TO=hello@getplentry.com
+```
+
+`RESEND_API_KEY` is required. `ORDER_EMAIL_FROM` may be omitted; the function then uses `Plentry <orders@getplentry.com>`. A blank resolved From, or a missing key, returns 503 and does not claim a row. `ORDER_EMAIL_REPLY_TO` is `hello@getplentry.com`. The function stays env-driven: if that secret is unset, the send has no `reply_to`. Replies to order emails land at `hello@getplentry.com` and are then forwarded. Never put these values in git or in `doc/`. Do not put a Gmail address in the repo. The function does not log the key. `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are the same secrets `notify-order` already uses. After three Resend 401/403 releases in a row, across any orders, `order-email` sends one Telegram saying the email config looks wrong. It does not send that again until a customer mail or a test mail succeeds. There is no 24-hour cooldown. The message names no secret. If Telegram does not accept it, the next 401/403 tries once more.
+4. **Deploy `order-email`.** `supabase functions deploy order-email` (project `ucciqthwxnlkjalwlhvh`). `verify_jwt` is false. Confirm a POST with no `x-webhook-secret` returns 401.
+5. **Apply the SQL.** `order_received.sql` first, if it is not already applied. Then paste `order_completion_email.sql` and run it. The trigger is `AFTER UPDATE OF received_confirmed_at` WHEN that timestamp goes from null to set, and only when `payment_status = 'captured'`. The first run sets every order that is already received and captured to `completion_email_status=skipped`. A `received_confirmed_by = 'backfill'` row is skipped with `backfill: receipt backfill is not emailed` and is never emailed. Confirm one `cron.job` row named `plentry-order-email-sweep`. A second paste does not add another job and does not change a row that already has a status. It does skip a captured, already-received row that is still null. Do not re-run after the first real completion email unless that is intended.
+6. **Deploy static after the SQL.** The admin badge and **Send test email** button ship with the static promote. Customers do not see them. The button needs an aal2 admin session. It sends a labelled TEST mail to that admin’s login address and does not write `orders`.
+
+**Roll back in reverse.** Roll the static back first, while the columns still exist. Then roll the SQL back (the commented block at the bottom of the file). Then remove or redeploy `order-email` if that function should go away. Rolling the SQL back before the static makes the admin select miss the columns; the page falls back and hides the badge, which is why static comes off first.
+
+**Stuck `sending` at 5 attempts.** The admin badge says **email sending** for every row with `completion_email_status = 'sending'`, including one whose `completion_email_attempts` is already 5. That row is not reclaimed. The claim and the 15-minute sweep both require attempts under 5, so the Resend idempotency key expiring after 24 hours does not send it again. The badge stays until the status changes.
+
+Clearing it is manual SQL on production. That needs Noé's GO. Run it in the SQL editor. The column guard allows `postgres` and `supabase_admin`. Replace `<id>` with the order id.
+
+See the row:
+
+```sql
+select id, completion_email_status, completion_email_attempts,
+       completion_email_claimed_at, completion_email_error
+from public.orders
+where id = <id>;
+```
+
+Record it as failed. The badge becomes **email failed** and the error is the tooltip. Attempts stay at 5, so it is still not retried:
+
+```sql
+update public.orders
+set completion_email_status = 'failed',
+    completion_email_error = 'stuck sending at attempt cap; cleared by hand'
+where id = <id>
+  and completion_email_status = 'sending'
+  and completion_email_attempts >= 5;
+```
+
+Or allow exactly one more try. The next claim increments attempts from 4 to 5:
+
+```sql
+update public.orders
+set completion_email_status = null,
+    completion_email_claimed_at = null,
+    completion_email_error = null,
+    completion_email_attempts = 4
+where id = <id>
+  and completion_email_status = 'sending'
+  and completion_email_attempts >= 5;
+```
+
+The sweep, or the next delivered and captured update, claims that one retry. Do not set attempts back to 0 unless five new tries are intended.
+
+Manual checks after the paste: [TESTING.md](TESTING.md).
+
 ## Shipping pay and static together
 
 Use the full sequence when a change edits the shared basket: `supabase/functions/_shared/portions.ts`, or the basket block in `index.html` (the region between the portion markers, kept byte-identical with `portions.ts`). `pay` is the function that imports `portions.ts`. It rebuilds the basket and holds `round(shop × 1.05 × 1.30)`. The Confirm screen uses the same formula on the client's basket. Those two copies have to be the same code, or the figure on the screen and the Stripe hold diverge.
 
 From 13 Oct 2026 until PR #12 (`4699353a`, 15 Oct 2026), a merge to `main` auto-deployed static immediately through Vercel's Git integration, and `pay` was a separate `supabase functions deploy pay`. The new static was already on https://getplentry.com while `pay` was still the previous version. On 13 Oct 2026 that gap was about 37 seconds. `vercel.json` now sets `git.deploymentEnabled` to `{ "main": false }`. A merge does not deploy static from `main`. Branches left out of that object stay enabled, so pull-request and other-branch previews still deploy. A boolean `false` would stop every branch. `github.enabled` is the deprecated switch; do not use it.
 
-The Supabase GitHub integration is a different switch, and Deploy to production is OFF (Noé, 25/26 Oct 2026). A merge does not redeploy edge functions. See [Functions](#functions). `pay` was v33 after the 13 Oct ship and is still v52 from the 25 Oct #29 deploy (13:10:17 GMT). `ai` was hand-deployed from v51 to v52 at 15:44:08 GMT on 26 Oct 2026.
+The Supabase GitHub integration is a different switch, and Deploy to production is OFF (Noé, 25/26 Oct 2026). A merge does not redeploy edge functions. See [Functions](#functions). `pay` was v33 after the 13 Oct ship and v52 from the 25 Oct #29 deploy (13:10:17 GMT). Live `pay` is v53, hand-deployed at 12:05 GMT on 28 Oct 2026. `ai` was hand-deployed from v51 to v52 at 15:44:08 GMT on 26 Oct 2026.
 
 The default ship is below. Merge on GO. When a function changed, deploy that function by hand (`supabase functions deploy <name>` or MCP) under a GO, after `npm test` on the merge SHA. Do not deploy functions that did not change. Build static from the merge SHA without moving the domains, confirm the hand deploy, then promote straight away. When the functions changed, the customer-facing gap is new functions with the previous static, from the hand deploy until the promote.
 
@@ -314,6 +399,20 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 ## Ship log
 
 Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
+
+### 2026-10-28 12:02 GMT — PR #35, capture split (SQL + pay + notify-order)
+
+PR #35 squash-merged to main as `ea90a314bbe55af000e41d3bc0f34bd9569ad151` at 12:02:45 GMT. `supabase/orders_capture_split.sql` was applied to prod at about 12:04 GMT. Loose file, not a migration. The header says `APPLIED to prod 28 Oct 2026 ~12:04 GMT`. SQL statements are byte-identical to the applied file. Pending-file sha256 `15146e29c11c273cf5a3d2bc653091e4a243aa36f96a4bb18b6abca78636a022`. Stamped sha256 `e7f214da066d0205bfa6ea734e62b157cadbfd0c3207e7c3773a4ffead96b139`.
+
+- **Functions.** `notify-order` hand-deployed as v46 at 12:04 GMT. `pay` hand-deployed as v53 at 12:05 GMT. No static deploy. `ai` v52, `checkout` v44, `stripe-webhook` v43, and `newcoming` v37 are unchanged.
+- **Rollback.** `pay` v52 and `notify-order` v45 (code from `985a4511`), then `security_hardening_v3.sql`, then drop `overrun_amount`, `fee_amount`, and `store_total`. Once `guard_completion_email_columns` exists, skip the table-wide INSERT/UPDATE re-grant on `public.orders`.
+
+### 2026-10-27 ~22:42 GMT — PR #33, meals MAINTAIN revoke (SQL only)
+
+PR #33 squash-merged to main as `985a451199b74c30e904fb607a6c03cfb70a098f` at 22:41:32 GMT. `supabase/meals_revoke_maintain.sql` was applied to prod at about 22:42 GMT. Loose file, not a migration. The header says `APPLIED to prod 27 Oct 2026 ~22:42 GMT`. SQL statements are byte-identical to the applied file. Stamped sha256 `5fe758a5783713fc38b50f81a332a2a400e1154dbabda779dce275a157305bff`.
+
+- **Checks:** anon and authenticated have no `MAINTAIN` on `public.meals`. Each still has the same 11 SELECT columns: `category`, `emoji`, `id`, `image_url`, `ing`, `name`, `portions`, `recipe`, `reviewed_at`, `tags`, `time`.
+- **No deploy.** No edge function and no static promote. The 26 Oct ship below still records that `MAINTAIN` was open at that ship.
 
 ### 2026-10-26 15:34 GMT — PR #31, #30, #32, static + SQL + ai
 

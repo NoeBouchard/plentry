@@ -126,6 +126,10 @@ describe("source contracts", () => {
     // Customer + Ops both read slot + issue columns; the client bound matches the CHECK.
     assert.match(html, /delivery_slot,slot_date,slot_start,slot_end,issue_status"/);
     assert.match(html, /address,delivery_slot,slot_date,slot_start,slot_end,issue_status"/);
+    assert.match(html, /cols\+","\+receipt/);
+    assert.match(html, /delivered_at,received_confirmed_at,received_confirmed_by/);
+    assert.match(html, /cols\+","\+receipt\+","\+emailCols/);
+    assert.match(html, /completion_email_status,completion_email_claimed_at,completion_email_sent_at,completion_email_attempts,completion_email_error,completion_email_message_id/);
     assert.match(html, /const ETA_DAYS=4;/);
     assert.match(html, /const SLOT_MAX=80;/);
     assert.match(html, /function isUkPhone/);
@@ -924,14 +928,124 @@ describe("I-A14 meals follow-ups (applied on prod 26 Oct 2026)", () => {
   });
 });
 
-describe("I-M10 capture split SQL (pending, not applied)", () => {
+describe("I-O20 order completion email", () => {
+  const orderEmail = readFileSync(path.join(ROOT, "supabase/functions/order-email/index.ts"), "utf8");
+  const emailSrc = readFileSync(path.join(ROOT, "supabase/functions/_shared/email.ts"), "utf8");
+  const config = readFileSync(path.join(ROOT, "supabase/config.toml"), "utf8");
+  const raw = readFileSync(path.join(ROOT, "supabase/order_completion_email.sql"), "utf8");
+  const active = stripSqlComments(raw);
+
+  it("I-O20 function source, verify_jwt, no migrations folder, and the SQL claim, guard, and backfill", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.match(config, /\[functions\.order-email\]\s+verify_jwt = false/);
+    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /begin;/);
+    assert.match(raw, /commit;/);
+    assert.match(raw, /-- begin;/);
+    assert.match(raw, /cron\.unschedule\('plentry-order-email-sweep'\)/);
+    assert.match(active, /create or replace function public\.claim_completion_email\(p_order_id bigint\)/);
+    assert.match(active, /security definer/);
+    assert.match(active, /set search_path = public, pg_temp/);
+    assert.match(active, /before insert or update of/);
+    assert.equal((active.match(/completion_email_status = 'sending'\s+and o\.completion_email_attempts < 5/g) || []).length, 3);
+    assert.match(active, /create or replace function public\.release_completion_email\(p_order_id bigint\)/);
+    assert.match(active, /revoke all on function public\.release_completion_email\(bigint\) from public, anon, authenticated/);
+    assert.match(active, /create table if not exists public\.completion_email_config/);
+    assert.match(active, /grant select, update on table public\.completion_email_config to service_role/);
+    assert.match(active, /revoke all on table public\.completion_email_config from public, anon, authenticated/);
+    assert.match(active, /create or replace function public\.note_completion_email_config_failure\(\)/);
+    assert.match(active, /create or replace function public\.note_completion_email_config_success\(\)/);
+    assert.match(active, /revoke all on function public\.note_completion_email_config_failure\(\) from public, anon, authenticated/);
+    assert.match(active, /grant execute on function public\.note_completion_email_config_failure\(\) to service_role/);
+    assert.match(active, /p_terminal/);
+    assert.match(active, /grant execute on function public\.claim_completion_email\(bigint\) to service_role/);
+    assert.match(active, /revoke all on function public\.claim_completion_email\(bigint\) from public, anon, authenticated/);
+    assert.match(active, /create or replace function public\.guard_completion_email_columns\(\)/);
+    assert.match(active, /completion email columns are service-owned/);
+    assert.match(active, /completion_email_status = 'skipped'/);
+    assert.match(active, /received_confirmed_at is not null/);
+    assert.match(active, /received_confirmed_by is distinct from 'backfill'/);
+    assert.match(active, /received_confirmed_by = 'backfill'/);
+    assert.doesNotMatch(active, /status = 'delivered'/);
+    assert.match(active, /completion_email_status is null/);
+    assert.match(active, /plentry-order-email-sweep/);
+    assert.match(active, /'\*\/15 \* \* \* \*'/);
+    assert.match(active, /not exists \(select 1 from cron\.job where jobname = 'plentry-order-email-sweep'\)/);
+    assert.match(active, /after update of received_confirmed_at/);
+    assert.match(active, /old\.received_confirmed_at is null/);
+    assert.match(active, /new\.received_confirmed_at is not null/);
+    assert.match(active, /new\.payment_status = 'captured'/);
+    assert.match(raw, /order_received\.sql/);
+    assert.match(active, /x-webhook-secret/);
+    assert.match(active, /order_webhook_secret\(\)/);
+    assert.match(active, /no recipient/);
+    assert.doesNotMatch(active, /create extension if not exists pg_net/);
+
+    assert.match(orderEmail, /x-webhook-secret/);
+    assert.match(orderEmail, /timingSafeEqual/);
+    assert.match(orderEmail, /claim_completion_email/);
+    assert.match(orderEmail, /mark_completion_email/);
+    assert.match(orderEmail, /idempotencyKey: `order-complete\/\$\{orderId\}`/);
+    assert.match(emailSrc, /'Idempotency-Key': input\.idempotencyKey/);
+    assert.match(orderEmail, /body\?\.task === 'test'/);
+    assert.match(orderEmail, /is_admin_aal2/);
+    assert.match(orderEmail, /claims\?\.aal !== 'aal2'/);
+    assert.match(orderEmail, /order_email_test/);
+    assert.match(orderEmail, /allow\(/);
+    assert.match(orderEmail, /RESEND_API_KEY missing/);
+    assert.match(orderEmail, /noop: true/);
+    assert.doesNotMatch(orderEmail, /console\.(log|info|debug|error)\([^)]*RESEND_API_KEY/);
+    const testFn = orderEmail.slice(orderEmail.indexOf("async function sendTestEmail"), orderEmail.indexOf("async function deliverOrder"));
+    assert.doesNotMatch(testFn, /claim_completion_email/);
+    assert.doesNotMatch(testFn, /from\('orders'\)/);
+    assert.ok(testFn.indexOf("order_email_test_ip") >= 0);
+    assert.ok(testFn.indexOf("order_email_test_ip") < testFn.indexOf("getUser"));
+    const deliverFn = orderEmail.slice(orderEmail.indexOf("async function deliverOrder"));
+    assert.ok(deliverFn.indexOf("completionSendGate") >= 0);
+    assert.ok(deliverFn.indexOf("completionSendGate") < deliverFn.indexOf("claim_completion_email"));
+    assert.match(deliverFn, /status: 503/);
+    assert.match(orderEmail, /release_completion_email/);
+    assert.match(deliverFn, /await release\(/);
+    assert.match(orderEmail, /p_terminal: terminal/);
+    assert.match(deliverFn, /invalid_idempotent_request: not retrying', false, true/);
+    assert.match(deliverFn, /invalid_idempotent_request/);
+    assert.match(deliverFn, /if \(sent\.kind === 'config'\) await noteConfigFailure/);
+    assert.match(deliverFn, /await noteConfigSuccess\(ctx\)/);
+    assert.match(testFn, /if \(sent\.kind === 'config'\) await noteConfigFailure/);
+    assert.match(testFn, /noteConfigSuccess/);
+    assert.match(orderEmail, /note_completion_email_config_failure/);
+    assert.match(orderEmail, /note_completion_email_config_success/);
+    assert.match(orderEmail, /rearm_completion_email_config_alert/);
+    assert.match(orderEmail, /TELEGRAM_BOT_TOKEN/);
+    assert.match(orderEmail, /TELEGRAM_CHAT_ID/);
+    assert.match(orderEmail, /api\.telegram\.org\/bot/);
+    assert.match(emailSrc, /export function configAlertText/);
+    assert.doesNotMatch(orderEmail, /console\.(log|info|debug|error)\([^)]*TELEGRAM_BOT_TOKEN/);
+    assert.match(emailSrc, /Plentry <orders@getplentry.com>/);
+    assert.match(emailSrc, /if \(reply\) payload\.reply_to = reply/);
+    assert.match(emailSrc, /step 2/);
+    assert.match(emailSrc, /step 3/);
+    assert.doesNotMatch(emailSrc, /console\.(log|info|debug|error)/);
+
+    const selects = [...html.matchAll(/from\("orders"\)[\s\S]{0,160}\.select\("([^"]+)"\)/g)].map((match) => match[1]);
+    const withEmail = selects.filter((cols) => cols.includes("completion_email_"));
+    assert.equal(withEmail.length, 0, "customer selects stay off the email columns");
+    assert.equal((html.match(/completion_email_status,completion_email_claimed_at/g) || []).length, 1);
+    assert.match(html, /Send test email/);
+    assert.match(html, /functions\/v1\/order-email/);
+    assert.match(html, /function completionEmailBadge/);
+  });
+});
+
+describe("I-M10 capture split SQL (applied 28 Oct 2026)", () => {
   const raw = sqlBody("orders_capture_split.sql");
   const active = stripSqlComments(raw);
 
-  it("I-M10 is a loose pending file, not a migration, and keeps the orders guard", () => {
+  it("I-M10 is a loose applied file, not a migration, and keeps the orders guard", () => {
     assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
     assert.equal(existsSync(path.join(ROOT, "supabase/orders_capture_split.sql")), true);
-    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /APPLIED to prod 28 Oct 2026 ~12:04 GMT/);
+    assert.doesNotMatch(raw, /PENDING, not applied/);
     assert.match(raw, /Rollback/);
     assert.match(raw, /security_hardening_v3\.sql/);
     assert.match(raw, /drop column if exists store_total/);
@@ -974,14 +1088,15 @@ describe("I-M10 capture split SQL (pending, not applied)", () => {
   });
 });
 
-describe("meals MAINTAIN revoke (pending, not applied)", () => {
+describe("meals MAINTAIN revoke (applied 27 Oct 2026)", () => {
   const raw = sqlBody("meals_revoke_maintain.sql");
   const active = stripSqlComments(raw);
 
   it("revokes MAINTAIN from anon and authenticated in one transaction, with a commented rollback, and is not a migration", () => {
     assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
     assert.equal(existsSync(path.join(ROOT, "supabase/meals_revoke_maintain.sql")), true);
-    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /APPLIED to prod 27 Oct 2026 ~22:42 GMT/);
+    assert.doesNotMatch(raw, /PENDING, not applied/);
     assert.match(raw, /^-- grant maintain on table public\.meals to anon, authenticated;$/m);
     assert.doesNotMatch(active, /grant maintain on table public\.meals to anon, authenticated/);
     const begin = active.indexOf("begin;");
@@ -990,5 +1105,97 @@ describe("meals MAINTAIN revoke (pending, not applied)", () => {
     const body = active.slice(begin, commit);
     assert.match(body, /revoke maintain on table public\.meals from anon, authenticated;/);
     assert.equal(active.slice(commit + "commit;".length).trim(), "");
+  });
+});
+
+describe("I-O19 order receipt (pending, not applied)", () => {
+  const raw = sqlBody("order_received.sql");
+  const active = stripSqlComments(raw);
+
+  it("I-O19 is one loose pending file, not a migration, and does not grant the new columns", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.equal(existsSync(path.join(ROOT, "supabase/order_received.sql")), true);
+    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /execute_sql/);
+    assert.match(raw, /emailed or skipped/);
+    assert.match(raw, /#31, #38, and #39/);
+    assert.doesNotMatch(active, /where id in\s*\(\s*31/);
+    const begin = active.indexOf("begin;");
+    const commit = active.lastIndexOf("commit;");
+    assert.ok(begin >= 0 && commit > begin);
+    assert.equal(active.slice(commit + "commit;".length).trim(), "");
+    const body = active.slice(begin, commit);
+    assert.match(body, /add column if not exists delivered_at timestamptz/);
+    assert.match(body, /add column if not exists received_confirmed_at timestamptz/);
+    assert.match(body, /add column if not exists received_confirmed_by text/);
+    assert.match(body, /'customer', 'auto', 'ops', 'backfill'/);
+    assert.match(body, /create trigger orders_receipt_insert/);
+    assert.match(body, /before insert on public\.orders/);
+    assert.match(body, /new\.delivered_at := null;/);
+    assert.match(body, /new\.received_confirmed_at := null;/);
+    assert.match(body, /new\.received_confirmed_by := null;/);
+    assert.match(body, /create trigger orders_receipt_stamp/);
+    assert.match(body, /new\.delivered_at := now\(\);/);
+    assert.match(body, /cannot change status after the order is received/);
+    assert.match(body, /create trigger orders_receipt_guard/);
+    assert.match(body, /before update of delivered_at, received_confirmed_at, received_confirmed_by/);
+    assert.match(body, /plentry\.receipt_write/);
+    assert.match(body, /set_config\('plentry\.receipt_write', '1', true\)/);
+    assert.match(body, /interval '48 hours'/);
+    assert.match(body, /issue_status is distinct from 'open'/);
+    assert.match(body, /received_confirmed_by = 'backfill'/);
+    assert.match(body, /cron\.unschedule\('plentry_auto_complete'\)/);
+    assert.match(body, /'plentry_auto_complete'/);
+    assert.match(body, /'\*\/15 \* \* \* \*'/);
+    assert.doesNotMatch(body, /create or replace function public\.validate_order/);
+    assert.doesNotMatch(body, /grant\s+(select|insert|update|delete|all)\b/i);
+    assert.doesNotMatch(body, /on table public\.orders to (anon|authenticated)/);
+    for (const name of ["confirm_order_received", "admin_mark_received", "auto_complete_orders", "orders_receipt_reset", "orders_receipt_stamp", "orders_receipt_guard"]) {
+      const at = body.indexOf(`function public.${name}`);
+      assert.ok(at > 0, name);
+      const chunk = body.slice(at, at + 220);
+      assert.match(chunk, /security definer/, name);
+      assert.match(chunk, /set search_path = public, pg_temp/, name);
+    }
+    assert.match(body, /revoke all on function public\.confirm_order_received\(bigint\) from public, anon, authenticated/);
+    assert.match(body, /grant execute on function public\.confirm_order_received\(bigint\) to authenticated/);
+    assert.match(body, /revoke all on function public\.admin_mark_received\(bigint\) from public, anon, authenticated/);
+    assert.match(body, /grant execute on function public\.admin_mark_received\(bigint\) to authenticated/);
+    assert.match(body, /revoke all on function public\.auto_complete_orders\(\) from public, anon, authenticated/);
+    assert.doesNotMatch(body, /grant execute on function public\.auto_complete_orders/);
+    assert.doesNotMatch(body, /grant execute on function public\.confirm_order_received\(bigint\) to (anon|public)/);
+    assert.doesNotMatch(body, /grant execute on function public\.admin_mark_received\(bigint\) to (anon|public)/);
+    assert.match(body, /auth\.uid\(\)/);
+    assert.match(body, /is_admin_aal2\(\)/);
+    assert.match(raw, /^--\s+select cron\.unschedule\('plentry_auto_complete'\);/m);
+    assert.match(raw, /^--\s+drop function if exists public\.confirm_order_received\(bigint\);/m);
+    assert.match(raw, /^--\s+alter table public\.orders drop column if exists delivered_at;/m);
+  });
+
+  it("I-O19 customer and Ops receipt UI calls the RPCs and wraps at a narrow width", () => {
+    assert.match(html, /id="orders-receipt-badge"/);
+    assert.match(html, /class="inbox-badge" id="orders-receipt-badge"/);
+    assert.match(html, /Did it all arrive\?/);
+    assert.match(html, /Yes, all received/);
+    assert.match(html, /Something's wrong/);
+    assert.match(html, /Auto-completes in \$\{receiptHoursLeft\(o\)\}h/);
+    assert.match(html, /sb\.rpc\("confirm_order_received",\{p_order_id:id\}\)/);
+    assert.match(html, /sb\.rpc\("admin_mark_received",\{p_order_id:id\}\)/);
+    assert.match(html, /Awaiting receipt \(\$\{receiptHoursLeft\(o\)\}h left\)/);
+    assert.match(html, /Complete ✓/);
+    assert.match(html, /Mark received/);
+    assert.match(html, /setOpsReceiptFilter\('all'\)/);
+    assert.match(html, /setOpsReceiptFilter\('awaiting'\)/);
+    assert.match(html, /setOpsReceiptFilter\('complete'\)/);
+    assert.match(html, />Complete<\/div>/);
+    assert.match(html, /function awaitingOwnReceipt/);
+    assert.match(html, /\.receipt-actions\{display:flex;flex-wrap:wrap/);
+    assert.match(html, /\.receipt-chips\{display:flex;flex-wrap:wrap/);
+    assert.match(html, /nav button\{[^}]*min-width:0/);
+    assert.match(html, /const RECEIPT_HOURS=48;/);
+    assert.doesNotMatch(html, /reminder email/i);
+    const ask = html.slice(html.indexOf("function receiptAskHtml"), html.indexOf("function adminReceiptHtml"));
+    assert.match(ask, /awaitingOwnReceipt\(o\)/);
+    assert.doesNotMatch(ask, /openIssueThread\(\$\{oid\},true\)/);
   });
 });

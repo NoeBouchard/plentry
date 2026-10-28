@@ -32,9 +32,9 @@
   .logo{font-family:var(--serif);font-size:1.45rem;font-weight:700;letter-spacing:-.4px;color:var(--green-d)}
   .logo span{color:var(--green)}
   .pill{background:transparent;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:.78rem;color:var(--green-d);cursor:pointer;text-decoration:none}
-  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(244,240,230,.94);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:none;justify-content:center;gap:2px;padding:6px 4px;z-index:50}
+  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(244,240,230,.94);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:none;justify-content:center;gap:2px;padding:6px 4px;z-index:50;flex-wrap:wrap}
   nav.show{display:flex}
-  nav button{flex:1;max-width:150px;background:none;border:none;color:var(--muted);font-size:.68rem;padding:6px 2px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+  nav button{flex:1 1 3.4rem;max-width:150px;min-width:0;background:none;border:none;color:var(--muted);font-size:.68rem;padding:6px 2px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;white-space:normal;overflow-wrap:anywhere;line-height:1.15}
   nav button .ico{font-size:1.1rem}
   nav button.active{color:var(--green-d);background:var(--sage)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:12px;box-shadow:0 8px 24px rgba(28,51,40,.04)}
@@ -190,8 +190,8 @@
   .feature .f-ico{font-size:1.4rem}
   .feature b{display:block;font-size:.9rem}
   .feature p{color:var(--muted);font-size:.8rem}
-  .timeline{display:flex;gap:0;margin:12px 0 4px}
-  .tstep{flex:1;text-align:center;font-size:.68rem;color:var(--muted);position:relative;padding-top:16px}
+  .timeline{display:flex;gap:0;margin:12px 0 4px;max-width:100%}
+  .tstep{flex:1;min-width:0;text-align:center;font-size:.64rem;color:var(--muted);position:relative;padding:16px 1px 0;overflow-wrap:anywhere}
   .tstep::before{content:"";position:absolute;top:4px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--line);box-sizing:border-box}
   .tstep.done{color:var(--green)}
   .tstep.done::before{background:var(--green);border-color:var(--green)}
@@ -201,7 +201,20 @@
   .slot-picks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
   .slot-picks button{border:1.5px solid var(--line);background:var(--card2);border-radius:10px;padding:8px 10px;font-size:.75rem;cursor:pointer;color:var(--text);font:inherit}
   .slot-picks button.sel{background:var(--sage);border-color:var(--green);color:var(--green-d);font-weight:700}
-  .inbox-badge{display:none;min-width:16px;height:16px;border-radius:99px;background:var(--amber);color:#1a1a1a;font-size:.62rem;font-weight:800;align-items:center;justify-content:center;padding:0 4px;margin-left:4px}
+  .inbox-badge{display:none;min-width:16px;height:16px;border-radius:99px;background:var(--amber);color:#1a1a1a;font-size:.62rem;font-weight:800;align-items:center;justify-content:center;padding:0 4px;margin-left:4px;flex-shrink:0}
+  .receipt-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;max-width:100%;min-width:0}
+  .receipt-chips button{border:1.5px solid var(--line);background:var(--card2);border-radius:99px;padding:6px 10px;font-size:.75rem;cursor:pointer;color:var(--text);font:inherit;max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}
+  .receipt-chips button.sel{background:var(--sage);border-color:var(--green);color:var(--green-d);font-weight:700}
+  .receipt-ask{margin-top:8px;padding:10px;border:1.5px solid var(--line);border-radius:12px;background:#fff;max-width:100%;min-width:0;overflow-wrap:anywhere}
+  .receipt-ask .sub{margin-bottom:0}
+  .receipt-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-width:100%;min-width:0}
+  .receipt-actions .btn{flex:1 1 8.5rem;min-width:0;max-width:100%;white-space:normal;line-height:1.25;overflow-wrap:anywhere}
+  .receipt-line{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;max-width:100%;min-width:0}
+  .receipt-line .badge{margin-left:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35;max-width:100%;min-width:0}
+  @media (max-width:393px){
+    nav button{flex-basis:18%;font-size:.6rem;padding:4px 1px}
+    .receipt-actions .btn{flex-basis:100%}
+  }
   .meal-bar{display:flex;border:1.5px solid var(--line);border-radius:99px;overflow:hidden;margin:12px 0 8px;background:var(--card2)}
   .meal-seg{flex:1;border:none;background:transparent;padding:12px 0;font-size:.9rem;font-weight:800;color:var(--muted);cursor:pointer;font-family:inherit}
   .meal-seg.active{background:var(--green-d);color:#fff}
@@ -513,7 +526,7 @@
     <button data-s="menu" class="active" onclick="nav('menu')"><span class="ico">🍽️</span>Menu</button>
     <button data-s="pantry" onclick="nav('pantry')"><span class="ico">🥫</span>Pantry</button>
     <button data-s="shop" onclick="nav('shop')"><span class="ico">🛒</span>Basket</button>
-    <button data-s="orders" onclick="nav('orders')"><span class="ico">📦</span>Orders</button>
+    <button data-s="orders" id="nav-orders" onclick="nav('orders')"><span class="ico">📦</span>Orders<span class="inbox-badge" id="orders-receipt-badge">0</span></button>
     <button data-s="profile" onclick="nav('profile')"><span class="ico">👤</span>Profile</button>
     <button data-s="meals" id="nav-meals" style="display:none" onclick="nav('meals')"><span class="ico">📒</span>Meals</button>
     <button data-s="ingredients" id="nav-ingredients" style="display:none" onclick="nav('ingredients')"><span class="ico">🥬</span>Ingredients</button>
@@ -608,6 +621,23 @@ async function payApi(task,payload){
     const accessToken=data&&data.session?data.session.access_token:null;
     if(!accessToken)return null;
     const r=await fetch(SUPABASE_URL+"/functions/v1/pay",{method:"POST",
+      headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+accessToken},
+      body:JSON.stringify({task,payload})});
+    const j=await r.json().catch(()=>null);
+    if(!r.ok)return j||{error:"http",detail:"HTTP "+r.status};
+    return j;
+  }catch(e){return null;}
+}
+
+// Admin-only sample of the order-completion email. The function checks aal2.
+async function orderEmailApi(task,payload){
+  try{
+    if(!sb)return null;
+    try{if(sb.auth&&sb.auth.refreshSession)await sb.auth.refreshSession();}catch(e){}
+    const {data}=await sb.auth.getSession();
+    const accessToken=data&&data.session?data.session.access_token:null;
+    if(!accessToken)return null;
+    const r=await fetch(SUPABASE_URL+"/functions/v1/order-email",{method:"POST",
       headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+accessToken},
       body:JSON.stringify({task,payload})});
     const j=await r.json().catch(()=>null);
@@ -2877,19 +2907,49 @@ async function adminVerifyMeal(id){
   else{await loadAdminMeals();renderMeals();closeModal();}
 }
 async function adminMarkMealReviewed(id){return adminVerifyMeal(id);}
+function completionEmailBadge(o){
+  const st=o&&o.completion_email_status;
+  if(st==="sent")return ` <span class="badge">email sent</span>`;
+  if(st==="failed"){
+    const tip=o.completion_email_error?` title="${esc(String(o.completion_email_error).slice(0,300))}"`:"";
+    return ` <span class="badge"${tip} style="background:var(--amber)">email failed</span>`;
+  }
+  if(st==="skipped")return ` <span class="badge">email skipped</span>`;
+  if(st==="sending")return ` <span class="badge">email sending</span>`;
+  return "";
+}
 async function renderAdmin(){
   const el=document.getElementById("admin-list");
   if(!el)return;
   if(!sb||!isAdmin()){el.innerHTML='<p class="sub">Admin only.</p>';return;}
-  const {data,error}=await sb.from("orders")
-    .select("id,email,name,postcode,store,total,items,status,created_at,payment_status,amount_held,amount_captured,address,delivery_slot,slot_date,slot_start,slot_end,issue_status")
-    .order("created_at",{ascending:false}).limit(100);
+  const cols="id,email,name,postcode,store,total,items,status,created_at,payment_status,amount_held,amount_captured,address,delivery_slot,slot_date,slot_start,slot_end,issue_status";
+  const receipt="delivered_at,received_confirmed_at,received_confirmed_by";
+  const emailCols="completion_email_status,completion_email_claimed_at,completion_email_sent_at,completion_email_attempts,completion_email_error,completion_email_message_id";
+  let showEmail=true;
+  let {data,error}=await sb.from("orders").select(cols+","+receipt+","+emailCols).order("created_at",{ascending:false}).limit(100);
+  if(error){
+    showEmail=false;
+    const withReceipt=await sb.from("orders").select(cols+","+receipt).order("created_at",{ascending:false}).limit(100);
+    data=withReceipt.data;error=withReceipt.error;
+    if(error){
+      const plain=await sb.from("orders").select(cols).order("created_at",{ascending:false}).limit(100);
+      data=plain.data;error=plain.error;
+    }
+  }
   if(error||!data){el.innerHTML='<p class="sub">Could not load orders — run supabase/admin_policies.sql?</p>';return;}
-  if(!data.length){el.innerHTML='<p class="sub">No orders yet.</p>';return;}
+  const emailBar=showEmail?`<div class="row" style="margin:0 0 10px;align-items:center;gap:8px"><button type="button" class="btn ghost sm" id="admin-test-email" onclick="adminSendTestEmail()">Send test email</button><span id="admin-test-email-msg" class="sdetail"></span></div>`:"";
+  if(!data.length){el.innerHTML=emailBar+'<p class="sub">No orders yet.</p>';return;}
   window.__adminOrders={};data.forEach(o=>window.__adminOrders[o.id]=o);
+  const receiptLive=data.some(o=>Object.prototype.hasOwnProperty.call(o,"delivered_at")||Object.prototype.hasOwnProperty.call(o,"received_confirmed_at"));
+  const filt=window.__opsReceiptFilter==="awaiting"||window.__opsReceiptFilter==="complete"?window.__opsReceiptFilter:"all";
+  let rows=data;
+  if(receiptLive&&filt==="awaiting")rows=data.filter(o=>o.status==="delivered"&&!o.received_confirmed_at);
+  else if(receiptLive&&filt==="complete")rows=data.filter(o=>!!o.received_confirmed_at);
+  const chips=receiptLive?`<div class="receipt-chips" id="ops-receipt-chips"><button type="button" class="${filt==="all"?"sel":""}" onclick="setOpsReceiptFilter('all')">All</button><button type="button" class="${filt==="awaiting"?"sel":""}" onclick="setOpsReceiptFilter('awaiting')">Awaiting receipt</button><button type="button" class="${filt==="complete"?"sel":""}" onclick="setOpsReceiptFilter('complete')">Complete</button></div>`:"";
+  if(!rows.length){el.innerHTML=emailBar+chips+'<p class="sub">'+(filt==="awaiting"?"No orders awaiting receipt.":filt==="complete"?"No complete orders.":"No orders yet.")+'</p>';return;}
   const st={new:["🆕 New","var(--green)"],ordered:["🛒 Ordered","var(--muted)"],delivered:["✅ Delivered","var(--muted)"]};
   const pst={none:"",unpaid:"⏳ awaiting payment",authorized:"💳 hold",captured:"💳 money received",canceled:"❌ payment canceled"};
-  el.innerHTML=data.map(o=>{
+  el.innerHTML=chips+rows.map(o=>{
     const items=(o.items&&o.items.basket)||[];const meals=(o.items&&o.items.meals)||[];
     const s=st[o.status]||st.new;
     const storeInfo=STORES.find(x=>x.name===o.store);
@@ -2899,10 +2959,11 @@ async function renderAdmin(){
     const door=orderDelivery(o);
     const promised=promisedSlotLabel(o);
     return `<div class="store" style="display:block;cursor:default;${o.status==="new"&&!unpaid?"border-color:var(--green)":""}${unpaid?"opacity:.55":""}">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><b>#${+o.id||0}</b> · ${esc(o.store)} · est. £${Number(o.total||0).toFixed(2)} <span class="badge" style="background:${s[1]}">${s[0]}</span>${paidBadge?` <span class="badge">${paidBadge}${o.payment_status==="authorized"?` hold £${Number(o.amount_held||0).toFixed(2)}`:o.payment_status==="captured"?` received £${Number(o.amount_captured||0).toFixed(2)}`:""}</span>`:""}${o.issue_status==="open"?` <span class="badge" style="background:var(--amber)">issue</span>`:""}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        <div style="min-width:0;flex:1"><b>#${+o.id||0}</b> · ${esc(o.store)} · est. £${Number(o.total||0).toFixed(2)} <span class="badge" style="background:${s[1]}">${s[0]}</span>${paidBadge?` <span class="badge">${paidBadge}${o.payment_status==="authorized"?` hold £${Number(o.amount_held||0).toFixed(2)}`:o.payment_status==="captured"?` received £${Number(o.amount_captured||0).toFixed(2)}`:""}</span>`:""}${o.issue_status==="open"?` <span class="badge" style="background:var(--amber)">issue</span>`:""}${showEmail?completionEmailBadge(o):""}</div>
         <div class="sdetail">${new Date(o.created_at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
       </div>
+      ${adminReceiptHtml(o)}
       <div class="sdetail">${esc((o.address&&o.address.name)||o.name||"—")} · ${esc((o.address&&o.address.email)||o.email||"—")}${meals.length?` · ${meals.length} meals`:""}</div>
       <div class="sdetail"><b>Phone</b> ${esc((door&&door.phone)||"missing — do not shop")}</div>
       <div class="sdetail"><b>Deliver to</b> ${esc(door?deliveryLabel(door):addr)}</div>
@@ -2917,13 +2978,54 @@ async function renderAdmin(){
       ${adminSlotPanel(o)}
       <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px">
         <button class="btn ghost sm" onclick="navigator.clipboard.writeText(adminListText(window.__adminOrders[${o.id}])).then(()=>{this.textContent='✓ Copied'})">📋 Copy list</button>
+        ${o.status==="delivered"&&!o.received_confirmed_at&&(Object.prototype.hasOwnProperty.call(o,"delivered_at")||Object.prototype.hasOwnProperty.call(o,"received_confirmed_at"))?`<button type="button" class="btn sm" onclick="adminMarkReceived(${+o.id||0})">Mark received</button>`:""}
         ${storeInfo?`<a class="btn ghost sm" style="text-decoration:none" target="_blank" rel="noopener" href="${storeInfo.home}">Open ${esc(o.store)} ↗</a>`:""}
       </div></div>`;}).join("");
+  el.innerHTML=emailBar+el.innerHTML;
 }
 async function adminSetStatus(id,status){
   if(!sb||!isAdmin())return;
   const {error}=await sb.from("orders").update({status}).eq("id",id);
   if(!error)renderAdmin();
+}
+function setOpsReceiptFilter(f){
+  window.__opsReceiptFilter=f==="awaiting"||f==="complete"?f:"all";
+  renderAdmin();
+}
+async function confirmOrderReceived(id){
+  id=+id||0;
+  if(!sb||!id)return;
+  const o=orderById(id);
+  if(o&&!awaitingOwnReceipt(o))return;
+  const {error}=await sb.rpc("confirm_order_received",{p_order_id:id});
+  if(error){alert(error.message||"Could not confirm.");return;}
+  await hydrateOrdersFromDb();
+}
+async function adminMarkReceived(id){
+  id=+id||0;
+  if(!sb||!isAdmin()||!id)return;
+  const {error}=await sb.rpc("admin_mark_received",{p_order_id:id});
+  if(error){alert(error.message||"Could not mark received.");return;}
+  await renderAdmin();
+}
+async function adminSendTestEmail(){
+  if(!sb||!isAdmin())return;
+  const btn=document.getElementById("admin-test-email");
+  const msg=document.getElementById("admin-test-email-msg");
+  if(btn){btn.disabled=true;btn.textContent="Sending…";}
+  if(msg){msg.textContent="";msg.style.color="";}
+  const r=await orderEmailApi("test",{});
+  if(btn){btn.disabled=false;btn.textContent="Send test email";}
+  if(r&&r.error==="mfa_required"){
+    if(msg){msg.style.color="var(--red)";msg.textContent="Enter your 2-step code, then try again.";}
+    try{await refreshMfa();openMfaChallenge();}catch(e){}
+    return;
+  }
+  if(r&&r.ok){
+    if(msg){msg.style.color="var(--green)";msg.textContent="Test email sent to your login address.";}
+    return;
+  }
+  if(msg){msg.style.color="var(--red)";msg.textContent="Could not send"+(r&&(r.detail||r.error)?": "+(r.detail||r.error):".");}
 }
 // Capture the EXACT store total against the Stripe hold (never more than held).
 async function adminCapture(id){
@@ -4304,6 +4406,7 @@ function storeIdFromName(name){const s=STORES.find(x=>x.name===name);return s?s.
 // Delivery: customer picks a 2-hour window ≥ 3 London days out (hard promise).
 // Ops books that exact window or messages first. delivery_slot is the booked snapshot.
 const ETA_DAYS=4;
+const RECEIPT_HOURS=48;
 const SLOT_MAX=80;
 const SLOT_LEAD_DAYS=3;
 const SLOT_HORIZON_DAYS=10;
@@ -4385,6 +4488,39 @@ function slotEnded(o){
 function deliveredDone(o){
   return (o&&o.status|0)>=3||slotEnded(o);
 }
+function receiptKnown(o){return !!(o&&o.receiptKnown);}
+function awaitingOwnReceipt(o){
+  if(!receiptKnown(o)||(o.status|0)<3||o.received_confirmed_at)return false;
+  if(o.user_id&&(!S.user||String(o.user_id)!==String(S.user.id)))return false;
+  return true;
+}
+function receiptHoursLeft(o){
+  const at=Date.parse(o&&o.delivered_at||"");
+  if(!Number.isFinite(at))return RECEIPT_HOURS;
+  return Math.max(0,Math.ceil((at+RECEIPT_HOURS*60*60*1000-Date.now())/3600000));
+}
+function receiptAskHtml(o,oid){
+  if(!awaitingOwnReceipt(o)||!oid)return "";
+  return `<div class="receipt-ask">
+    <div style="font-weight:700">Did it all arrive?</div>
+    <div class="sub" style="margin:2px 0 0">Auto-completes in ${receiptHoursLeft(o)}h</div>
+    <div class="receipt-actions">
+      <button type="button" class="btn sm" onclick="confirmOrderReceived(${+oid||0})">Yes, all received</button>
+      <button type="button" class="btn ghost sm" onclick="openIssueThread(${+oid||0})">Something's wrong</button>
+    </div>
+  </div>`;
+}
+function adminReceiptHtml(o){
+  if(!o)return "";
+  const known=Object.prototype.hasOwnProperty.call(o,"delivered_at")||Object.prototype.hasOwnProperty.call(o,"received_confirmed_at");
+  if(!known)return "";
+  if(o.received_confirmed_at){
+    const who=["customer","auto","ops","backfill"].indexOf(o.received_confirmed_by)>=0?o.received_confirmed_by:"";
+    return `<div class="receipt-line"><span class="badge">Complete ✓${who?` (${esc(who)})`:""}</span></div>`;
+  }
+  if(o.status==="delivered")return `<div class="receipt-line"><span class="badge">Awaiting receipt (${receiptHoursLeft(o)}h left)</span></div>`;
+  return "";
+}
 function issueAllowed(o){
   const p=(o&&o.payment_status)||"";
   return p==="authorized"||p==="captured"||(o&&o.status|0)>=3;
@@ -4426,9 +4562,21 @@ function orderFromRow(row,prev){
     date:new Date(row.created_at).toLocaleDateString("en-GB"),
     created_at:row.created_at,status:st,payment_status:row.payment_status||"none",
     amount_held:row.amount_held,amount_captured:row.amount_captured,
+    user_id:row.user_id||(prev&&prev.user_id)||null,
     pantrySynced:!!(prev&&prev.pantrySynced),
     bagUrl:(prev&&prev.bagUrl)||"",adjustUrl:(prev&&prev.adjustUrl)||"",pepestoSession:(prev&&prev.pepestoSession)||"",
   };
+  if(Object.prototype.hasOwnProperty.call(row,"delivered_at")||Object.prototype.hasOwnProperty.call(row,"received_confirmed_at")||Object.prototype.hasOwnProperty.call(row,"received_confirmed_by")){
+    next.delivered_at=row.delivered_at||null;
+    next.received_confirmed_at=row.received_confirmed_at||null;
+    next.received_confirmed_by=row.received_confirmed_by||null;
+    next.receiptKnown=true;
+  }else if(prev&&prev.receiptKnown){
+    next.delivered_at=prev.delivered_at||null;
+    next.received_confirmed_at=prev.received_confirmed_at||null;
+    next.received_confirmed_by=prev.received_confirmed_by||null;
+    next.receiptKnown=true;
+  }
   if(st>=3&&prev&&prev.status<3&&!prev.pantrySynced){
     items.forEach(b=>{S.pantry[b.i]=Math.min(2,(S.pantry[b.i]||0)+b.q);});
     next.pantrySynced=true;
@@ -4455,9 +4603,13 @@ function orderStatusCopy(o){
 async function hydrateOrdersFromDb(){
   if(!sb||!S.user||!S.user.id){renderOrders();renderProfileOrders();return;}
   try{
-    const {data,error}=await sb.from("orders")
-      .select("id,store,total,items,status,created_at,payment_status,amount_held,amount_captured,delivery_slot,slot_date,slot_start,slot_end,issue_status")
-      .eq("user_id",S.user.id).order("created_at",{ascending:false}).limit(50);
+    const cols="id,user_id,store,total,items,status,created_at,payment_status,amount_held,amount_captured,delivery_slot,slot_date,slot_start,slot_end,issue_status";
+    const receipt="delivered_at,received_confirmed_at,received_confirmed_by";
+    let {data,error}=await sb.from("orders").select(cols+","+receipt).eq("user_id",S.user.id).order("created_at",{ascending:false}).limit(50);
+    if(error){
+      const again=await sb.from("orders").select(cols).eq("user_id",S.user.id).order("created_at",{ascending:false}).limit(50);
+      data=again.data;error=again.error;
+    }
     if(error||!data){renderOrders();renderProfileOrders();return;}
     const prevById={};
     (S.orders||[]).forEach(o=>{prevById[o.backendId||o.id]=o;});
@@ -4467,7 +4619,15 @@ async function hydrateOrdersFromDb(){
   renderOrders();
   renderProfileOrders();
 }
+function refreshReceiptBadge(){
+  const badge=document.getElementById("orders-receipt-badge");
+  if(!badge)return;
+  const n=(S.orders||[]).filter(awaitingOwnReceipt).length;
+  badge.textContent=String(n);
+  badge.style.display=n?"flex":"none";
+}
 function renderOrders(){
+  refreshReceiptBadge();
   const el=document.getElementById("orders-list");
   if(!el)return;
   if(!S.orders.length){
@@ -4493,7 +4653,9 @@ function renderOrders(){
           <div class="tstep ${paid?"done":"warn"}">${paid?"Paid":(o.payment_status==="canceled"?"Canceled":"Payment")}</div>
           <div class="tstep ${o.status>=2?"done":""}${paid&&o.status<2?" active":""}">Ordered</div>
           <div class="tstep ${deliveredDone(o)?"done":""}${o.status===2&&!deliveredDone(o)?" active":""}">Delivered</div>
+          <div class="tstep ${o.received_confirmed_at?"done":""}${awaitingOwnReceipt(o)?" active":""}">Complete</div>
         </div>
+        ${receiptAskHtml(o,oid)}
         <div class="row" style="margin-top:8px;flex-wrap:wrap">
           ${!paid&&oid?`<button class="btn sm" onclick="retryPay(${oid})">Pay now →</button>`:""}
           ${issueAllowed(o)&&oid?`<button class="btn ghost sm" onclick="openIssueThread(${oid})">${o.issue_status==="open"?"View issue":"Issue"}</button>`:""}
@@ -4829,7 +4991,7 @@ if(typeof window!=="undefined"){
     state:()=>S,
     COMMISSION,HOLD_BUFFER,
     ETA_DAYS,SLOT_MAX,etaDate,fmtDay,deliveryCopy,normSlot,catalogMealByName,mealCache,recipeFromOrder,orderRecipesPayload,
-    isUkPhone,validSlot,slotDays,fmtSlot,promisedSlotLabel,deliveredDone,issueAllowed,cleanMsg,
+    isUkPhone,validSlot,slotDays,fmtSlot,promisedSlotLabel,deliveredDone,issueAllowed,cleanMsg,RECEIPT_HOURS,receiptHoursLeft,awaitingOwnReceipt,
     validMeal,
     setModifyPicks(a){modifyPicks=Array.isArray(a)?a:[];},
     modifyPicks:()=>modifyPicks,
