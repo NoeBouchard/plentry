@@ -65,7 +65,7 @@ Apply order on a fresh project: schema → hardening v1 → v2 → v3 → admin 
 - `plentry/supabase/orders_payment.sql` (notify triggers — the secret literal in this file is superseded by the Vault version)
 - `plentry/supabase/revoke_notify_rpc.sql` (RPC revoke + drop free-beta triggers)
 - `plentry/supabase/webhook_secret_vault.sql` (Vault-backed secret, default privileges) — **live 17 Sep 2026**
-- `plentry/supabase/order_received.sql` (receipt columns, guard, customer and ops RPCs, 48h auto-complete, generic backfill) — **PENDING, not applied**
+- `plentry/supabase/order_received.sql` (receipt columns, guard, customer and ops RPCs, 48h auto-complete, generic backfill) — **applied 28 Oct 2026 ~15:35:50 GMT**
 
 ## Closed on 17 Sep 2026
 
@@ -112,7 +112,7 @@ See the status table above. Live (DB 17 Sep, functions 17 Sep, static 18 Sep): S
 ## Open
 
 - Anon and authenticated still hold `MAINTAIN` on `public.meals`. `supabase/meals_revoke_maintain.sql` is written and **not applied**. Do not put it in `supabase/migrations/`.
-- After the 28 Oct 2026 capture-split ship, anon and authenticated still hold table DELETE and TRUNCATE on `public.orders` (privileges `rdDxtm`, plus column-level INSERT and UPDATE). TRUNCATE bypasses RLS. `supabase/orders_revoke_delete_truncate.sql` revokes both from anon and authenticated and is **not applied** (sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`). It does not change other privileges or column grants. Apply with Supabase SQL (`execute_sql`), not a migration. The app never deletes an order. Independent of PR #34 (`feat/order-completion-email`). Verify with `has_table_privilege` for both roles and both privileges; rollback is `grant delete, truncate on table public.orders to anon, authenticated`. See [RUNBOOK.md](RUNBOOK.md#orders-delete-and-truncate-pending).
+- ~~DELETE and TRUNCATE on orders~~ (closed 28 Oct 2026 ~15:41:55 GMT). After the 28 Oct 2026 capture-split ship, anon and authenticated held table DELETE and TRUNCATE on `public.orders` (privileges `rdDxtm`, plus column-level INSERT and UPDATE). TRUNCATE bypasses RLS. `supabase/orders_revoke_delete_truncate.sql` revokes both from anon and authenticated and was **applied to prod at ~15:41:55 GMT on 28 Oct 2026** (applied file sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`; only the header comment changed afterwards). Closed. It does not change other privileges or column grants. Apply with Supabase SQL (`execute_sql`), not a migration. The app never deletes an order. Independent of PR #34 (`feat/order-completion-email`). Verify with `has_table_privilege` for both roles and both privileges; rollback is `grant delete, truncate on table public.orders to anon, authenticated`. See [RUNBOOK.md](RUNBOOK.md#orders-delete-and-truncate-applied).
 
 ## Known accepted risks (do not “fix” without product sign-off)
 

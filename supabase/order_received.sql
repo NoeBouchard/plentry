@@ -1,4 +1,4 @@
--- PENDING, not applied
+-- APPLIED to prod 28 Oct 2026 ~15:35:50 GMT (execute_sql).
 -- Plentry — customer receipt. An order is complete when received_confirmed_at
 -- is set. Paste this file into the Supabase SQL editor, or run it with
 -- execute_sql. Do not move it into supabase/migrations/. This repo has no

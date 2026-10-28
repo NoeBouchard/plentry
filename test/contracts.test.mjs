@@ -1061,14 +1061,15 @@ describe("servings scaling (I-P01 / I-P05)", () => {
   });
 });
 
-describe("I-O19 order receipt (pending, not applied)", () => {
+describe("I-O19 order receipt (applied 28 Oct 2026)", () => {
   const raw = sqlBody("order_received.sql");
   const active = stripSqlComments(raw);
 
-  it("I-O19 is one loose pending file, not a migration, and does not grant the new columns", () => {
+  it("I-O19 is one loose applied file, not a migration, and does not grant the new columns", () => {
     assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
     assert.equal(existsSync(path.join(ROOT, "supabase/order_received.sql")), true);
-    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /APPLIED to prod 28 Oct 2026 ~15:35:50 GMT/);
+    assert.doesNotMatch(raw, /PENDING/);
     assert.match(raw, /execute_sql/);
     assert.match(raw, /emailed or skipped/);
     assert.match(raw, /#31, #38, and #39/);
@@ -1159,14 +1160,15 @@ describe("I-O19 order receipt (pending, not applied)", () => {
   });
 });
 
-describe("orders DELETE/TRUNCATE revoke (pending, not applied)", () => {
+describe("orders DELETE/TRUNCATE revoke (applied 28 Oct 2026)", () => {
   const raw = sqlBody("orders_revoke_delete_truncate.sql");
   const active = stripSqlComments(raw);
 
   it("revokes DELETE and TRUNCATE from anon and authenticated in one transaction, with a commented rollback, and is not a migration", () => {
     assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
     assert.equal(existsSync(path.join(ROOT, "supabase/orders_revoke_delete_truncate.sql")), true);
-    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /APPLIED to prod 28 Oct 2026 ~15:41:55 GMT/);
+    assert.doesNotMatch(raw, /PENDING/);
     assert.match(raw, /execute_sql/);
     assert.match(raw, /has_table_privilege\(rolname, 'public\.orders', 'DELETE'\)/);
     assert.match(raw, /has_table_privilege\(rolname, 'public\.orders', 'TRUNCATE'\)/);

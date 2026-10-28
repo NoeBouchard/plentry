@@ -2,6 +2,12 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-28 — Order receipt and orders DELETE/TRUNCATE revoke: SQL applied
+
+- **Applied (GMT, 28 Oct 2026).** `supabase/order_received.sql` at ~15:35:50 (applied file sha256 `210864e66cee43103ad55510a8283db333074d95fcfbe68e33babfddad4d6c4c`). `supabase/orders_revoke_delete_truncate.sql` at ~15:41:55 (applied file sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`). Both with `execute_sql`, not migrations.
+- **Files.** Only the header comment of each `.sql` changed (PENDING → APPLIED), so the repo file sha256 no longer equals the applied one. The SQL statements are unchanged. Source contracts now assert the APPLIED header and no PENDING. No new tests; `npm test` stays **240**.
+- **Not in this change.** No static or function deploy.
+
 ## 2026-10-28 — Revoke DELETE and TRUNCATE on orders (SQL written; not applied)
 
 - **Open.** After the 28 Oct capture-split ship, anon and authenticated hold table privileges `rdDxtm` on `public.orders`, plus column-level INSERT and UPDATE. DELETE and TRUNCATE remain. TRUNCATE bypasses RLS.

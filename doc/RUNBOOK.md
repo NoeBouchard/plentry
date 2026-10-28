@@ -149,9 +149,9 @@ Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not dep
 
 `reconcile` is an aal2 admin task on `pay`. Omit `dryRun` or pass `true` to report only. Pass `dryRun: false` to write `amount_captured` and `payment_status` from a succeeded PaymentIntent. It does not fill the split.
 
-## Order receipt (pending)
+## Order receipt (applied)
 
-Not applied. Not a function deploy. `supabase/order_received.sql` is a loose file (sha256 `210864e66cee43103ad55510a8283db333074d95fcfbe68e33babfddad4d6c4c`). Header says **PENDING, not applied**. Paste it into the Supabase SQL editor, or run it with `execute_sql`. Do not put it in `supabase/migrations/`.
+Applied to prod on 28 Oct 2026 at ~15:35:50 GMT with `execute_sql`. Not a function deploy. `supabase/order_received.sql` is a loose file (applied file sha256 `210864e66cee43103ad55510a8283db333074d95fcfbe68e33babfddad4d6c4c`; only the header comment changed afterwards). Header says **APPLIED**. A re-apply is idempotent. Paste it into the Supabase SQL editor, or run it with `execute_sql`. Do not put it in `supabase/migrations/`.
 
 The static that shows the Orders badge, **Did it all arrive?**, and the Ops chips is a separate promote. Until the columns exist, the client select fails and retries without them, so the badge and the card stay hidden. Apply the SQL before promoting that static if both should go live together. This PR does not promote static.
 
@@ -170,9 +170,9 @@ npm test   # must be 0
 
 **Rollback.** The commented block at the bottom of the file: `cron.unschedule('plentry_auto_complete')`, drop the three triggers, drop the six functions, drop the two checks, then drop `received_confirmed_by`, `received_confirmed_at`, and `delivered_at`. Dropping the columns while a static build still selects them makes that select fail; the client then loads orders without the receipt columns and hides the card.
 
-## Orders DELETE and TRUNCATE (pending)
+## Orders DELETE and TRUNCATE (applied)
 
-Not applied. `supabase/orders_revoke_delete_truncate.sql` is a loose file (sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`). Header says **PENDING, not applied**. Apply with Supabase SQL (`execute_sql`), not a migration. Do not put it in `supabase/migrations/`. A merge does not apply it. Independent of PR #34 (`feat/order-completion-email`). Whichever of this change and #34 merges second will have a trivial doc and test-count conflict.
+Applied to prod on 28 Oct 2026 at ~15:41:55 GMT with `execute_sql`. `supabase/orders_revoke_delete_truncate.sql` is a loose file (applied file sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`; only the header comment changed afterwards). Header says **APPLIED**. Apply with Supabase SQL (`execute_sql`), not a migration. Do not put it in `supabase/migrations/`. A merge does not apply it. Independent of PR #34 (`feat/order-completion-email`). Whichever of this change and #34 merges second will have a trivial doc and test-count conflict.
 
 After the 28 Oct 2026 capture-split ship, table privileges on `public.orders` for anon and authenticated are `rdDxtm`, plus column-level INSERT and UPDATE. This file revokes DELETE and TRUNCATE from both roles. TRUNCATE bypasses RLS. It does not change other privileges or column grants. The app never deletes an order: `index.html` inserts, selects, and updates; `pay` and `stripe-webhook` select and update through the service role.
 
