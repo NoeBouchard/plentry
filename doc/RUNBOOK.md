@@ -129,20 +129,40 @@ Then open the app, DevTools console: no `Refused to …` CSP lines while loading
 
 Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner` (then `cd plentry`).
 
+## Capture split (pending)
+
+Not applied. Not deployed. `supabase/orders_capture_split.sql` is a loose file (sha256 `15146e29c11c273cf5a3d2bc653091e4a243aa36f96a4bb18b6abca78636a022`). Header says **PENDING, not applied**. Do not put it in `supabase/migrations/`.
+
+**Order.** Apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. `notify-order` behaviour is unchanged. It imports the changed `_shared/telegram.ts`, so the previous bundle must not stay live beside the new `pay`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing, `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. supabase-js reports that as PostgREST `PGRST204` (HTTP 400, schema cache: could not find the column) before Postgres `42703`. Both codes take that fallback. Apply the SQL first so the split is stored.
+
+```bash
+cd plentry
+npm test   # must be 0
+# 1. Paste supabase/orders_capture_split.sql into the Supabase SQL editor and run it.
+# 2. Only then, and only under a GO, both functions:
+supabase functions deploy pay notify-order
+```
+
+Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not deploy `pay` or `notify-order`. Do not merge this change and assume the functions shipped. Do not run the deploy before the SQL.
+
+**Rollback.** Redeploy the previous `pay` and the previous `notify-order`, then roll back the SQL. In the SQL editor: re-run `supabase/security_hardening_v3.sql` (restores `validate_order`), `grant insert, update on table public.orders to anon, authenticated;`, then drop `overrun_amount`, `fee_amount`, and `store_total`. That table GRANT puts back the grants this file removes. It also reopens client writes to any later money or email columns, including PR #34's `completion_email_*` columns, until that PR's BEFORE INSERT reset and column guard are in. If those columns already exist and that guard is not in, skip the GRANT and leave this file's column grants (browser columns only). Dropping the columns while the new function or the new `pay` is still live breaks orders writes and capture. The commented rollback in the SQL file is the same order.
+
+`reconcile` is an aal2 admin task on `pay`. Omit `dryRun` or pass `true` to report only. Pass `dryRun: false` to write `amount_captured` and `payment_status` from a succeeded PaymentIntent. It does not fill the split.
+
 ## Functions
 
 **Deploy to production is OFF.** Noé turned the Supabase GitHub integration setting off on 25/26 Oct 2026 (project `ucciqthwxnlkjalwlhvh`, production branch `main`). A merge to `main` does not deploy edge functions. After the #31, #30, and #32 merges, all 6 functions were unchanged and the Supabase Preview check was skipped. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If Deploy to production is ever re-enabled, every merge to `main` redeploys all `supabase/functions/*`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` files are not auto-applied. Static does not ride along: `git.deploymentEnabled.main` is false.
 
 From 13 Oct 2026 until that setting was turned off, the integration redeployed all functions about 40s after any push to `main`, even when the commit did not touch those files. GitHub showed it as the **Supabase Preview** check. `pay` was v33 after PR #10 on 13 Oct 2026. Nineteen merges to `main` in that period, each with one auto-deploy, left `pay` at v52 (25 Oct 2026, 13:10:17 GMT, the deploy after #29). The 26 Oct merges did not move it.
 
-A hand deploy is the only deploy while the setting is off. `npm test` has to exit 0 first. The same command is the rollback path.
+A hand deploy is the only deploy while the setting is off. `npm test` has to exit 0 first. The same command is the rollback path. Capture split is a separate order: apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` together. See [Capture split (pending)](#capture-split-pending).
 
 ```bash
 cd plentry
 npm test && supabase functions deploy <name>
 ```
 
-CLI needs `supabase-go` on PATH if the shim complains. `_shared/ratelimit.ts` and `_shared/orders.ts` are bundled into every function that imports them — redeploy **all** importers when a shared file changes (`ai`, `checkout`, `pay`, `stripe-webhook`, `notify-order`).
+CLI needs `supabase-go` on PATH if the shim complains. `_shared/ratelimit.ts` and `_shared/orders.ts` are bundled into every function that imports them — redeploy **all** importers when a shared file changes (`ai`, `checkout`, `pay`, `stripe-webhook`, `notify-order`). `_shared/capture.ts` is imported by `pay`. `_shared/telegram.ts` is imported by `pay` and `notify-order`. The CLI bundles those imports. A dashboard upload has to pass each file.
 
 **17 Sep 2026 security batch:** functions shipped 17 Sep 16:20 BST (`ai` v21, `checkout` v14, `pay` v17, `stripe-webhook` v14, `notify-order` v16); static shipped 18 Sep 13:04 BST (`plentry-p1413liv3`), all static checks above green. Still to do once: one Stripe **test** hold end-to-end on the new build: checkout → 4242 → Orders shows the hold → Telegram (server-built list, store search links) → Ops capture.
 
@@ -209,7 +229,7 @@ When `pay` changed, deploy it by hand from that same SHA before you promote. `su
 - name `pay`
 - entrypoint `index.ts`
 - `verify_jwt` **true**. The platform JWT gate stays on. A POST with no JWT must stay 401.
-- files: `supabase/functions/pay/index.ts`, plus the `_shared` modules it imports: `_shared/ratelimit.ts`, `_shared/orders.ts`, `_shared/portions.ts`. The call uploads only the files you pass. Leave one out and the new version fails to boot.
+- files: `supabase/functions/pay/index.ts`, plus the `_shared` modules it imports: `_shared/ratelimit.ts`, `_shared/orders.ts`, `_shared/portions.ts`, `_shared/capture.ts`, `_shared/telegram.ts`. The call uploads only the files you pass. Leave one out and the new version fails to boot. `notify-order` also imports `_shared/telegram.ts`; include that file when that function is deployed by hand.
 
 ```bash
 supabase functions list --project-ref ucciqthwxnlkjalwlhvh
@@ -251,7 +271,7 @@ The merge only changes `doc/`, the README, or other files `.vercelignore` alread
 
 Before you ship, note the deployment id getplentry.com already points at, and the SHA of the `pay` source that is live.
 
-**Promote has not run.** Do not promote. The domains stay on the previous static. Redeploy `pay` from the previous SHA with `deploy_edge_function` (`verify_jwt` true, and that SHA's `index.ts` plus the same three `_shared` files) so production `pay` matches the live site.
+**Promote has not run.** Do not promote. The domains stay on the previous static. Redeploy `pay` from the previous SHA with `deploy_edge_function` (`verify_jwt` true, and that SHA's `index.ts` plus the `_shared` files it imports) so production `pay` matches the live site.
 
 **Both are already live.** Move them back straight away. Pick the order where, during the gap, the amount held is at most the amount shown. Compare the new hold with the old hold on a week the change can affect.
 

@@ -11,7 +11,7 @@ This GitHub repo **is** the app (`index.html` + Supabase Edge Functions). In the
 3. [`doc/FLOWS.md`](doc/FLOWS.md) — checkout / Ops / Meals  
 4. [`doc/CURRENT-STATE.md`](doc/CURRENT-STATE.md) — what is live  
 5. [`doc/AGENT-PLAYBOOK.md`](doc/AGENT-PLAYBOOK.md) — how to change the app  
-6. [`doc/ENGINEERING.md`](doc/ENGINEERING.md) — branch → PR → CI → merge (static is not live; edge functions deploy by hand under a GO)  
+6. [`doc/ENGINEERING.md`](doc/ENGINEERING.md) — branch → PR → CI → merge (static is not live; edge functions deploy by hand under a GO)
 7. Security work: [`doc/SECURITY.md`](doc/SECURITY.md)  
 8. There is no React/Next app. Do not add a bundler.
 
@@ -45,7 +45,7 @@ In the Kitchen planner workspace, edit root `doc/` then `npm run vault` so this 
 
 ## Deploy (only if the user asks)
 
-**Merge to main does not deploy edge functions.** Supabase GitHub integration Deploy to production is OFF. Noé turned it off on 25/26 Oct 2026 (project `ucciqthwxnlkjalwlhvh`). After the #31, #30, and #32 merges, all 6 functions were unchanged and the Supabase Preview check was skipped. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If Deploy to production is ever re-enabled, every merge to `main` redeploys all `supabase/functions/*`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` is not applied by that integration. `pay` is v52. `ai` was hand-deployed from v51 to v52 at 15:44:08 GMT on 26 Oct 2026. `checkout` is v44, `notify-order` v45, `stripe-webhook` v43, and `newcoming` v37. See [`doc/RUNBOOK.md`](doc/RUNBOOK.md).
+**Merge to main does not deploy edge functions.** Supabase GitHub integration Deploy to production is OFF. Noé turned it off on 25/26 Oct 2026 (project `ucciqthwxnlkjalwlhvh`). After the #31, #30, and #32 merges, all 6 functions were unchanged and the Supabase Preview check was skipped. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If Deploy to production is ever re-enabled, every merge to `main` redeploys all `supabase/functions/*`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` is not applied by that integration. `pay` is v52. `ai` was hand-deployed from v51 to v52 at 15:44:08 GMT on 26 Oct 2026. `checkout` is v44, `notify-order` v45, `stripe-webhook` v43, and `newcoming` v37. Capture split is not live: apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. See [`doc/RUNBOOK.md`](doc/RUNBOOK.md).
 
 Static does not auto-deploy. Since PR #12 (`4699353a`, 15 Oct 2026) `git.deploymentEnabled.main` is false. Other branches still get preview deployments. Production static is a Vercel REST create with `autoAssignCustomDomains: false`, then a promote. A push to `main` is not a functions deploy and is not a static deploy. A `git push` of any other branch is not production.
 
@@ -56,6 +56,7 @@ npm test
 # static: REST create + promote in doc/RUNBOOK.md
 # functions, under a GO, only for the names that changed:
 # supabase functions deploy <name>
+# Capture split: SQL first, then pay and notify-order together.
 ```
 
 ## Never
@@ -64,4 +65,4 @@ npm test
 - Capture more than the Stripe hold  
 - Add a second front-end framework  
 - Skip `npm test`, or ship to production while tests are red  
-- Push product changes straight to `main`, or treat a merge as the static ship  
+- Push product changes straight to `main`, or treat a merge as the static ship or the functions ship

@@ -2706,6 +2706,56 @@ describe("ops", () => {
     assert.equal(fallback.detail, "HTTP 502");
   });
 
+  it("I-M10 a capture the server did not record is an error, not money received", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: {
+        meals: [],
+        profiles: [],
+        ingredient_prices: [],
+        orders: [
+          {
+            id: 33,
+            email: "c@x.com",
+            name: "A",
+            postcode: "E2 8AA",
+            store: "Tesco",
+            total: 3.79,
+            items: { basket: [{ i: "eggs", q: 1, product: "eggs" }], meals: [] },
+            status: "new",
+            created_at: "2026-09-16T12:00:00.000Z",
+            payment_status: "authorized",
+            amount_held: 4.58,
+            address: {},
+          },
+        ],
+      },
+    });
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    await window.renderAdmin();
+    const alerts = [];
+    window.alert = (m) => alerts.push(String(m));
+    window.fetch = async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: "capture_not_recorded",
+        detail: "Stripe captured £1.05 but the order row did not save. Try again — a retry repairs the row.",
+      }),
+    });
+    document.getElementById("cap-33").value = "1.00";
+    await window.adminCapture(33);
+    assert.equal(alerts.length, 0, "the first tap only confirms");
+    await window.adminCapture(33);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0], /order row did not save/);
+    assert.match(document.getElementById("cap-prev-33").textContent, /order row did not save/);
+    assert.equal(document.getElementById("admin-list").textContent.includes("Money received"), false);
+    assert.equal(window.__sbTables.orders[0].payment_status, "authorized");
+    assert.equal(document.getElementById("cap-btn-33").disabled, false);
+  });
+
   it("I-O02 unpaid orders lock the status bar and hide capture", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),

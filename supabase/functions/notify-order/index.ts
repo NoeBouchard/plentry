@@ -20,6 +20,7 @@
 
 import { withSupabase } from 'npm:@supabase/server'
 import { clean, searchUrl } from '../_shared/orders.ts'
+import { sendTelegram } from '../_shared/telegram.ts'
 
 const TELEGRAM_MAX = 4000 // sendMessage rejects > 4096 chars; a lost ping is worse than a trimmed one
 
@@ -131,19 +132,9 @@ export default {
       return Response.json({ error: 'unexpected payload' }, { status: 400 })
     }
 
-    const token = Deno.env.get('TELEGRAM_BOT_TOKEN')
-    const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
-    if (!token || !chatId) return Response.json({ error: 'telegram not configured' }, { status: 500 })
-
-    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
-    })
-    if (!r.ok) {
-      const t = await r.text()
-      return Response.json({ error: 'telegram', detail: t.slice(0, 200) }, { status: 502 })
-    }
+    const sent = await sendTelegram(text, { get: (name) => Deno.env.get(name) })
+    if (sent.status === 500) return Response.json({ error: 'telegram not configured' }, { status: 500 })
+    if (!sent.ok) return Response.json({ error: 'telegram', detail: sent.detail || '' }, { status: 502 })
     return Response.json({ ok: true })
   }),
 }
