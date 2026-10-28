@@ -2,6 +2,13 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-28 — Revoke DELETE and TRUNCATE on orders (SQL written; not applied)
+
+- **Open.** After the 28 Oct capture-split ship, anon and authenticated hold table privileges `rdDxtm` on `public.orders`, plus column-level INSERT and UPDATE. DELETE and TRUNCATE remain. TRUNCATE bypasses RLS.
+- **App.** No delete of an order. `index.html` inserts, selects, and updates `orders`. `pay` and `stripe-webhook` select and update through the service role. Nothing in the app deletes an order.
+- **SQL.** `supabase/orders_revoke_delete_truncate.sql` revokes DELETE and TRUNCATE from anon and authenticated in one transaction. Header says `PENDING, not applied`. sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`. Apply with Supabase SQL (`execute_sql`), not a migration. Commented rollback: `grant delete, truncate on table public.orders to anon, authenticated`. A commented `has_table_privilege` query checks both roles and both privileges. Other privileges and column grants stay. Independent of PR #34 (`feat/order-completion-email`). Whichever of this change and #34 merges second will have a trivial doc and test-count conflict.
+- **Tests.** One source contract: the file exists, the revoke names both roles, the active SQL has no GRANT of DELETE or TRUNCATE, the rollback is commented, and `supabase/migrations/` does not exist. `npm test` **215** (main `ea90a314` is **214**).
+
 ## 2026-10-28 — Order receipt (not applied)
 
 - **Complete.** An order is complete when `received_confirmed_at` is set. Status values stay `new | ordered | delivered`. `delivered_at` is stamped when status becomes `delivered`. Moving status away before anyone confirms clears `delivered_at`. Moving status away after `received_confirmed_at` is set raises `cannot change status after the order is received`.
