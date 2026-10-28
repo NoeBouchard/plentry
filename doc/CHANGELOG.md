@@ -8,6 +8,13 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Files.** Only the header comment of each `.sql` changed (PENDING → APPLIED), so the repo file sha256 no longer equals the applied one. The SQL statements are unchanged. Source contracts now assert the APPLIED header and no PENDING. No new tests; `npm test` stays **240**.
 - **Not in this change.** No static or function deploy.
 
+## 2026-10-28 — Production ships (PR #35; #37, #38, #39; #40)
+
+- **PR #35 (capture split).** Squash `ea90a314` at 12:02:45 GMT. `orders_capture_split.sql` applied at about 12:04 GMT; `notify-order` v46 and `pay` v53 hand-deployed. No static deploy.
+- **Static:** `dpl_9fGPbmtbbfScRbM5AfkYwBzUDrpD` from `0420fa82` (PR #37, #38, #39). Promoted at about 15:08 GMT. Rollback `dpl_4DarVmBySV9ujJq3Lrdn7MJgDx93`.
+- **Static:** `dpl_32nbFekRDcZfQioESYQPKLHXkEig` from `963bf0bd` (PR #40). Promoted at about 15:36 GMT. Rollback `dpl_9fGPbmtbbfScRbM5AfkYwBzUDrpD`. `order_received.sql` applied at about 15:35:50 GMT.
+- **Edge functions** after these ships: `pay` v53, `notify-order` v46, `ai` v52, `checkout` v44, `stripe-webhook` v43, `newcoming` v37.
+
 ## 2026-10-28 — Revoke DELETE and TRUNCATE on orders (SQL written; not applied)
 
 - **Open.** After the 28 Oct capture-split ship, anon and authenticated hold table privileges `rdDxtm` on `public.orders`, plus column-level INSERT and UPDATE. DELETE and TRUNCATE remain. TRUNCATE bypasses RLS.

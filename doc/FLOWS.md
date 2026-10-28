@@ -33,7 +33,7 @@ Confirm shows **Deliver to this address?** (name, address, **phone**) when Profi
 
 £1.00 in Ops is a **money test** (charges £1.05). Do not place a supermarket order for that test.
 
-## Customer receipt — did it all arrive? (written, not live)
+## Customer receipt — did it all arrive?
 
 `supabase/order_received.sql` was **applied to prod on 28 Oct 2026 at ~15:35:50 GMT**. Status values stay new, ordered, delivered. An order is complete when `received_confirmed_at` is set. After that file is applied and this static is promoted:
 

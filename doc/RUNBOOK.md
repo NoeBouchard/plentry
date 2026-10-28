@@ -129,11 +129,11 @@ Then open the app, DevTools console: no `Refused to …` CSP lines while loading
 
 Workspace: `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner` (then `cd plentry`).
 
-## Capture split (pending)
+## Capture split (shipped 28 Oct 2026)
 
-Not applied. Not deployed. `supabase/orders_capture_split.sql` is a loose file (sha256 `15146e29c11c273cf5a3d2bc653091e4a243aa36f96a4bb18b6abca78636a022`). Header says **PENDING, not applied**. Do not put it in `supabase/migrations/`.
+**Shipped 28 Oct 2026.** PR #35 squash-merged as `ea90a314bbe55af000e41d3bc0f34bd9569ad151` at 12:02:45 GMT. `supabase/orders_capture_split.sql` (repo file sha256 `15146e29c11c273cf5a3d2bc653091e4a243aa36f96a4bb18b6abca78636a022`) was applied to prod at about 12:04 GMT, then `notify-order` was hand-deployed as v46 and `pay` as v53. It is a loose file; do not put it in `supabase/migrations/`. The order and rollback below are kept for the record and for a rollback.
 
-**Order.** Apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. `notify-order` behaviour is unchanged. It imports the changed `_shared/telegram.ts`, so the previous bundle must not stay live beside the new `pay`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing, `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. supabase-js reports that as PostgREST `PGRST204` (HTTP 400, schema cache: could not find the column) before Postgres `42703`. Both codes take that fallback. Apply the SQL first so the split is stored.
+**Order (as shipped).** Apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` in the same GO. `notify-order` behaviour is unchanged. It imports the changed `_shared/telegram.ts`, so the previous bundle must not stay live beside the new `pay`. `pay` writes `store_total`, `fee_amount`, and `overrun_amount` in the same update as `amount_captured`. If those columns are missing, `pay` retries the write without them so `amount_captured` and `payment_status` still save, and Telegram says the split wasn't recorded because the columns are missing. supabase-js reports that as PostgREST `PGRST204` (HTTP 400, schema cache: could not find the column) before Postgres `42703`. Both codes take that fallback. Apply the SQL first so the split is stored.
 
 ```bash
 cd plentry
@@ -200,7 +200,7 @@ from (values ('anon'), ('authenticated')) as roles(rolname);
 
 From 13 Oct 2026 until that setting was turned off, the integration redeployed all functions about 40s after any push to `main`, even when the commit did not touch those files. GitHub showed it as the **Supabase Preview** check. `pay` was v33 after PR #10 on 13 Oct 2026. Nineteen merges to `main` in that period, each with one auto-deploy, left `pay` at v52 (25 Oct 2026, 13:10:17 GMT, the deploy after #29). The 26 Oct merges did not move it.
 
-A hand deploy is the only deploy while the setting is off. `npm test` has to exit 0 first. The same command is the rollback path. Capture split is a separate order: apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` together. See [Capture split (pending)](#capture-split-pending).
+A hand deploy is the only deploy while the setting is off. `npm test` has to exit 0 first. The same command is the rollback path. Capture split is a separate order: apply `orders_capture_split.sql`, then hand-deploy `pay` and `notify-order` together. See [Capture split (pending)](#capture-split-shipped-28-oct-2026).
 
 ```bash
 cd plentry
@@ -359,6 +359,31 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 ## Ship log
 
 Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
+
+### 2026-10-28 15:36 GMT — PR #40, static + SQL (PR #36 SQL at 15:41)
+
+PR #40 squash `963bf0bd9323b0f013ed42b087b82d12a46218e5` at 15:35:17 GMT. PR #36 squash `15fb5f492665176995c05c2ce7db965a34f6a731` at 15:41:43 GMT.
+
+- **Static:** `dpl_32nbFekRDcZfQioESYQPKLHXkEig` from `963bf0bd`. Promoted at about 15:36 GMT.
+- **Rollback:** `dpl_9fGPbmtbbfScRbM5AfkYwBzUDrpD`.
+- **SQL:** `supabase/order_received.sql` applied at about 15:35:50 GMT. `supabase/orders_revoke_delete_truncate.sql` applied at about 15:41:55 GMT.
+- **Edge functions:** none deployed.
+
+### 2026-10-28 15:08 GMT — PR #37, #38, #39, static
+
+All squash, on 28 Oct 2026: PR #37 `5e12e97d98a4efc42ac60ab7a2b33edfac480ce3` at 14:52:49 GMT, PR #38 `310224c50aace2b938b61755de344b4221a92998` at 15:04:38 GMT, PR #39 `0420fa82ae8c0dd215bd79350afc91663916c0ec` at 15:07:12 GMT.
+
+- **Static:** `dpl_9fGPbmtbbfScRbM5AfkYwBzUDrpD` from `0420fa82`. Promoted at about 15:08 GMT.
+- **Rollback:** `dpl_4DarVmBySV9ujJq3Lrdn7MJgDx93`.
+- **SQL / edge functions:** none.
+
+### 2026-10-28 12:05 GMT — PR #35, SQL + edge functions
+
+PR #35 squash `ea90a314bbe55af000e41d3bc0f34bd9569ad151` at 12:02:45 GMT.
+
+- **SQL:** `supabase/orders_capture_split.sql` applied at about 12:04 GMT.
+- **Edge functions:** `notify-order` v46 at about 12:04 GMT, `pay` v53 at about 12:05 GMT (hand-deployed under a GO). `ai` v52, `checkout` v44, `stripe-webhook` v43 and `newcoming` v37 unchanged.
+- **Static:** none.
 
 ### 2026-10-26 15:34 GMT — PR #31, #30, #32, static + SQL + ai
 
