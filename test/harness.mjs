@@ -131,6 +131,31 @@ function createMockSb(tables, session, mfa) {
     from(table) {
       return makeQuery(tables, table);
     },
+    async rpc(fn, args) {
+      const calls = (tables.__rpc = tables.__rpc || []);
+      calls.push({ fn, args: args || {} });
+      const id = args && args.p_order_id;
+      const row = (tables.orders || []).find((r) => r.id === id);
+      if (fn === "confirm_order_received") {
+        if (tables.__receiptError) return { data: null, error: { message: tables.__receiptError } };
+        const uid = session && session.id;
+        if (row && row.status === "delivered" && !row.received_confirmed_at && (!row.user_id || row.user_id === uid)) {
+          row.received_confirmed_at = new Date().toISOString();
+          row.received_confirmed_by = "customer";
+          return { data: row.received_confirmed_at, error: null };
+        }
+        return { data: null, error: { message: "order cannot be confirmed" } };
+      }
+      if (fn === "admin_mark_received") {
+        if (row && row.status === "delivered" && !row.received_confirmed_at) {
+          row.received_confirmed_at = new Date().toISOString();
+          row.received_confirmed_by = "ops";
+          return { data: row.received_confirmed_at, error: null };
+        }
+        return { data: null, error: { message: "order cannot be marked received" } };
+      }
+      return { data: null, error: { message: "unknown rpc" } };
+    },
     auth,
   };
 }

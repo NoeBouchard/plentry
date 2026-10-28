@@ -33,6 +33,17 @@ Confirm shows **Deliver to this address?** (name, address, **phone**) when Profi
 
 £1.00 in Ops is a **money test** (charges £1.05). Do not place a supermarket order for that test.
 
+## Customer receipt — did it all arrive? (written, not live)
+
+`supabase/order_received.sql` is **PENDING, not applied**. Status values stay new, ordered, delivered. An order is complete when `received_confirmed_at` is set. After that file is applied and this static is promoted:
+
+1. The Orders badge counts only the signed-in customer's own delivered orders that are not yet confirmed.
+2. Those cards ask **Did it all arrive?** **Yes, complete** calls `confirm_order_received` (`received_confirmed_by = 'customer'`, and the row must be that customer's). The button disables while the request is in flight. A failure says **We couldn't confirm this just now, please try again**, enables the button, and reloads the list. **Something's wrong** opens the existing issue thread. The line says auto-completes in X hours, counted from `delivered_at` plus 48. An open issue replaces that line with **Paused while an issue is open**.
+3. The timeline is Payment, Ordered, Delivered, **Complete**. Complete is green once `received_confirmed_at` is set. At 320px those four labels stay on one line.
+4. Ops badges are **Awaiting receipt (Xh left)** and **Complete ✓ (customer, auto, ops, or backfill)**. An open issue shows **Paused while an issue is open** instead of the hours. Chips filter All, Awaiting receipt, and Complete. **Mark complete** calls `admin_mark_received` (`received_confirmed_by = 'ops'`) and the database checks `is_admin_aal2()`. A status change that the database rejects is shown to Ops.
+5. `auto_complete_orders` runs every 15 minutes. It skips rows whose `issue_status` is `open` (the only open value; null and `resolved` do not pause). Resolving the issue does not move `delivered_at`, so a delivery that is already 48 hours old completes on the next sweep.
+6. Applying the file marks a delivered, unconfirmed order `backfill` only when `delivered_at` is null and the issue is not open. That includes historic #31 and #38, and #39 when its issue is not open. A later apply does not confirm a live delivery. An open issue stays awaiting receipt. PR #34's completion-email backfill must treat `backfill` rows as already emailed or skipped.
+
 ## 4. Issue + Inbox
 
 Customer **Issue** on a paid order opens the thread. Founder nav **Inbox** (open-count badge) lists open threads; **Message customer** on an Ops card starts one. Poll while the modal is open. Customer messages also Telegram-ping. Founder can **Resolve**.
