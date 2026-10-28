@@ -1245,15 +1245,15 @@ function mealFitsDiet(m){
   if(diet==="pescatarian")return d!=="meat";
   return true;
 }
+// Visible: reviewed, or a built-in fallback that has no catalog id.
+// A row with an id and no reviewed_at is hidden (unpublished).
 function isPublished(m){
   if(!m)return false;
   if(m.reviewed_at)return true;
   return m.id==null||m.id===0;
 }
 function publishedPool(list){
-  const all=list||[];
-  const live=all.filter(isPublished);
-  return live.length?live:all;
+  return (list||[]).filter(isPublished);
 }
 function scoreMeal(m){
   const tags=mealTags(m),want=wantedTags();
@@ -1794,8 +1794,19 @@ async function disableMfa(){
 }
 const mealCache={}; // name -> normalised catalog row fetched for an old order (see catalogMealByName)
 function mealByName(n){
-  const m=S.menuOptions.find(x=>x.name===n)||FALLBACK_MEALS.find(x=>x.name===n)||mealCache[n];
-  return m?Object.assign({},m,{ing:completeIng(m)}):null;
+  const m=S.menuOptions.find(x=>x.name===n);
+  if(m)return Object.assign({},m,{ing:completeIng(m)});
+  // A hidden catalog name must not fall through to a built-in dinner of the same name.
+  if(n&&hiddenMealCategory[n])return null;
+  // A successful database read is the catalog. Built-ins stay out, including ones removed from the database.
+  if(catalogFromDb){
+    const cached=mealCache[n];
+    if(cached&&isPublished(cached))return Object.assign({},cached,{ing:completeIng(cached)});
+    return null;
+  }
+  const fb=FALLBACK_MEALS.find(x=>x.name===n)||mealCache[n];
+  if(fb&&isPublished(fb))return Object.assign({},fb,{ing:completeIng(fb)});
+  return null;
 }
 const selectedMeals=()=>S.selected.map(mealByName).filter(Boolean);
 
@@ -2170,7 +2181,7 @@ async function loadWeekCatalog(){
 }
 function autoPickWeek(){
   const n=clampMeals(S.prefs.meals);
-  if(!S.menuOptions.length)S.menuOptions=FALLBACK_MEALS.map(normMeal);
+  if(!S.menuOptions.length&&!catalogFromDb)S.menuOptions=FALLBACK_MEALS.map(normMeal);
   const pool=rankCatalog(publishedPool(S.menuOptions));
   const s=preferredStoreObj()||STORES[0];
   const picked=[];
@@ -3095,36 +3106,56 @@ const normMeal=m=>{
   const portions=copyPortions(m&&m.portions);if(portions)out.portions=portions;
   if(m&&m.id)out.id=+m.id;
   if(m&&m.reviewed_at)out.reviewed_at=m.reviewed_at;
+  if(m&&m.category&&MEAL_CATEGORIES.indexOf(m.category)>=0)out.category=m.category;
   const r=storedRecipe(m);
   if(r)out.recipe=r;
   return out;
 };
 // Customer week reads the shared catalog. Founder writes via the Meals screen
 // (RLS email gate). The `ai` function still inserts advisor drafts as newcoming.
+// Every read includes id and reviewed_at so isPublished can tell a hidden row
+// from a built-in fallback. The list returned here is visible meals only.
+let catalogFromDb=false;
+let hiddenMealCategory={};
+let weekSwapNotice="";
 async function loadCatalogMeals(){
+  catalogFromDb=false;
+  hiddenMealCategory={};
   let dbMeals=[];
   if(sb){
     const pull=async()=>{
       try{
-        const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions");
-        if(!error&&data)return data.filter(validMeal).map(normMeal);
+        const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions,category");
+        if(!error&&data)return data;
       }catch(e){}
       try{
-        const {data}=await sb.from("meals").select("name,emoji,time,ing,image_url");
-        if(data)return data.filter(validMeal).map(normMeal);
+        const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,image_url,reviewed_at,category");
+        if(!error&&data)return data;
       }catch(e2){}
       try{
-        const {data}=await sb.from("meals").select("name,emoji,time,ing");
-        if(data)return data.filter(validMeal).map(normMeal);
+        const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,reviewed_at,category");
+        if(!error&&data)return data;
       }catch(e3){}
-      return [];
+      return null;
     };
-    try{dbMeals=await pull();}catch(e){dbMeals=[];}
+    try{
+      const data=await pull();
+      if(data){
+        catalogFromDb=true;
+        dbMeals=data.filter(validMeal).map(normMeal);
+      }
+    }catch(e){dbMeals=[];}
   }
+  // Built-ins are only for a failed read. A successful read, even an empty one,
+  // must not put a removed or unpublished built-in back on the customer week.
   const seed=FALLBACK_MEALS.map(normMeal);
-  if(!(dbMeals&&dbMeals.length))return seed;
-  const seen=new Set(dbMeals.map(m=>m.name));
-  return dbMeals.concat(seed.filter(m=>!seen.has(m.name)));
+  const merged=catalogFromDb?dbMeals:seed;
+  const hidden={};
+  merged.forEach(m=>{
+    if(m&&m.name&&!isPublished(m)&&m.category)hidden[m.name]=m.category;
+  });
+  hiddenMealCategory=hidden;
+  return merged.filter(isPublished);
 }
 function itemUnitPrice(key, store){
   const r=store?shelfRow(key, store):null;
@@ -3457,32 +3488,99 @@ function mealTag(m){
 }
 function sanitizeMeals(){
   S.menuOptions=(Array.isArray(S.menuOptions)?S.menuOptions:[]).filter(validMeal).map(normMeal);
-  const names=new Set([...S.menuOptions.map(m=>m.name),...FALLBACK_MEALS.map(m=>m.name)]);
-  S.selected=(Array.isArray(S.selected)?S.selected:[]).filter(n=>names.has(n));
 }
+function swapNoticeText(n){
+  return n===1?"We swapped 1 meal that is no longer available.":"We swapped "+n+" meals that are no longer available.";
+}
+// Next visible dinner for one slot. Same diet and veg-cap rules as autoPickWeek.
+// Same category first when the dropped dinner had one, then the ranked pool.
+function replacementFor(taken, category){
+  const pool=(Array.isArray(S.menuOptions)?S.menuOptions:[]).filter(isPublished);
+  const ranked=rankCatalog(publishedPool(pool));
+  const n=clampMeals(S.prefs.meals);
+  const vegCap=dietPref()==="omnivore"?Math.min(1,n):n;
+  const isVeg=m=>{const d=mealDiet(m);return d==="vegetarian"||d==="vegan";};
+  let veg=0;
+  (taken||[]).forEach(name=>{
+    const m=pool.find(x=>x&&x.name===name);
+    if(m&&isVeg(m))veg++;
+  });
+  function consider(m,relax){
+    if(!m||!m.name||taken.indexOf(m.name)>=0||!isPublished(m)||!mealFitsDiet(m))return false;
+    if(!relax&&dietPref()==="omnivore"&&isVeg(m)&&veg>=vegCap)return false;
+    return true;
+  }
+  const lists=[];
+  if(category)lists.push(ranked.filter(m=>m.category===category));
+  lists.push(ranked);
+  for(let p=0;p<lists.length;p++){
+    const list=lists[p];
+    for(let i=0;i<list.length;i++)if(consider(list[i],false))return list[i];
+    for(let i=0;i<list.length;i++)if(consider(list[i],true))return list[i];
+  }
+  return null;
+}
+let ensureWeekTask=null;
 async function ensureWeek(){
-  try{
-    const catalog=await loadCatalogMeals();
-    if(catalog.length){
-      const names=new Set(catalog.map(m=>m.name));
-      S.menuOptions=catalog;
-      S.selected=(Array.isArray(S.selected)?S.selected:[]).filter(n=>names.has(n));
-    }
-  }catch(e){}
-  sanitizeMeals();
-  if(!S.menuOptions.length)S.menuOptions=FALLBACK_MEALS.map(normMeal);
-  if(!selectedMeals().length)autoPickWeek();
+  if(ensureWeekTask)return ensureWeekTask;
+  ensureWeekTask=runEnsureWeek();
+  try{return await ensureWeekTask;}
+  finally{ensureWeekTask=null;}
+}
+async function runEnsureWeek(){
+  const previous=Array.isArray(S.menuOptions)?S.menuOptions.slice():[];
+  const prior={};
+  previous.forEach(m=>{if(m&&m.name&&prior[m.name]==null)prior[m.name]=m;});
+  let catalog=[];
+  try{catalog=await loadCatalogMeals();}catch(e){catalog=[];}
+  if(catalog.length)S.menuOptions=catalog.filter(isPublished);
+  else if(!catalogFromDb){
+    const kept=(Array.isArray(S.menuOptions)?S.menuOptions:[]).filter(m=>m&&isPublished(m));
+    S.menuOptions=kept.length?kept:FALLBACK_MEALS.map(normMeal);
+  }else S.menuOptions=[];
+  const visible={};
+  S.menuOptions.forEach(m=>{if(m&&m.name&&isPublished(m))visible[m.name]=1;});
+  const saved=Array.isArray(S.selected)?S.selected.slice():[];
+  const slots=[];
+  const taken=[];
+  saved.forEach(name=>{
+    if(name&&visible[name]&&taken.indexOf(name)<0){slots.push(name);taken.push(name);}
+    else slots.push(null);
+  });
+  let swapped=0;
+  for(let i=0;i<slots.length;i++){
+    if(slots[i])continue;
+    const name=saved[i];
+    const old=name?prior[name]:null;
+    const category=(name&&hiddenMealCategory[name])||(old&&old.category)||"";
+    const repl=replacementFor(taken, category);
+    swapped++;
+    if(repl){slots[i]=repl.name;taken.push(repl.name);}
+  }
+  const next=slots.filter(Boolean);
+  if(!next.length){
+    if(!S.menuOptions.length&&!catalogFromDb)S.menuOptions=FALLBACK_MEALS.map(normMeal);
+    if(S.menuOptions.length)autoPickWeek();
+    else S.selected=[];
+  }else S.selected=next;
+  if(swapped)weekSwapNotice=swapNoticeText(swapped);
   save();
   syncBasketFromMeals();
+  if(swapped){
+    const menu=document.getElementById("scr-menu");
+    if(menu&&menu.classList.contains("active"))renderMenu();
+  }
 }
 async function loadMenuOptions(force){
   if(force&&!requireAccount("Create an account to pick a new week of dinners."))return;
   if(S.menuOptions.length&&!force){renderMenu();return;}
+  weekSwapNotice="";
+  advisorReviewNotice="";
   const wrap=document.getElementById("menu-week");
   if(wrap)wrap.innerHTML='<div class="card" style="text-align:center"><p class="sub" style="margin:8px 0 0">Loading dinners from the catalog…</p></div>';
   let catalog=[];
   try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
-  if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
+  if(!catalog.length&&!catalogFromDb)catalog=FALLBACK_MEALS.map(normMeal);
   S.menuOptions=catalog;
   advanceWeekSeed();
   autoPickWeek();
@@ -3564,6 +3662,8 @@ function renderMenu(){
         <button class="btn ghost sm" onclick="loadMenuOptions(true)">↻ New week</button>
       </div>
       <p class="sub">Tap Modify to swap a dinner. Your week stays ${esc(S.prefs.meals)} meals.</p>
+      ${weekSwapNotice?`<div class="alert" id="week-swap-notice">${esc(weekSwapNotice)}</div>`:""}
+      ${advisorReviewNotice?`<div class="alert" id="advisor-review-notice">${esc(advisorReviewNotice)}</div>`:""}
       <div class="week-head">
         <div class="week-card"><div class="k">This shop</div><div class="v">${quote.est?"£"+pay.toFixed(2):"—"}</div></div>
         <div class="week-card"><div class="k">${basket.length||Object.keys(buy).length} items</div><div class="v">${s?esc(s.name):"Pick a shop"}</div></div>
@@ -3694,8 +3794,8 @@ async function openModify(selI){
   openModal(`<h2>Replace ${esc(current.name)}</h2><p class="sub">Finding other dinners…</p>`);
   let catalog=[];
   try{catalog=await loadCatalogMeals();}catch(e){catalog=FALLBACK_MEALS.map(normMeal);}
-  if(!catalog.length)catalog=FALLBACK_MEALS.map(normMeal);
-  catalog.forEach(m=>{if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.push(m);});
+  if(!catalog.length&&!catalogFromDb)catalog=FALLBACK_MEALS.map(normMeal);
+  catalog.forEach(m=>{if(m&&isPublished(m)&&!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.push(m);});
   if(token!==modifyToken)return;
   modifyCatalog=catalog;
   takeModifyPage(true);
@@ -3722,10 +3822,12 @@ function applyModify(selI,j){
 
 // ---------- MEAL ADVISOR ----------
 let advisorMsgs=[],advisorProposed=[],advisorPicked=new Set();
+let advisorReviewNotice="";
 function openAdvisor(){
   if(!requireAccount("Create an account to choose dinners with the meal advisor."))return;
   advisorMsgs=[{role:"assistant",content:"Hey! I'm your meal advisor 👋 What are you in the mood for this week — comfort food, something fresh, quick weeknight dinners?"}];
   advisorProposed=[];advisorPicked=new Set();
+  advisorReviewNotice="";
   renderAdvisor();
 }
 function renderAdvisor(thinking){
@@ -3734,6 +3836,7 @@ function renderAdvisor(thinking){
       ${advisorMsgs.map(m=>`<div class="bubble ${m.role==="assistant"?"ai":"user"}">${esc(m.content)}</div>`).join("")}
       ${thinking?'<div class="bubble ai"><span class="spin">✨</span> thinking…</div>':""}
     </div>
+    ${advisorReviewNotice?`<div class="alert" id="advisor-review-notice">${esc(advisorReviewNotice)}</div>`:""}
     <div id="adv-meals">${advisorProposed.length?renderAdvisorMeals():""}</div>
     <div class="row" style="margin-top:10px">
       <input id="adv-input" placeholder="Type your answer…" onkeydown="if(event.key==='Enter')sendAdvisor()">
@@ -3771,16 +3874,30 @@ async function sendAdvisor(){
   }
   renderAdvisor(false);
 }
-function addAdvisorMeals(){
+async function addAdvisorMeals(){
   const picked=advisorProposed.filter((_,i)=>advisorPicked.has(i));
   if(!picked.length)return;
-  // The ai fn already persisted these dishes. Week length stays prefs.meals:
-  // fill empty slots, then replace from Monday — never grow past N.
-  const n=clampMeals(S.prefs.meals);
+  // The ai fn already saved new dishes unpublished. Only a published catalog
+  // dinner may join the week. A new idea stays in the review queue.
+  let catalog=[];
+  try{catalog=await loadCatalogMeals();}catch(e){catalog=[];}
+  const visible={};
+  (catalog||[]).forEach(m=>{if(m&&m.name&&isPublished(m))visible[m.name]=m;});
+  const live=[];
+  let fresh=0;
   picked.forEach(m=>{
+    const known=m&&m.name?visible[m.name]:null;
+    if(known){if(!live.some(x=>x.name===known.name))live.push(known);}
+    else if(m&&m.name)fresh++;
+  });
+  advisorReviewNotice=fresh?"We've sent this idea to our kitchen to review.":"";
+  if(!live.length){renderAdvisor(false);return;}
+  // Week length stays prefs.meals: fill empty slots, then replace from Monday.
+  const n=clampMeals(S.prefs.meals);
+  live.forEach(m=>{
     if(!S.menuOptions.some(x=>x.name===m.name))S.menuOptions.unshift(m);
   });
-  const incoming=picked.filter(m=>!S.selected.includes(m.name));
+  const incoming=live.filter(m=>!S.selected.includes(m.name));
   const next=S.selected.slice();
   let r=0;
   for(const m of incoming){
@@ -3798,12 +3915,17 @@ function addAdvisorMeals(){
 async function catalogMealByName(name){
   const key=String(name==null?"":name).trim();
   if(!key)return null;
-  if(mealCache[key])return mealCache[key];
+  if(mealCache[key])return isPublished(mealCache[key])?mealCache[key]:null;
   if(!sb)return null;
   try{
-    const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions").eq("name",key).limit(1);
+    const {data,error}=await sb.from("meals").select("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions,category").eq("name",key).limit(1);
     const row=!error&&Array.isArray(data)?data.find(validMeal):null;
-    if(row){mealCache[key]=normMeal(row);return mealCache[key];}
+    if(row){
+      const meal=normMeal(row);
+      if(!isPublished(meal))return null;
+      mealCache[key]=meal;
+      return meal;
+    }
   }catch(e){}
   return null;
 }
@@ -4343,6 +4465,18 @@ function persistDelivery(d){
   const pc=document.getElementById("pr-postcode");if(pc)pc.value=d.postcode;
   const dpc=document.getElementById("pr-del-postcode");if(dpc)dpc.value=d.postcode;
 }
+async function selectionOrderable(){
+  let catalog=[];
+  try{catalog=await loadCatalogMeals();}catch(e){catalog=null;}
+  const names=Array.isArray(S.selected)?S.selected:[];
+  if(!catalog)return !names.length;
+  const visible={};
+  catalog.forEach(m=>{if(m&&m.name&&isPublished(m))visible[m.name]=1;});
+  for(let i=0;i<names.length;i++){
+    if(!names[i]||!visible[names[i]])return false;
+  }
+  return true;
+}
 async function placeOrder(){
   if(!chosenStore||!basket.length)return;
   if(!sb||!S.user||!S.user.id){
@@ -4364,6 +4498,18 @@ async function placeOrder(){
     const err=document.getElementById("slot-err")||document.getElementById("del-err");
     if(err)err.textContent="Pick a delivery day (3+ days out) and a 2-hour window.";
     else confirmOrder();
+    return;
+  }
+  if(!(await selectionOrderable())){
+    const msg="Refresh your week. A dinner in it is no longer available.";
+    const err=document.getElementById("del-err")||document.getElementById("slot-err");
+    if(err)err.textContent=msg;
+    await ensureWeek();
+    const menu=document.getElementById("scr-menu");
+    if(menu&&!menu.classList.contains("active"))nav("menu");
+    else renderMenu();
+    if(!err)openModal(`<h2>Refresh your week</h2><p class="sub">${esc(msg)}</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
+    else closeModal();
     return;
   }
   persistDelivery(d);

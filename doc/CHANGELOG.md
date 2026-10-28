@@ -2,6 +2,16 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-28 — Hidden meals stay off the week
+
+- **Catalog.** Customer reads, including the two fallbacks, select `id` and `reviewed_at` (and `category`). `isPublished` is the visibility rule: `reviewed_at` set, or a built-in fallback with no id. A catalog id with no `reviewed_at` is hidden. `loadCatalogMeals` returns visible meals only. An unpublished database row still blocks the built-in dinner of the same name. Admin Meals is unchanged and still lists unpublished rows.
+- **Week load.** `ensureWeek` drops a saved dinner that is hidden or not in that catalog and swaps in a visible meal for that slot. Same category when the dropped dinner had one, otherwise the usual ranked pick (diet and the omnivore veg cap). The customer sees “We swapped N meals that are no longer available.” The cleaned week is saved. A second load does not swap those replacements again.
+- **Checkout.** `placeOrder` checks the week against the visible catalog. A hidden or unknown dinner does not insert the order. The customer is asked to refresh the week.
+- **Advisor.** A dinner the advisor just created stays unpublished in the review queue and is not added to the week. The customer sees “We've sent this idea to our kitchen to review.” A proposal that is already a published catalog dinner can still be added.
+- **Checkout.** When `placeOrder` refuses a hidden or unknown dinner, it runs the same `ensureWeek` swap immediately. The “We swapped N meals…” notice shows without a reload, and the customer can retry.
+- **Built-ins.** A successful database read does not merge the built-in dinner list back in. An unpublished or removed built-in stays hidden. Built-ins are only the fallback when the read fails. Admin Meals is unchanged.
+- **Not live.** No SQL. No meal rows edited. No `supabase/migrations/`. Static and edge functions are not deployed. `npm test` **229** on main after the servings and delivery-window changes (**223**); I-W09 adds 6 tests.
+
 ## 2026-10-28 — A stale delivery day is not a choice
 
 - **Checkout.** A chosen day that is no longer in the window (left open past midnight, or inside the 3-day lead) is cleared, with its time. Time buttons stay off and pay stays off. The disabled pay button shows “Choose a delivery day and time to continue” (`aria-describedby="slot-prompt"`). That line is hidden once both are chosen. Day and time buttons set `aria-pressed`. Money, SQL, and edge functions are unchanged.

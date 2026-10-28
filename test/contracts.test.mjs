@@ -850,15 +850,43 @@ describe("I-A13 published meals read (applied on prod 25 Oct 2026)", () => {
         }
       }
     }
-    assert.match(catalog, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions"\)/);
-    assert.match(catalog, /\.from\("meals"\)\.select\("name,emoji,time,ing,image_url"\)/);
-    assert.match(catalog, /\.from\("meals"\)\.select\("name,emoji,time,ing"\)/);
-    assert.match(byName, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions"\)/);
+    assert.match(catalog, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions,category"\)/);
+    assert.match(catalog, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,image_url,reviewed_at,category"\)/);
+    assert.match(catalog, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,reviewed_at,category"\)/);
+    assert.match(byName, /\.from\("meals"\)\.select\("id,name,emoji,time,ing,image_url,recipe,tags,reviewed_at,portions,category"\)/);
 
     const adminFn = html.slice(adminStart, adminEnd);
     assert.match(adminFn, /if\(!isAdmin\(\)\)/);
     assert.match(adminFn, /source,created_at/);
     assert.match(adminFn, /\.from\("meals"\)\.select\(cols\)/);
+  });
+});
+
+describe("I-W09 hidden meals stay off the customer catalog", () => {
+  it("I-W09 catalog fallbacks select id and reviewed_at", () => {
+    const start = html.indexOf("async function loadCatalogMeals()");
+    const end = html.indexOf("function itemUnitPrice(", start);
+    assert.ok(start >= 0 && end > start);
+    const catalog = html.slice(start, end);
+    const lists = [...catalog.matchAll(/\.select\("([^"]*)"\)/g)];
+    assert.equal(lists.length, 3);
+    for (const list of lists) {
+      const cols = list[1].split(",").map((s) => s.trim());
+      assert.equal(cols.includes("id"), true, list[1]);
+      assert.equal(cols.includes("reviewed_at"), true, list[1]);
+    }
+    assert.match(lists[1][1], /^id,/);
+    assert.match(lists[2][1], /^id,/);
+    assert.match(lists[1][1], /reviewed_at/);
+    assert.match(lists[2][1], /reviewed_at/);
+    assert.match(catalog, /return merged\.filter\(isPublished\)/);
+    assert.match(catalog, /const merged=catalogFromDb\?dbMeals:seed/);
+    assert.doesNotMatch(catalog, /dbMeals\.concat\(seed/);
+    assert.match(html, /We've sent this idea to our kitchen to review\./);
+    assert.match(html, /id="advisor-review-notice"/);
+    assert.match(html, /We swapped "\+n\+" meals that are no longer available\./);
+    assert.match(html, /id="week-swap-notice"/);
+    assert.match(html, /Refresh your week\. A dinner in it is no longer available\./);
   });
 });
 
