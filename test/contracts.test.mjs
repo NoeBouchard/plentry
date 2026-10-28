@@ -992,3 +992,22 @@ describe("meals MAINTAIN revoke (pending, not applied)", () => {
     assert.equal(active.slice(commit + "commit;".length).trim(), "");
   });
 });
+
+describe("servings scaling (I-P01 / I-P05)", () => {
+  it("resolves an unchosen household, prompts before this week, lists scaled ingredients, and snapshots servings on the local order", () => {
+    assert.equal(html.match(/S\.prefs\.servings=resolveServings\(S\.prefs\)/g).length, 3);
+    assert.match(html, /function resolveServings\(prefs\)/);
+    assert.match(html, /p\.servingsChosen===true&&has\)return normServings\(p\.servings\)/);
+    assert.match(html, /if\(!has\)return servingsFromHousehold\(p\.size\)/);
+    assert.match(html, /if\(stored===2&&fromHouse!==2\)return fromHouse/);
+    assert.match(html, /Apply cooking for "/);
+    assert.match(html, /function applyServingsToCurrentWeek\(\)/);
+    assert.match(html, /S\.basketEdit=null/);
+    assert.match(html, /class="ing-scaled"/);
+    assert.match(html, /Step amounts are written for 2\. Multiply by /);
+    assert.match(html, /ai\("recipe",\{name,ing:meal\.ing,servings:n\}\)/);
+    assert.match(html, /servings:n\}/);
+    assert.match(html, /meals:\[\.\.\.S\.selected\],servings:weekServings\(\)/);
+    assert.doesNotMatch(html, /ai\("recipe",\{name,ing:meal\.ing,servings:2\}\)/);
+  });
+});

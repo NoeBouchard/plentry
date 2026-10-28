@@ -221,6 +221,10 @@
   .recipe-step .n{color:var(--green);font-weight:800;flex-shrink:0}
   .recipe-heading{font-weight:700;font-size:.92rem;color:var(--green-d);margin:16px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
   .recipe-heading:first-child{margin-top:0;padding-top:0;border-top:none}
+  .ing-scaled{list-style:none;margin:6px 0 12px;padding:0;background:var(--card2);border:1px solid var(--line);border-radius:12px}
+  .ing-scaled li{padding:8px 12px;border-bottom:1px solid var(--line);font-size:.95rem;font-weight:700}
+  .ing-scaled li:last-child{border-bottom:none}
+  .recipe-note{margin:0 0 12px;color:var(--text)}
   .bubble{max-width:85%;padding:9px 13px;border-radius:14px;margin:6px 0;font-size:.87rem;line-height:1.4}
   .bubble.ai{background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:4px;margin-right:auto}
   .bubble.user{background:var(--green-d);color:#fff;border-bottom-right-radius:4px;margin-left:auto;font-weight:600}
@@ -402,7 +406,7 @@
         </select></div>
       </div>
       <div style="margin-top:12px"><label>Cooking for</label>
-        <p class="sub" id="pr-servings-note">2, 4 or 6. A 3-person home cooks for 4. This applies to the next week you build.</p>
+        <p class="sub" id="pr-servings-note">2, 4 or 6. A 3-person home cooks for 4. We'll ask before changing the week already on screen.</p>
         <div id="pr-servings"></div>
       </div>
       <div style="margin-top:12px"><label>Dinners / week</label><div id="pr-meals-bar"></div><select id="pr-meals" style="display:none"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
@@ -919,6 +923,18 @@ function basketFor(weekMeals, servings, cupboardTicks, catalog, strict, storePac
   return packs;
 }
 /* portions:end */
+// A stored 2 is the old default (and the merge in loadCloudState), not a choice,
+// unless servingsChosen is set. Anything else stored, or a missing key, follows household.
+function resolveServings(prefs){
+  const p=prefs&&typeof prefs==="object"?prefs:{};
+  const has=Object.prototype.hasOwnProperty.call(p,"servings")&&p.servings!=null&&p.servings!=="";
+  if(p.servingsChosen===true&&has)return normServings(p.servings);
+  if(!has)return servingsFromHousehold(p.size);
+  const stored=normServings(p.servings);
+  const fromHouse=servingsFromHousehold(p.size);
+  if(stored===2&&fromHouse!==2)return fromHouse;
+  return stored;
+}
 const STAPLES=["olive oil","butter","garlic","onions","lemons","curry paste","salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
 function isStaple(i){return STAPLES.indexOf(i)>=0;}
 // In-house SVGs. Served from /vendor/cupboard/ (same origin, immutable cache). A name with no picture uses the fallback jar.
@@ -952,7 +968,7 @@ function cupboardIconHtml(name,px){
   return `<img class="cupboard-ico" src="${cupboardIconSrc(name)}" width="${n}" height="${n}" alt="" aria-hidden="true">`;
 }
 function weekServings(){return normServings(S.weekServings==null?S.prefs.servings:S.weekServings);}
-function lockWeekServings(){S.weekServings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));}
+function lockWeekServings(){S.weekServings=resolveServings(S.prefs);}
 function cookMinutes(m,servings){
   const base=Math.max(0,Math.round(+(m&&m.time)||0));
   const s=normServings(servings==null?weekServings():servings);
@@ -977,9 +993,9 @@ function copyPortions(raw){
   });
   return Object.keys(out).length?out:null;
 }
-function formatScaledIng(meal,servings){
+function scaledIngLines(meal,servings){
   const p=meal&&meal.portions;
-  if(!p)return "";
+  if(!p||typeof p!=="object"||Array.isArray(p))return [];
   const s=normServings(servings==null?weekServings():servings);
   return Object.keys(p).filter(k=>SEASONINGS.indexOf(k)<0).map(k=>{
     const amount=scalePortion(+p[k][0],String(p[k][1]),k,s);
@@ -990,12 +1006,58 @@ function formatScaledIng(meal,servings){
     if(unit==="clove")return num+" clove"+(n===1?"":"s")+" "+k;
     if(unit==="tbsp"||unit==="tsp")return num+" "+unit+" "+k;
     return num+unit+" "+k;
-  }).join(" · ");
+  });
+}
+function formatScaledIng(meal,servings){
+  const lines=scaledIngLines(meal,servings);
+  return lines.length?lines.join(" · "):"";
+}
+function scaledIngListHtml(meal,servings){
+  const lines=scaledIngLines(meal,servings);
+  if(!lines.length)return "";
+  return `<ul class="ing-scaled">${lines.map(line=>`<li>${esc(line)}</li>`).join("")}</ul>`;
+}
+// Catalog methods are written for 2. A recipe the AI just wrote for N says so, and is not multiplied again.
+function recipeStepNote(wroteFor, cookingFor){
+  const w=normServings(wroteFor);
+  const c=normServings(cookingFor);
+  if(w!==2)return "Steps are written for "+w+".";
+  return "Step amounts are written for 2. Multiply by "+(c/2)+" (×2 for 4, ×3 for 6).";
 }
 function servingsNote(){
-  const s=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));
+  const s=resolveServings(S.prefs);
   if(String(S.prefs.size)==="3")return "Cooking for "+s+" — a 3-person home gets a lunch portion.";
   return "Cooking for "+s+".";
+}
+function servingsWeekCopy(){
+  const next=normServings(S.prefs.servings);
+  const week=weekServings();
+  if(next===week)return "This week cooks for "+week+".";
+  return "Next week you build cooks for "+next+". This week stays serves "+week+".";
+}
+function paintServingsNotes(){
+  const note=document.getElementById("ob-servings-note");if(note)note.textContent=servingsNote();
+  const pr=document.getElementById("pr-servings-note");
+  if(pr)pr.textContent=servingsWeekCopy();
+}
+function applyServingsToCurrentWeek(){
+  S.weekServings=normServings(S.prefs.servings);
+  S.basketEdit=null;
+  syncBasketFromMeals();
+  save();
+  renderMenu();
+}
+function offerApplyServingsToWeek(){
+  const next=normServings(S.prefs.servings);
+  const current=weekServings();
+  if(next===current)return;
+  if(!S.onboarded)return;
+  if(!Array.isArray(S.selected)||!S.selected.length)return;
+  const q="Apply cooking for "+next+" to this week too? The basket will be rescaled. Cancel keeps this week at "+current+", and the next week you build cooks for "+next+".";
+  let yes=false;
+  try{yes=typeof confirm==="function"&&confirm(q)===true;}catch(e){yes=false;}
+  if(!yes)return;
+  applyServingsToCurrentWeek();
 }
 function servingsControlHtml(active){
   const n=normServings(active);
@@ -1007,19 +1069,20 @@ function renderServingsControl(id){
 }
 function setServings(n){
   S.prefs.servings=normServings(n);
+  S.prefs.servingsChosen=true;
   save();
   renderServingsControl("pr-servings");
-  const note=document.getElementById("ob-servings-note");if(note)note.textContent=servingsNote();
-  const pr=document.getElementById("pr-servings-note");
-  if(pr)pr.textContent="Next week you build cooks for "+S.prefs.servings+". This week stays serves "+weekServings()+".";
+  offerApplyServingsToWeek();
+  paintServingsNotes();
 }
 function onProfileSize(){
   const el=document.getElementById("pr-size");if(!el)return;
   S.prefs.size=el.value;
   S.prefs.servings=servingsFromHousehold(el.value);
+  S.prefs.servingsChosen=false;
   renderServingsControl("pr-servings");
-  const pr=document.getElementById("pr-servings-note");
-  if(pr)pr.textContent="Next week you build cooks for "+S.prefs.servings+". This week stays serves "+weekServings()+".";
+  offerApplyServingsToWeek();
+  paintServingsNotes();
 }
 function seasoningFor(m){
   const blob=((m&&m.name||"")+" "+((m&&m.ing)||[]).join(" ")).toLowerCase();
@@ -1460,7 +1523,7 @@ if(!S.prefs.diet)S.prefs.diet="omnivore";
 S.prefs.budget=normBudget(S.prefs.budget,null); // local blob is untrusted too; never fill £60 for a missing budget
 S.prefs.postcode=normPostcode(S.prefs.postcode)||""; // a missing postcode stays empty; a saved one is kept
 S.prefs.meals=clampMeals(S.prefs.meals);
-S.prefs.servings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));
+S.prefs.servings=resolveServings(S.prefs);
 if(S.weekServings==null)S.weekServings=S.prefs.servings;
 else S.weekServings=normServings(S.weekServings);
 S.prefs.delivery=deliveryFrom(S.prefs.delivery);
@@ -1499,7 +1562,7 @@ async function loadCloudState(user){
         basketEdit:Array.isArray(data.state.basketEdit)&&data.state.basketEdit.length?data.state.basketEdit:null,
         basketFor:data.state.basketFor||null,
         weekServings:data.state.weekServings==null?null:normServings(data.state.weekServings)});
-      S.prefs.servings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));
+      S.prefs.servings=resolveServings(S.prefs);
       if(S.weekServings==null)S.weekServings=S.prefs.servings;
     }
   }catch(e){}
@@ -1810,6 +1873,7 @@ function saveHousehold(){
   S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("ob-size").value;
   S.prefs.servings=servingsFromHousehold(S.prefs.size);
+  S.prefs.servingsChosen=false;
   S.prefs.budget=normBudget(S.prefs.budget,null);
   S.prefs.meals=clampMeals(document.getElementById("ob-meals").value);
   save();
@@ -1903,6 +1967,7 @@ function adjSize(d){
   let n=Math.max(1,Math.min(6,sizeNum()+d));
   S.prefs.size=String(n);
   S.prefs.servings=servingsFromHousehold(S.prefs.size);
+  S.prefs.servingsChosen=false;
   const sel=document.getElementById("ob-size");if(sel)sel.value=S.prefs.size;
   save();syncSizeLabel();
 }
@@ -3709,6 +3774,7 @@ function parseStepWithHeading(step){
   return {text:s};
 }
 async function showRecipe(name, snapshot, servingsOverride){
+  const n=normServings(servingsOverride==null?weekServings():servingsOverride);
   const snap=snapshot&&storedRecipe(snapshot)?snapshot:null;
   let meal=snap||mealByName(name);
   if(!meal){
@@ -3721,13 +3787,15 @@ async function showRecipe(name, snapshot, servingsOverride){
     }
   }
   const stored=storedRecipe(meal);
+  let wroteFor=2;
   if(stored){
     S.recipes[name]=stored;
     save();
   }else if(!snap&&!S.recipes[name]){
     openModal(`<h2>${esc(meal.emoji)} ${esc(name)}</h2><p class="sub"><span class="spin">✨</span> Writing your recipe…</p>`);
-    const res=await ai("recipe",{name,ing:meal.ing,servings:2});
-    S.recipes[name]=(res&&Array.isArray(res.steps)&&res.steps.length)?{steps:res.steps,tip:res.tip||""}:{
+    const res=await ai("recipe",{name,ing:meal.ing,servings:n});
+    const got=res&&Array.isArray(res.steps)&&res.steps.length;
+    S.recipes[name]=got?{steps:res.steps,tip:res.tip||"",servings:n}:{
       steps:[`Prep everything on the list: ${meal.ing.join(", ")}.`,
         `Heat a splash of olive oil in a large pan over medium heat.`,
         `Start with the aromatics and any meat or protein; cook until coloured (5–8 min).`,
@@ -3735,7 +3803,10 @@ async function showRecipe(name, snapshot, servingsOverride){
         `Simmer or cook through until everything is tender (10–15 min).`,
         `Taste, adjust seasoning from the list, and serve hot.`],
       tip:"Read all steps once before you start — it makes everything smoother."};
+    if(got)wroteFor=n;
     save();
+  }else if(!stored&&S.recipes[name]&&S.recipes[name].servings!=null){
+    wroteFor=normServings(S.recipes[name].servings);
   }
   const r=stored||S.recipes[name];
   if(!r||!Array.isArray(r.steps)||!r.steps.length){
@@ -3743,10 +3814,12 @@ async function showRecipe(name, snapshot, servingsOverride){
       <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">OK</button>`);
     return;
   }
-  const n=normServings(servingsOverride==null?weekServings():servingsOverride);
+  if(stored)wroteFor=2;
   const serves=n===2?"quantities for 2":("serves "+n);
-  const scaled=formatScaledIng(meal,n);
-  const bigger=n===2?"":`<p class="sub">Written for 2 — you're cooking for ${n}: use your largest pan or two, and allow a few extra minutes to brown meat.</p>`;
+  const listHtml=scaledIngListHtml(meal,n);
+  const ingBlock=listHtml
+    ?`<h3 style="margin:12px 0 4px">Ingredients for ${n}</h3>${listHtml}`
+    :`<p class="sub">${esc((meal.ing||[]).join(", "))}</p>`;
   let stepNum=0;
   const stepsHtml=r.steps.map((s)=>{
     const parsed=parseStepWithHeading(s);
@@ -3757,8 +3830,8 @@ async function showRecipe(name, snapshot, servingsOverride){
   }).join("");
   openModal(`<h2>${esc(meal.emoji||"🍽️")} ${esc(name)}</h2>
     <p class="sub">${cookMinutes(meal,n)} min · ${esc(serves)}</p>
-    ${bigger}
-    ${scaled?`<p class="sub">${esc(scaled)}</p>`:`<p class="sub">${esc((meal.ing||[]).join(", "))}</p>`}
+    ${ingBlock}
+    <p class="recipe-note">${esc(recipeStepNote(wroteFor,n))}</p>
     ${stepsHtml}
     ${r.tip?`<div class="alert ok" style="margin-top:12px">💡 ${esc(r.tip)}</div>`:""}
     <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">Done</button>`);
@@ -4227,7 +4300,7 @@ async function placeOrder(){
   const {t}=compareQuote(chosenStore);
   const items=orderItemsPayload();
   const order={id:Date.now(),backendId:null,storeId:chosenStore.id,store:chosenStore.name,total:t,eta:chosenStore.eta,
-    items,meals:[...S.selected],
+    items,meals:[...S.selected],servings:weekServings(),
     slot_date:slot.slot_date,slot_start:slot.slot_start,slot_end:slot.slot_end,
     date:new Date().toLocaleDateString("en-GB"),status:1,bagUrl:"",adjustUrl:"",pepestoSession:""};
   try{
@@ -4289,8 +4362,9 @@ function openHandoffModal(order){
 }
 async function showRecipePrefetch(name){
   const meal=mealByName(name);if(!meal||storedRecipe(meal)||S.recipes[name])return;
-  const res=await ai("recipe",{name,ing:meal.ing,servings:2});
-  if(res&&Array.isArray(res.steps)&&res.steps.length){S.recipes[name]={steps:res.steps,tip:res.tip||""};save();renderMenu();}
+  const n=weekServings();
+  const res=await ai("recipe",{name,ing:meal.ing,servings:n});
+  if(res&&Array.isArray(res.steps)&&res.steps.length){S.recipes[name]={steps:res.steps,tip:res.tip||"",servings:n};save();renderMenu();}
 }
 function markDelivered(id){
   const o=orderById(id);if(!o||o.status>=3)return;
@@ -4653,8 +4727,7 @@ function renderProfile(){
   document.getElementById("pr-postcode").value=S.prefs.postcode||"";
   document.getElementById("pr-size").value=S.prefs.size==="4+"?"4":String(sizeNum());
   renderServingsControl("pr-servings");
-  const prNote=document.getElementById("pr-servings-note");
-  if(prNote)prNote.textContent="Next week you build cooks for "+normServings(S.prefs.servings)+". This week stays serves "+weekServings()+".";
+  paintServingsNotes();
   document.getElementById("pr-budget").value=S.prefs.budget==null?"":S.prefs.budget;
   renderPrMealBar();
   const sel=document.getElementById("pr-store");
@@ -4679,7 +4752,7 @@ function saveProfile(){
   el.style.color="var(--green)";
   S.prefs.postcode=pc;
   S.prefs.size=document.getElementById("pr-size").value;
-  S.prefs.servings=normServings(S.prefs.servings||servingsFromHousehold(S.prefs.size));
+  S.prefs.servings=resolveServings(S.prefs);
   const budgetEl=document.getElementById("pr-budget");
   const budgetRaw=String(budgetEl.value==null?"":budgetEl.value).trim();
   const budgetBad=budgetEl.validity&&budgetEl.validity.badInput;

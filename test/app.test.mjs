@@ -1776,6 +1776,7 @@ describe("servings (I-P01 / I-P02 / I-P05)", () => {
     window.nav("profile");
     const buttons = [...document.getElementById("pr-servings").querySelectorAll("button")].map((b) => b.textContent);
     assert.deepEqual(buttons, ["2", "4", "6"]);
+    window.confirm = () => false;
     window.setServings(4);
     assert.equal(window.__plentry.state().prefs.servings, 4);
     assert.equal(window.weekServings(), 2);
@@ -1819,8 +1820,12 @@ describe("servings (I-P01 / I-P02 / I-P05)", () => {
     const modal = document.getElementById("modal").textContent;
     assert.ok(modal.includes("800g minced beef"));
     assert.ok(modal.includes("2 onions"));
-    assert.ok(modal.includes("Written for 2"));
-    assert.ok(modal.includes("cooking for 4"));
+    assert.ok(modal.includes("Step amounts are written for 2. Multiply by 2 (×2 for 4, ×3 for 6)."));
+    const lines = [...document.querySelectorAll("#modal .ing-scaled li")].map((li) => li.textContent);
+    assert.ok(lines.includes("800g minced beef"));
+    assert.ok(lines.length > 1);
+    const html = document.getElementById("modal").innerHTML;
+    assert.ok(html.indexOf("ing-scaled") < html.indexOf("recipe-step"));
     assert.ok(modal.includes("Brown the mince."));
     assert.ok(!modal.includes("{{"));
     const order = window.orderFromRow({
@@ -1836,6 +1841,198 @@ describe("servings (I-P01 / I-P02 / I-P05)", () => {
     S.weekServings = 2;
     assert.equal(order.servings, 4);
     assert.equal(window.weekServings(), 2);
+  });
+
+  it("I-P01 a household of 4+ with no explicit cooking-for choice resolves to 4", async () => {
+    const { window } = await loadApp();
+    assert.equal(window.resolveServings({ size: "4+" }), 4);
+    assert.equal(window.resolveServings({ size: "1" }), 2);
+    assert.equal(window.resolveServings({ size: "4+", servings: 2 }), 4);
+    assert.equal(window.resolveServings({ size: "4+", servings: 2, servingsChosen: true }), 2);
+    assert.equal(window.resolveServings({ size: "4+", servings: 6 }), 6);
+    assert.equal(window.servingsFromHousehold("4+"), 4);
+
+    const local = weekState();
+    local.prefs.size = "4+";
+    delete local.prefs.servings;
+    local.weekServings = 2;
+    const booted = await loadApp({ localState: local });
+    assert.equal(booted.window.__plentry.state().prefs.servings, 4);
+    assert.equal(booted.window.weekServings(), 2);
+
+    const poisoned = weekState();
+    poisoned.prefs.size = "4+";
+    poisoned.prefs.servings = 2;
+    poisoned.weekServings = 2;
+    const kept = await loadApp({ localState: poisoned });
+    assert.equal(kept.window.__plentry.state().prefs.servings, 4, "stored default 2 is not a choice");
+    assert.equal(kept.window.weekServings(), 2);
+
+    const chosen = weekState();
+    chosen.prefs.size = "4+";
+    chosen.prefs.servings = 2;
+    chosen.prefs.servingsChosen = true;
+    chosen.weekServings = 2;
+    const explicit = await loadApp({ localState: chosen });
+    assert.equal(explicit.window.__plentry.state().prefs.servings, 2);
+    assert.equal(explicit.window.__plentry.state().prefs.servingsChosen, true);
+
+    const cloud = weekState();
+    cloud.prefs.size = "4+";
+    delete cloud.prefs.servings;
+    cloud.weekServings = 2;
+    const hydrated = await loadApp({
+      session: { id: "u-4plus", email: "four@example.com" },
+      tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u-4plus", state: cloud }] },
+    });
+    assert.equal(hydrated.window.__plentry.state().prefs.servings, 4);
+    assert.equal(hydrated.window.weekServings(), 2);
+
+    const { window: profileWin, document } = await loadApp({ localState: weekState() });
+    const S = profileWin.__plentry.state();
+    S.prefs.size = "4+";
+    S.prefs.servings = 2;
+    delete S.prefs.servingsChosen;
+    S.weekServings = 2;
+    profileWin.confirm = () => { throw new Error("Save should not prompt"); };
+    profileWin.renderProfile();
+    profileWin.saveProfile();
+    assert.equal(S.prefs.servings, 4);
+    assert.equal(profileWin.weekServings(), 2);
+    assert.match(document.getElementById("pr-saved").textContent, /Saved/);
+  });
+
+  it("I-P05 applying cooking-for to this week re-locks and rescales; declining leaves the week and past orders", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.menuOptions = [{
+      name: "Beef ragù spaghetti",
+      emoji: "🍝",
+      time: 35,
+      ing: ["minced beef", "passata", "spaghetti", "parmesan", "onions", "garlic", "olive oil", "salt", "stock cubes"],
+      portions: {
+        "minced beef": [400, "g"],
+        passata: [400, "g"],
+        spaghetti: [180, "g"],
+        parmesan: [30, "g"],
+        onions: [1, "pc"],
+        garlic: [2, "clove"],
+        "olive oil": [1, "tbsp"],
+      },
+      recipe: { steps: ["Brown the mince."], tip: "Don't rush it." },
+    }];
+    S.selected = ["Beef ragù spaghetti"];
+    S.prefs.servings = 2;
+    S.weekServings = 2;
+    S.basketEdit = null;
+    S.orders = [{ id: 3, servings: 2, meals: ["Beef ragù spaghetti"], items: [{ i: "minced beef", q: 1 }], store: "Tesco", total: 10, status: 1, date: "06/10/2026" }];
+    window.syncBasketFromMeals();
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "minced beef").q, 1);
+
+    let asked = "";
+    window.confirm = (q) => { asked = String(q); return false; };
+    window.nav("profile");
+    window.setServings(4);
+    assert.match(asked, /Apply cooking for 4 to this week too/);
+    assert.match(asked, /Cancel keeps this week at 2/);
+    assert.equal(S.prefs.servings, 4);
+    assert.equal(S.prefs.servingsChosen, true);
+    assert.equal(window.weekServings(), 2);
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "minced beef").q, 1);
+    assert.equal(S.orders[0].servings, 2);
+    assert.match(document.getElementById("pr-servings-note").textContent, /This week stays serves 2/);
+
+    window.confirm = () => true;
+    window.setServings(4);
+    assert.equal(window.weekServings(), 4);
+    assert.equal(window.__plentry.getBasket().find((b) => b.i === "minced beef").q, 2);
+    assert.equal(S.orders[0].servings, 2);
+    window.renderMenu();
+    assert.match(document.getElementById("menu-week").textContent, /serves 4/);
+
+    document.getElementById("pr-size").value = "6";
+    window.confirm = () => false;
+    window.onProfileSize();
+    assert.equal(S.prefs.size, "6");
+    assert.equal(S.prefs.servings, 6);
+    assert.equal(S.prefs.servingsChosen, false);
+    assert.equal(window.weekServings(), 4);
+    assert.equal(S.orders[0].servings, 2);
+  });
+
+  it("recipe view lists scaled amounts above the steps, and leaves names when a meal has no portions", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.weekServings = 4;
+    S.menuOptions = [{
+      name: "Named stew",
+      emoji: "🍲",
+      time: 20,
+      ing: ["chickpeas", "onions", "salt"],
+      recipe: { steps: ["Simmer the chickpeas."], tip: "" },
+    }];
+    S.selected = ["Named stew"];
+    await window.showRecipe("Named stew");
+    const plain = document.getElementById("modal");
+    assert.equal(plain.querySelector(".ing-scaled"), null);
+    assert.match(plain.textContent, /chickpeas, onions, salt/);
+    assert.match(plain.textContent, /Step amounts are written for 2\. Multiply by 2/);
+    assert.match(plain.textContent, /Simmer the chickpeas/);
+
+    let sent = null;
+    window.fetch = async (_url, opts) => {
+      sent = JSON.parse(opts.body);
+      return { ok: true, json: async () => ({ steps: ["Cook it for six."], tip: "Hot pan." }) };
+    };
+    S.weekServings = 6;
+    S.recipes = {};
+    S.menuOptions = [{ name: "Unwritten stew", emoji: "🍲", time: 20, ing: ["rice", "onions"] }];
+    S.selected = ["Unwritten stew"];
+    await window.showRecipe("Unwritten stew");
+    assert.equal(sent.task, "recipe");
+    assert.equal(sent.payload.servings, 6);
+    const aiModal = document.getElementById("modal");
+    assert.match(aiModal.textContent, /Steps are written for 6/);
+    assert.doesNotMatch(aiModal.textContent, /Multiply by/);
+    assert.match(aiModal.textContent, /rice, onions/);
+    assert.match(aiModal.textContent, /Cook it for six/);
+  });
+});
+
+describe("checkout servings", () => {
+  it("I-P05 the local order keeps this week's servings before a reload", async () => {
+    const { window, document } = await loadApp({
+      localState: { ...weekState(), user: { id: "u1", email: "t@t.com", name: "T" } },
+      session: { id: "u1", email: "t@t.com", name: "T" },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    S.menuOptions = [{
+      name: "Beef ragù spaghetti",
+      emoji: "🍝",
+      time: 35,
+      ing: ["minced beef", "passata", "spaghetti", "onions", "garlic", "olive oil"],
+      portions: { "minced beef": [400, "g"], spaghetti: [180, "g"], onions: [1, "pc"] },
+      recipe: { steps: ["Brown the mince."], tip: "" },
+    }];
+    S.selected = ["Beef ragù spaghetti"];
+    S.weekServings = 4;
+    S.prefs.servings = 2;
+    S.prefs.delivery = { name: "Noe", phone: "07123456789", line1: "1 Test Street", line2: "", city: "London", postcode: "E2 8AA" };
+    S.basketEdit = null;
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    window.confirmOrder();
+    window.__chosenSlot = { date: window.slotDays()[0], start: "10:00" };
+    await window.placeOrder();
+    const row = window.__sbTables.orders[0];
+    assert.equal(row.items.servings, 4);
+    assert.equal(S.orders[0].servings, 4);
+    assert.notEqual(S.orders[0].servings, 2);
+    await window.showRecipeFromOrder(S.orders[0].backendId || S.orders[0].id, 0);
+    const modal = document.getElementById("modal").textContent;
+    assert.match(modal, /800g minced beef/);
+    assert.match(modal, /Multiply by 2 \(×2 for 4, ×3 for 6\)/);
   });
 });
 
