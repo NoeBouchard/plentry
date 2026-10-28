@@ -132,8 +132,24 @@ export function cleanMeals(v: unknown): string[] {
 }
 
 export const MAX_RECIPE_STEPS = 12
-export const MAX_RECIPE_STEP = 400
+// Steps may carry {{type:body=fallback}} placeholders (renderStep in
+// portions.ts), so the stored text is longer than what the customer reads.
+// The longest tokenised catalog step on 28 Oct 2026 is 680 characters.
+export const MAX_RECIPE_STEP = 800
 export const MAX_RECIPE_TIP = 200
+
+// Like clean(), but a cut never leaves half a {{token}}: an unclosed token at
+// the cut is dropped with the text after it.
+export function clipStep(s: unknown, n: number): string {
+  const full = clean(s, 100000)
+  if (full.length <= n) return full
+  let cut = full.slice(0, n)
+  const open = cut.lastIndexOf('{{')
+  if (open >= 0 && open > cut.lastIndexOf('}}')) cut = cut.slice(0, open)
+  // A cut between the two opening braces leaves one '{': drop it too.
+  if (cut.endsWith('{')) cut = cut.slice(0, -1)
+  return cut.trim()
+}
 
 export type OrderRecipe = {
   name: string
@@ -188,8 +204,8 @@ export function cleanRecipes(raw: unknown, mealNames?: unknown): OrderRecipe[] {
     }
     const rec = row.recipe && typeof row.recipe === 'object' ? row.recipe : row
     const stepsRaw = Array.isArray((rec as any)?.steps) ? (rec as any).steps : []
-    const steps = stepsRaw.map((s: unknown) => clean(s, MAX_RECIPE_STEP)).filter(Boolean).slice(0, MAX_RECIPE_STEPS)
-    const tip = clean((rec as any)?.tip, MAX_RECIPE_TIP)
+    const steps = stepsRaw.map((s: unknown) => clipStep(s, MAX_RECIPE_STEP)).filter(Boolean).slice(0, MAX_RECIPE_STEPS)
+    const tip = clipStep((rec as any)?.tip, MAX_RECIPE_TIP)
     const portions = cleanPortions((row as any)?.portions)
     return { name, emoji, time, ing, ...(portions ? { portions } : {}), recipe: steps.length ? { steps, tip } : null }
   })

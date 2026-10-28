@@ -130,7 +130,7 @@ describe("S-04 server-built basket", () => {
     assert.equal(out[1].name, "bGone dinner/b");
     assert.equal(out[1].recipe, null, "name mismatch after clean → no client method");
     const gone = cleanRecipes(client, ["Gone dinner"]);
-    assert.equal(gone[0].recipe.steps[0].length, 400);
+    assert.equal(gone[0].recipe.steps[0].length, 500, "800-character cap: tokenised steps are longer than their text");
     assert.deepEqual(cleanRecipes(null, null), []);
   });
 
