@@ -1001,6 +1001,9 @@ describe("servings scaling (I-P01 / I-P05)", () => {
     assert.match(html, /if\(!has\)return servingsFromHousehold\(p\.size\)/);
     assert.match(html, /if\(stored===2&&fromHouse!==2\)return fromHouse/);
     assert.match(html, /Apply cooking for "/);
+    assert.match(html, /Your basket will be rescaled and any changes you made to it will be reset/);
+    assert.match(html, /servingsWeekAsked===true/);
+    assert.match(html, /function promptResolvedServingsOnce\(\)/);
     assert.match(html, /function applyServingsToCurrentWeek\(\)/);
     assert.match(html, /S\.basketEdit=null/);
     assert.match(html, /class="ing-scaled"/);

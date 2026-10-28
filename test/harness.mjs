@@ -184,6 +184,7 @@ function sleep(ms) {
  * @param {object} [opts.localState] written to localStorage before the app script runs
  * @param {string} [opts.url]
  * @param {object} [opts.mfa] fake `sb.auth.mfa` (see mockMfa); omitted = no MFA surface
+ * @param {function} [opts.confirm] replaces window.confirm before the app script runs
  */
 export async function loadApp(opts = {}) {
   const tables = opts.tables || {
@@ -216,6 +217,7 @@ export async function loadApp(opts = {}) {
       window.__sbTables = tables;
       window.__mockSb = createMockSb(tables, opts.session || null, opts.mfa || null);
       window.supabase = { createClient: () => window.__mockSb };
+      if (typeof opts.confirm === "function") window.confirm = opts.confirm;
     },
   });
 

@@ -1934,6 +1934,7 @@ describe("servings (I-P01 / I-P02 / I-P05)", () => {
     window.nav("profile");
     window.setServings(4);
     assert.match(asked, /Apply cooking for 4 to this week too/);
+    assert.match(asked, /Your basket will be rescaled and any changes you made to it will be reset/);
     assert.match(asked, /Cancel keeps this week at 2/);
     assert.equal(S.prefs.servings, 4);
     assert.equal(S.prefs.servingsChosen, true);
@@ -1996,6 +1997,129 @@ describe("servings (I-P01 / I-P02 / I-P05)", () => {
     assert.doesNotMatch(aiModal.textContent, /Multiply by/);
     assert.match(aiModal.textContent, /rice, onions/);
     assert.match(aiModal.textContent, /Cook it for six/);
+
+    S.recipes["Unwritten stew"] = { steps: ["Cook for two."], tip: "", servings: 2 };
+    S.weekServings = 4;
+    await window.showRecipe("Unwritten stew", null, 4);
+    assert.match(document.getElementById("modal").textContent, /Written for 2, multiply by 2/);
+  });
+
+  it("I-P05 asks once at load when a resolved household changes servings and this week is still on the old number", async () => {
+    const beef = {
+      name: "Beef ragù spaghetti",
+      emoji: "🍝",
+      time: 35,
+      ing: ["minced beef", "passata", "spaghetti", "onions", "garlic", "olive oil"],
+      portions: { "minced beef": [400, "g"], spaghetti: [180, "g"], onions: [1, "pc"] },
+      recipe: { steps: ["Brown the mince."], tip: "" },
+    };
+    function oldWeek(size) {
+      const st = weekState();
+      st.menuOptions = [beef];
+      st.selected = [beef.name];
+      st.prefs.size = size;
+      st.prefs.servings = 2;
+      delete st.prefs.servingsChosen;
+      delete st.prefs.servingsWeekAsked;
+      st.weekServings = 2;
+      st.onboarded = true;
+      return st;
+    }
+    const catalog = {
+      meals: [{
+        id: 1,
+        name: beef.name,
+        emoji: beef.emoji,
+        time: beef.time,
+        ing: beef.ing,
+        recipe: beef.recipe,
+        portions: beef.portions,
+        reviewed_at: "2026-10-01T00:00:00.000Z",
+      }],
+      orders: [],
+      ingredient_prices: [],
+      profiles: [],
+    };
+    let asked = 0;
+    const declined = await loadApp({
+      localState: oldWeek("4+"),
+      tables: catalog,
+      confirm: (q) => { asked += 1; assert.match(String(q), /Your basket will be rescaled and any changes you made to it will be reset/); return false; },
+    });
+    assert.equal(asked, 1);
+    assert.equal(declined.window.__plentry.state().prefs.servings, 4);
+    assert.equal(declined.window.weekServings(), 2);
+    assert.equal(declined.window.__plentry.getBasket().find((b) => b.i === "minced beef").q, 1);
+    assert.equal(declined.window.__plentry.state().prefs.servingsWeekAsked, true);
+    const again = JSON.parse(declined.window.localStorage.getItem("plentry_v1"));
+    again.prefs.servings = 2;
+    again.prefs.size = "4+";
+    again.weekServings = 2;
+    let askedAgain = 0;
+    const second = await loadApp({
+      localState: again,
+      confirm: () => { askedAgain += 1; return true; },
+    });
+    assert.equal(askedAgain, 0);
+    assert.equal(second.window.weekServings(), 2);
+
+    let accepted = 0;
+    const yes = await loadApp({
+      localState: oldWeek("4+"),
+      tables: catalog,
+      confirm: () => { accepted += 1; return true; },
+    });
+    assert.equal(accepted, 1);
+    assert.equal(yes.window.__plentry.state().prefs.servings, 4);
+    assert.equal(yes.window.weekServings(), 4);
+    assert.equal(yes.window.__plentry.getBasket().find((b) => b.i === "minced beef").q, 2);
+    assert.equal(yes.window.__plentry.state().prefs.servingsWeekAsked, true);
+    const afterYes = JSON.parse(yes.window.localStorage.getItem("plentry_v1"));
+    afterYes.prefs.servings = 2;
+    afterYes.prefs.size = "4+";
+    afterYes.weekServings = 2;
+    let acceptedAgain = 0;
+    await loadApp({
+      localState: afterYes,
+      confirm: () => { acceptedAgain += 1; return true; },
+    });
+    assert.equal(acceptedAgain, 0);
+
+    let chosenAsks = 0;
+    const chosen = oldWeek("4+");
+    chosen.prefs.servingsChosen = true;
+    const keptChoice = await loadApp({
+      localState: chosen,
+      confirm: () => { chosenAsks += 1; return true; },
+    });
+    assert.equal(chosenAsks, 0);
+    assert.equal(keptChoice.window.__plentry.state().prefs.servings, 2);
+    assert.equal(keptChoice.window.weekServings(), 2);
+
+    let matchAsks = 0;
+    const matching = oldWeek("4+");
+    matching.weekServings = 4;
+    const matched = await loadApp({
+      localState: matching,
+      confirm: () => { matchAsks += 1; return true; },
+    });
+    assert.equal(matchAsks, 0);
+    assert.equal(matched.window.__plentry.state().prefs.servings, 4);
+    assert.equal(matched.window.weekServings(), 4);
+    assert.notEqual(matched.window.__plentry.state().prefs.servingsWeekAsked, true);
+
+    let loginAsks = 0;
+    const cloud = oldWeek("6");
+    const loggedIn = await loadApp({
+      localState: weekState(),
+      session: { id: "u-load", email: "load@example.com" },
+      tables: { meals: [], orders: [], ingredient_prices: [], profiles: [{ id: "u-load", state: cloud }] },
+      confirm: () => { loginAsks += 1; return false; },
+    });
+    assert.equal(loginAsks, 1);
+    assert.equal(loggedIn.window.__plentry.state().prefs.servings, 6);
+    assert.equal(loggedIn.window.weekServings(), 2);
+    assert.equal(loggedIn.window.__plentry.state().prefs.servingsWeekAsked, true);
   });
 });
 

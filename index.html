@@ -1018,9 +1018,14 @@ function scaledIngListHtml(meal,servings){
   return `<ul class="ing-scaled">${lines.map(line=>`<li>${esc(line)}</li>`).join("")}</ul>`;
 }
 // Catalog methods are written for 2. A recipe the AI just wrote for N says so, and is not multiplied again.
-function recipeStepNote(wroteFor, cookingFor){
+function recipeStepNote(wroteFor, cookingFor, catalog){
   const w=normServings(wroteFor);
   const c=normServings(cookingFor);
+  if(!catalog&&w!==c){
+    const factor=c/w;
+    const shown=Number.isInteger(factor)?String(factor):String(Math.round(factor*10)/10);
+    return "Written for "+w+", multiply by "+shown+".";
+  }
   if(w!==2)return "Steps are written for "+w+".";
   return "Step amounts are written for 2. Multiply by "+(c/2)+" (×2 for 4, ×3 for 6).";
 }
@@ -1047,17 +1052,51 @@ function applyServingsToCurrentWeek(){
   save();
   renderMenu();
 }
+function servingsApplyQuestion(next, current){
+  return "Apply cooking for "+next+" to this week too? Your basket will be rescaled and any changes you made to it will be reset. Cancel keeps this week at "+current+", and the next week you build cooks for "+next+".";
+}
+function askApplyServings(next, current){
+  try{return typeof confirm==="function"&&confirm(servingsApplyQuestion(next, current))===true;}catch(e){return false;}
+}
 function offerApplyServingsToWeek(){
   const next=normServings(S.prefs.servings);
   const current=weekServings();
   if(next===current)return;
   if(!S.onboarded)return;
   if(!Array.isArray(S.selected)||!S.selected.length)return;
-  const q="Apply cooking for "+next+" to this week too? The basket will be rescaled. Cancel keeps this week at "+current+", and the next week you build cooks for "+next+".";
-  let yes=false;
-  try{yes=typeof confirm==="function"&&confirm(q)===true;}catch(e){yes=false;}
-  if(!yes)return;
+  if(!askApplyServings(next, current))return;
   applyServingsToCurrentWeek();
+}
+// Boot/login corrected an implicit 2. Ask once, then remember the answer on the profile.
+let servingsLoadPrompt=null;
+function storedServingsNumber(prefs){
+  const p=prefs&&typeof prefs==="object"?prefs:{};
+  const has=Object.prototype.hasOwnProperty.call(p,"servings")&&p.servings!=null&&p.servings!=="";
+  return has?normServings(p.servings):null;
+}
+function noteServingsResolution(before, locked){
+  const after=normServings(S.prefs.servings);
+  const from=before==null?2:before;
+  if(from===after||locked==null||locked!==from||locked===after){servingsLoadPrompt=null;return;}
+  servingsLoadPrompt={before:from};
+}
+function promptResolvedServingsOnce(){
+  const pending=servingsLoadPrompt;
+  servingsLoadPrompt=null;
+  if(!pending||!S.prefs||S.prefs.servingsWeekAsked===true)return;
+  if(!S.onboarded||!Array.isArray(S.selected)||!S.selected.length)return;
+  const next=normServings(S.prefs.servings);
+  const current=weekServings();
+  if(next===current||current!==pending.before)return;
+  let yes=false,answered=false;
+  try{
+    if(typeof confirm==="function"){yes=confirm(servingsApplyQuestion(next, current))===true;answered=true;}
+  }catch(e){answered=false;}
+  if(!answered)return;
+  S.prefs.servingsWeekAsked=true;
+  if(yes)applyServingsToCurrentWeek();
+  else save();
+  paintServingsNotes();
 }
 function servingsControlHtml(active){
   const n=normServings(active);
@@ -1523,9 +1562,12 @@ if(!S.prefs.diet)S.prefs.diet="omnivore";
 S.prefs.budget=normBudget(S.prefs.budget,null); // local blob is untrusted too; never fill £60 for a missing budget
 S.prefs.postcode=normPostcode(S.prefs.postcode)||""; // a missing postcode stays empty; a saved one is kept
 S.prefs.meals=clampMeals(S.prefs.meals);
+const servingsBeforeBoot=storedServingsNumber(S.prefs);
+const weekLockedBeforeBoot=S.weekServings==null?null:normServings(S.weekServings);
 S.prefs.servings=resolveServings(S.prefs);
 if(S.weekServings==null)S.weekServings=S.prefs.servings;
 else S.weekServings=normServings(S.weekServings);
+noteServingsResolution(servingsBeforeBoot, weekLockedBeforeBoot);
 S.prefs.delivery=deliveryFrom(S.prefs.delivery);
 if(S.basketEdit!=null&&!Array.isArray(S.basketEdit))S.basketEdit=null;
 if(Array.isArray(S.basketEdit)&&!S.basketEdit.length)S.basketEdit=null;
@@ -1562,8 +1604,12 @@ async function loadCloudState(user){
         basketEdit:Array.isArray(data.state.basketEdit)&&data.state.basketEdit.length?data.state.basketEdit:null,
         basketFor:data.state.basketFor||null,
         weekServings:data.state.weekServings==null?null:normServings(data.state.weekServings)});
+      const servingsBeforeCloud=storedServingsNumber(S.prefs);
+      const weekLockedBeforeCloud=S.weekServings==null?null:normServings(S.weekServings);
       S.prefs.servings=resolveServings(S.prefs);
       if(S.weekServings==null)S.weekServings=S.prefs.servings;
+      else S.weekServings=normServings(S.weekServings);
+      noteServingsResolution(servingsBeforeCloud, weekLockedBeforeCloud);
     }
   }catch(e){}
   if(S.prefs.preferredStore)chosenStore=STORES.find(s=>s.id===S.prefs.preferredStore)||chosenStore;
@@ -3831,7 +3877,7 @@ async function showRecipe(name, snapshot, servingsOverride){
   openModal(`<h2>${esc(meal.emoji||"🍽️")} ${esc(name)}</h2>
     <p class="sub">${cookMinutes(meal,n)} min · ${esc(serves)}</p>
     ${ingBlock}
-    <p class="recipe-note">${esc(recipeStepNote(wroteFor,n))}</p>
+    <p class="recipe-note">${esc(recipeStepNote(wroteFor,n,!!stored))}</p>
     ${stepsHtml}
     ${r.tip?`<div class="alert ok" style="margin-top:12px">💡 ${esc(r.tip)}</div>`:""}
     <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">Done</button>`);
@@ -4884,6 +4930,8 @@ async function retryPay(orderId){
     syncHeader();
     if((S.user&&S.onboarded)||(!S.user&&S.onboarded&&S.selected.length)){
       await enterApp();
+      // The catalog is in place. Ask once if boot or login moved servings off this week's lock.
+      promptResolvedServingsOnce();
       syncBasketFromMeals();
     }else{
       startOnboarding();
