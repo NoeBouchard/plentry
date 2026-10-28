@@ -39,6 +39,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 ## Next product
 
 - ~~**Per-shop packs (LIVE 8 Oct 2026)**~~ — `pack_qty` / `pack_unit` from `ingredient_prices` when the unit matches or converts g/kg or ml/l; otherwise the code `PACKS` entry. The shop comparison and a shop change use that store's packs. The confirm hold matches `pay`.
+- **Recipe-step placeholders, P2 follow-up.** Admin Meals preview of the steps at 2/4/6 next to the step textarea, and DB token validation in `validate_meal_write` (plan rules P1 and P5). Kept out of the renderer PR (`feat/step-placeholders`) by Product, 28 Oct 2026.
 - **Catalog keys in `pay`.** `pay` still rejects a `meal_key` that is not in the 46-key code catalog. Admin-added keys stay flagged not usable in baskets until that changes.
 
 ## Next product (older)
