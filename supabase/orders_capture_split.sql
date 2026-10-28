@@ -1,5 +1,11 @@
--- PENDING, not applied
+-- APPLIED to prod 28 Oct 2026 ~12:04 GMT.
 -- Plentry — store the capture split on public.orders.
+-- Applied to prod at about 12:04 GMT on 28 Oct 2026, after PR #35
+-- squash-merged to main as ea90a314bbe55af000e41d3bc0f34bd9569ad151
+-- at 12:02:45 GMT. notify-order was hand-deployed as v46 at 12:04 GMT
+-- and pay as v53 at 12:05 GMT. No static deploy. ai v52, checkout v44,
+-- stripe-webhook v43, and newcoming v37 were unchanged. Statements
+-- below are unchanged from the pending file.
 -- Paste this file in the Supabase SQL editor and run it there.
 -- Do not move it into supabase/migrations/. This repo has no migrations
 -- folder; a file placed there can auto-apply.

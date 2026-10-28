@@ -629,6 +629,23 @@ async function payApi(task,payload){
   }catch(e){return null;}
 }
 
+// Admin-only sample of the order-completion email. The function checks aal2.
+async function orderEmailApi(task,payload){
+  try{
+    if(!sb)return null;
+    try{if(sb.auth&&sb.auth.refreshSession)await sb.auth.refreshSession();}catch(e){}
+    const {data}=await sb.auth.getSession();
+    const accessToken=data&&data.session?data.session.access_token:null;
+    if(!accessToken)return null;
+    const r=await fetch(SUPABASE_URL+"/functions/v1/order-email",{method:"POST",
+      headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+accessToken},
+      body:JSON.stringify({task,payload})});
+    const j=await r.json().catch(()=>null);
+    if(!r.ok)return j||{error:"http",detail:"HTTP "+r.status};
+    return j;
+  }catch(e){return null;}
+}
+
 // ---------- CATALOG ----------
 // mult = reference-price multiplier, used ONLY as fallback when live quotes
 // (Pepesto via the `checkout` edge function) are unavailable.
@@ -2890,19 +2907,38 @@ async function adminVerifyMeal(id){
   else{await loadAdminMeals();renderMeals();closeModal();}
 }
 async function adminMarkMealReviewed(id){return adminVerifyMeal(id);}
+function completionEmailBadge(o){
+  const st=o&&o.completion_email_status;
+  if(st==="sent")return ` <span class="badge">email sent</span>`;
+  if(st==="failed"){
+    const tip=o.completion_email_error?` title="${esc(String(o.completion_email_error).slice(0,300))}"`:"";
+    return ` <span class="badge"${tip} style="background:var(--amber)">email failed</span>`;
+  }
+  if(st==="skipped")return ` <span class="badge">email skipped</span>`;
+  if(st==="sending")return ` <span class="badge">email sending</span>`;
+  return "";
+}
 async function renderAdmin(){
   const el=document.getElementById("admin-list");
   if(!el)return;
   if(!sb||!isAdmin()){el.innerHTML='<p class="sub">Admin only.</p>';return;}
   const cols="id,email,name,postcode,store,total,items,status,created_at,payment_status,amount_held,amount_captured,address,delivery_slot,slot_date,slot_start,slot_end,issue_status";
   const receipt="delivered_at,received_confirmed_at,received_confirmed_by";
-  let {data,error}=await sb.from("orders").select(cols+","+receipt).order("created_at",{ascending:false}).limit(100);
+  const emailCols="completion_email_status,completion_email_claimed_at,completion_email_sent_at,completion_email_attempts,completion_email_error,completion_email_message_id";
+  let showEmail=true;
+  let {data,error}=await sb.from("orders").select(cols+","+receipt+","+emailCols).order("created_at",{ascending:false}).limit(100);
   if(error){
-    const again=await sb.from("orders").select(cols).order("created_at",{ascending:false}).limit(100);
-    data=again.data;error=again.error;
+    showEmail=false;
+    const withReceipt=await sb.from("orders").select(cols+","+receipt).order("created_at",{ascending:false}).limit(100);
+    data=withReceipt.data;error=withReceipt.error;
+    if(error){
+      const plain=await sb.from("orders").select(cols).order("created_at",{ascending:false}).limit(100);
+      data=plain.data;error=plain.error;
+    }
   }
   if(error||!data){el.innerHTML='<p class="sub">Could not load orders — run supabase/admin_policies.sql?</p>';return;}
-  if(!data.length){el.innerHTML='<p class="sub">No orders yet.</p>';return;}
+  const emailBar=showEmail?`<div class="row" style="margin:0 0 10px;align-items:center;gap:8px"><button type="button" class="btn ghost sm" id="admin-test-email" onclick="adminSendTestEmail()">Send test email</button><span id="admin-test-email-msg" class="sdetail"></span></div>`:"";
+  if(!data.length){el.innerHTML=emailBar+'<p class="sub">No orders yet.</p>';return;}
   window.__adminOrders={};data.forEach(o=>window.__adminOrders[o.id]=o);
   const receiptLive=data.some(o=>Object.prototype.hasOwnProperty.call(o,"delivered_at")||Object.prototype.hasOwnProperty.call(o,"received_confirmed_at"));
   const filt=window.__opsReceiptFilter==="awaiting"||window.__opsReceiptFilter==="complete"?window.__opsReceiptFilter:"all";
@@ -2910,7 +2946,7 @@ async function renderAdmin(){
   if(receiptLive&&filt==="awaiting")rows=data.filter(o=>o.status==="delivered"&&!o.received_confirmed_at);
   else if(receiptLive&&filt==="complete")rows=data.filter(o=>!!o.received_confirmed_at);
   const chips=receiptLive?`<div class="receipt-chips" id="ops-receipt-chips"><button type="button" class="${filt==="all"?"sel":""}" onclick="setOpsReceiptFilter('all')">All</button><button type="button" class="${filt==="awaiting"?"sel":""}" onclick="setOpsReceiptFilter('awaiting')">Awaiting receipt</button><button type="button" class="${filt==="complete"?"sel":""}" onclick="setOpsReceiptFilter('complete')">Complete</button></div>`:"";
-  if(!rows.length){el.innerHTML=chips+'<p class="sub">'+(filt==="awaiting"?"No orders awaiting receipt.":filt==="complete"?"No complete orders.":"No orders yet.")+'</p>';return;}
+  if(!rows.length){el.innerHTML=emailBar+chips+'<p class="sub">'+(filt==="awaiting"?"No orders awaiting receipt.":filt==="complete"?"No complete orders.":"No orders yet.")+'</p>';return;}
   const st={new:["🆕 New","var(--green)"],ordered:["🛒 Ordered","var(--muted)"],delivered:["✅ Delivered","var(--muted)"]};
   const pst={none:"",unpaid:"⏳ awaiting payment",authorized:"💳 hold",captured:"💳 money received",canceled:"❌ payment canceled"};
   el.innerHTML=chips+rows.map(o=>{
@@ -2924,7 +2960,7 @@ async function renderAdmin(){
     const promised=promisedSlotLabel(o);
     return `<div class="store" style="display:block;cursor:default;${o.status==="new"&&!unpaid?"border-color:var(--green)":""}${unpaid?"opacity:.55":""}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-        <div style="min-width:0;flex:1"><b>#${+o.id||0}</b> · ${esc(o.store)} · est. £${Number(o.total||0).toFixed(2)} <span class="badge" style="background:${s[1]}">${s[0]}</span>${paidBadge?` <span class="badge">${paidBadge}${o.payment_status==="authorized"?` hold £${Number(o.amount_held||0).toFixed(2)}`:o.payment_status==="captured"?` received £${Number(o.amount_captured||0).toFixed(2)}`:""}</span>`:""}${o.issue_status==="open"?` <span class="badge" style="background:var(--amber)">issue</span>`:""}</div>
+        <div style="min-width:0;flex:1"><b>#${+o.id||0}</b> · ${esc(o.store)} · est. £${Number(o.total||0).toFixed(2)} <span class="badge" style="background:${s[1]}">${s[0]}</span>${paidBadge?` <span class="badge">${paidBadge}${o.payment_status==="authorized"?` hold £${Number(o.amount_held||0).toFixed(2)}`:o.payment_status==="captured"?` received £${Number(o.amount_captured||0).toFixed(2)}`:""}</span>`:""}${o.issue_status==="open"?` <span class="badge" style="background:var(--amber)">issue</span>`:""}${showEmail?completionEmailBadge(o):""}</div>
         <div class="sdetail">${new Date(o.created_at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
       </div>
       ${adminReceiptHtml(o)}
@@ -2945,6 +2981,7 @@ async function renderAdmin(){
         ${o.status==="delivered"&&!o.received_confirmed_at&&(Object.prototype.hasOwnProperty.call(o,"delivered_at")||Object.prototype.hasOwnProperty.call(o,"received_confirmed_at"))?`<button type="button" class="btn sm" onclick="adminMarkReceived(${+o.id||0})">Mark received</button>`:""}
         ${storeInfo?`<a class="btn ghost sm" style="text-decoration:none" target="_blank" rel="noopener" href="${storeInfo.home}">Open ${esc(o.store)} ↗</a>`:""}
       </div></div>`;}).join("");
+  el.innerHTML=emailBar+el.innerHTML;
 }
 async function adminSetStatus(id,status){
   if(!sb||!isAdmin())return;
@@ -2970,6 +3007,25 @@ async function adminMarkReceived(id){
   const {error}=await sb.rpc("admin_mark_received",{p_order_id:id});
   if(error){alert(error.message||"Could not mark received.");return;}
   await renderAdmin();
+}
+async function adminSendTestEmail(){
+  if(!sb||!isAdmin())return;
+  const btn=document.getElementById("admin-test-email");
+  const msg=document.getElementById("admin-test-email-msg");
+  if(btn){btn.disabled=true;btn.textContent="Sending…";}
+  if(msg){msg.textContent="";msg.style.color="";}
+  const r=await orderEmailApi("test",{});
+  if(btn){btn.disabled=false;btn.textContent="Send test email";}
+  if(r&&r.error==="mfa_required"){
+    if(msg){msg.style.color="var(--red)";msg.textContent="Enter your 2-step code, then try again.";}
+    try{await refreshMfa();openMfaChallenge();}catch(e){}
+    return;
+  }
+  if(r&&r.ok){
+    if(msg){msg.style.color="var(--green)";msg.textContent="Test email sent to your login address.";}
+    return;
+  }
+  if(msg){msg.style.color="var(--red)";msg.textContent="Could not send"+(r&&(r.detail||r.error)?": "+(r.detail||r.error):".");}
 }
 // Capture the EXACT store total against the Stripe hold (never more than held).
 async function adminCapture(id){

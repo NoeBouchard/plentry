@@ -19,6 +19,15 @@ import {
 } from "../supabase/functions/_shared/capture.ts";
 import { sendTelegram } from "../supabase/functions/_shared/telegram.ts";
 import {
+  classifyResendFailure,
+  completionSendGate,
+  configAlertText,
+  completionWhen,
+  formatGbp,
+  renderCompletion,
+  sendResend,
+} from "../supabase/functions/_shared/email.ts";
+import {
   CATALOG,
   basketTotal,
   cleanMeals,
@@ -452,7 +461,7 @@ describe("edge functions parse", () => {
   // Node strips the types and parses each module before resolving imports, so a
   // syntax error surfaces as SyntaxError while a healthy file fails only on the
   // `npm:` specifier Node cannot load. Cheap pre-deploy guard (no Deno locally).
-  for (const fn of ["pay", "stripe-webhook", "notify-order", "ai", "checkout", "newcoming"]) {
+  for (const fn of ["pay", "stripe-webhook", "notify-order", "ai", "checkout", "newcoming", "order-email"]) {
     it(`${fn}/index.ts is syntactically valid TypeScript`, async () => {
       const url = new URL(`../supabase/functions/${fn}/index.ts`, import.meta.url);
       try {
@@ -529,6 +538,201 @@ describe("S-01/S-03 rate-limit fail policy", () => {
     assert.deepEqual(seen.args, { p_bucket: "pay", p_ident: "user-1", p_max: 15, p_window_seconds: 60 });
     assert.equal(await allow(rpcOver, "ai", "ip:1", 40, 60), false);
     assert.equal(await allow(rpcOk, "ai", "ip:1", 40, 60), true);
+  });
+});
+
+describe("I-O20 completion email render", () => {
+  const order = {
+    id: 42,
+    email: "a@b.co",
+    delivery_slot: "Ops booked <b>18:00–20:00</b>",
+    slot_date: "2026-10-30",
+    slot_start: "10:00:00",
+    slot_end: "12:00:00",
+    amount_captured: "12.5",
+  };
+
+  it("I-O20 includes the order number, prefers the booked slot, formats £, and escapes HTML", () => {
+    const mail = renderCompletion(order);
+    assert.match(mail.subject, /order #42/);
+    assert.match(mail.text, /order #42/);
+    assert.match(mail.text, /£12\.50/);
+    assert.match(mail.text, /Ops booked <b>18:00–20:00<\/b>/);
+    assert.equal(mail.html.includes("<b>18:00"), false);
+    assert.match(mail.html, /Ops booked &lt;b&gt;18:00–20:00&lt;\/b&gt;/);
+    assert.match(mail.html, /#42/);
+    assert.match(mail.html, /£12\.50/);
+    assert.equal(mail.html.includes("30 Oct"), false);
+    assert.equal(mail.html.includes("10:00–12:00"), false);
+    assert.equal((mail.text.match(/18:00–20:00/g) || []).length, 1);
+    assert.match(mail.html, /<!-- step 2: recipes -->/);
+    assert.match(mail.html, /<!DOCTYPE html>/);
+    const when = completionWhen({ slot_date: "2026-10-30", slot_start: "08:00", slot_end: "10:00", delivery_slot: "" });
+    assert.equal(when.slot, "08:00–10:00");
+    assert.match(when.date, /30 Oct/);
+    assert.match(when.phrase, /30 Oct, 08:00–10:00/);
+    const booked = renderCompletion({
+      id: 7,
+      delivery_slot: "Thu, 30 Oct, 10:00–12:00",
+      slot_date: "2026-10-30",
+      slot_start: "10:00",
+      slot_end: "12:00",
+      amount_captured: 1,
+    });
+    assert.equal((booked.text.match(/30 Oct/g) || []).length, 1);
+    assert.match(booked.text, /complete on Thu, 30 Oct, 10:00–12:00\./);
+    assert.match(booked.text, /Thank you/);
+    assert.equal(booked.text.toLowerCase().includes("delivered"), false);
+    const bare = completionWhen({});
+    assert.equal(bare.date, "");
+    assert.equal(bare.slot, "");
+    assert.equal(bare.phrase, "");
+    const empty = renderCompletion({ id: 8, amount_captured: 2 });
+    assert.match(empty.text, /order #8 is complete\./);
+    assert.match(empty.text, /Thank you/);
+    assert.match(empty.subject, /is complete/);
+    assert.equal(empty.subject.toLowerCase().includes("delivered"), false);
+    assert.equal(empty.text.includes("your delivery day"), false);
+    assert.equal(empty.text.includes("the window you chose"), false);
+    assert.equal(formatGbp(0), "£0.00");
+    assert.equal(formatGbp(26.25), "£26.25");
+    assert.equal(formatGbp("10.1"), "£10.10");
+    const testMail = renderCompletion({ id: "TEST", amount_captured: 26.25, delivery_slot: "Thu, 30 Oct, 10:00–12:00" }, { test: true });
+    assert.match(testMail.subject, /^\[TEST\]/);
+    assert.match(testMail.text, /TEST/);
+    assert.match(testMail.html, /TEST/);
+  });
+});
+
+describe("I-O20 Resend client", () => {
+  it("I-O20 sends Idempotency-Key and omits reply_to when unset", async () => {
+    const previous = globalThis.fetch;
+    const previousKey = process.env.RESEND_API_KEY;
+    const previousReply = process.env.ORDER_EMAIL_REPLY_TO;
+    delete process.env.ORDER_EMAIL_REPLY_TO;
+    process.env.RESEND_API_KEY = "re_test_key";
+    let seen = null;
+    globalThis.fetch = async (url, opts) => {
+      seen = { url, opts };
+      return new Response(JSON.stringify({ id: "re_123" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    try {
+      const sent = await sendResend({
+        from: "Plentry <orders@getplentry.com>",
+        to: "a@b.co",
+        subject: "Hello",
+        text: "Plain",
+        html: "<p>Hi</p>",
+        idempotencyKey: "order-complete/42",
+      });
+      assert.equal(sent.ok, true);
+      assert.equal(sent.id, "re_123");
+      assert.equal(seen.url, "https://api.resend.com/emails");
+      assert.equal(seen.opts.headers["Idempotency-Key"], "order-complete/42");
+      assert.equal(seen.opts.headers.Authorization, "Bearer re_test_key");
+      const body = JSON.parse(seen.opts.body);
+      assert.equal(Object.hasOwn(body, "reply_to"), false);
+      assert.deepEqual(body.to, ["a@b.co"]);
+      const withReply = await sendResend({
+        from: "Plentry <orders@getplentry.com>",
+        to: "a@b.co",
+        replyTo: "hello@getplentry.com",
+        subject: "Hello",
+        text: "Plain",
+        html: "<p>Hi</p>",
+        idempotencyKey: "order-complete/43",
+      });
+      assert.equal(withReply.ok, true);
+      assert.equal(JSON.parse(seen.opts.body).reply_to, "hello@getplentry.com");
+      assert.equal(seen.opts.headers["Idempotency-Key"], "order-complete/43");
+    } finally {
+      globalThis.fetch = previous;
+      if (previousKey == null) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = previousKey;
+      if (previousReply == null) delete process.env.ORDER_EMAIL_REPLY_TO;
+      else process.env.ORDER_EMAIL_REPLY_TO = previousReply;
+    }
+  });
+
+  it("I-O20 does not call Resend when the API key is missing", async () => {
+    const previous = globalThis.fetch;
+    const previousKey = process.env.RESEND_API_KEY;
+    delete process.env.RESEND_API_KEY;
+    let called = false;
+    globalThis.fetch = async () => {
+      called = true;
+      return new Response("{}", { status: 500 });
+    };
+    try {
+      const sent = await sendResend({
+        from: "Plentry <orders@getplentry.com>",
+        to: "a@b.co",
+        subject: "Hello",
+        text: "Plain",
+        html: "<p>Hi</p>",
+        idempotencyKey: "order-complete/1",
+      });
+      assert.equal(sent.ok, false);
+      assert.equal(sent.error, "RESEND_API_KEY missing");
+      assert.equal(sent.kind, "missing");
+      assert.equal(called, false);
+    } finally {
+      globalThis.fetch = previous;
+      if (previousKey == null) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = previousKey;
+    }
+  });
+
+  it("I-O20 classifies a missing config, a 401, a concurrent 409, and an invalid idempotency key", async () => {
+    assert.deepEqual(completionSendGate({ apiKey: "", from: "Plentry <orders@getplentry.com>" }), {
+      ok: false,
+      error: "RESEND_API_KEY missing",
+    });
+    assert.deepEqual(completionSendGate({ apiKey: "re_test_key", from: "  " }), {
+      ok: false,
+      error: "ORDER_EMAIL_FROM missing",
+    });
+    assert.equal(completionSendGate({ apiKey: "re_test_key", from: "Plentry <orders@getplentry.com>" }).ok, true);
+    assert.equal(classifyResendFailure(401, "validation_error"), "config");
+    assert.equal(classifyResendFailure(403, "forbidden"), "config");
+    assert.equal(classifyResendFailure(409, "concurrent_idempotent_requests"), "retry");
+    assert.equal(classifyResendFailure(409, "invalid_idempotent_request"), "terminal");
+    assert.equal(classifyResendFailure(500, "internal_server_error"), "failed");
+    const alert = configAlertText();
+    assert.match(alert, /401\/403/);
+    assert.match(alert, /bad key or unverified domain/);
+    assert.match(alert, /once until a send succeeds/);
+    assert.doesNotMatch(alert, /TELEGRAM|bot\d|re_|api\.telegram\.org/);
+
+    const previous = globalThis.fetch;
+    const previousKey = process.env.RESEND_API_KEY;
+    process.env.RESEND_API_KEY = "re_test_key";
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      name: "invalid_idempotent_request",
+      message: "key reused",
+    }), { status: 409 });
+    try {
+      const sent = await sendResend({
+        from: "Plentry <orders@getplentry.com>",
+        to: "a@b.co",
+        subject: "Hello",
+        text: "Plain",
+        html: "<p>Hi</p>",
+        idempotencyKey: "order-complete/9",
+      });
+      assert.equal(sent.ok, false);
+      assert.equal(sent.kind, "terminal");
+      assert.equal(sent.status, 409);
+      assert.equal(sent.name, "invalid_idempotent_request");
+      assert.equal(String(sent.error).includes("re_test_key"), false);
+    } finally {
+      globalThis.fetch = previous;
+      if (previousKey == null) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = previousKey;
+    }
   });
 });
 

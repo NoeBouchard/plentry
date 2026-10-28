@@ -4255,3 +4255,90 @@ describe("I-O19 order receipt", () => {
     assert.equal(window.__sbTables.orders.find((o) => o.id === 40).received_confirmed_by, "ops");
   });
 });
+
+describe("I-O20 admin completion email", () => {
+  it("I-O20 shows an email badge and sends the test task to the admin's session", async () => {
+    const orders = [
+      { id: 1, status: "delivered", completion_email_status: "sent", store: "Tesco", total: 1, items: { basket: [], meals: [] }, created_at: "2026-10-01T12:00:00.000Z", payment_status: "captured", amount_captured: 10, address: {}, email: "a@b.co" },
+      { id: 2, status: "delivered", completion_email_status: "failed", completion_email_error: '"><img src=x onerror=alert(1)>', store: "Tesco", total: 1, items: { basket: [], meals: [] }, created_at: "2026-10-02T12:00:00.000Z", payment_status: "captured", amount_captured: 10, address: {}, email: "a@b.co" },
+      { id: 3, status: "delivered", completion_email_status: "skipped", store: "Tesco", total: 1, items: { basket: [], meals: [] }, created_at: "2026-10-03T12:00:00.000Z", payment_status: "captured", amount_captured: 10, address: {}, email: "a@b.co" },
+      { id: 4, status: "delivered", completion_email_status: "sending", store: "Tesco", total: 1, items: { basket: [], meals: [] }, created_at: "2026-10-04T12:00:00.000Z", payment_status: "captured", amount_captured: 10, address: {}, email: "a@b.co" },
+      { id: 5, status: "ordered", completion_email_status: null, store: "Tesco", total: 1, items: { basket: [], meals: [] }, created_at: "2026-10-05T12:00:00.000Z", payment_status: "authorized", amount_held: 12, address: {}, email: "a@b.co" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: { meals: [], profiles: [], ingredient_prices: [], orders },
+    });
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    await window.renderAdmin();
+    const html = document.getElementById("admin-list").innerHTML;
+    assert.ok(html.includes("email sent"));
+    assert.ok(html.includes("email failed"));
+    assert.ok(html.includes("email skipped"));
+    assert.ok(html.includes("email sending"));
+    const failed = [...document.querySelectorAll("#admin-list .badge")].find((el) => el.textContent === "email failed");
+    assert.equal(failed.getAttribute("title"), '"><img src=x onerror=alert(1)>');
+    assert.equal(document.querySelector("#admin-list img"), null);
+    assert.ok(html.includes("Send test email"));
+    const calls = [];
+    window.fetch = async (url, opts) => {
+      calls.push({ url: String(url), body: opts && opts.body, headers: opts && opts.headers });
+      return { ok: true, status: 200, json: async () => ({ ok: true, test: true }) };
+    };
+    await window.adminSendTestEmail();
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /\/functions\/v1\/order-email$/);
+    assert.equal(calls[0].headers.Authorization, "Bearer test-token");
+    assert.deepEqual(JSON.parse(calls[0].body), { task: "test", payload: {} });
+    assert.ok(document.getElementById("admin-test-email-msg").textContent.includes("Test email sent"));
+    window.nav("orders");
+    const customer = document.getElementById("orders-list") ? document.getElementById("orders-list").textContent : document.body.textContent;
+    assert.equal(customer.includes("Send test email"), false);
+  });
+
+  it("I-O20 hides the badge and test button when the email columns are missing", async () => {
+    const orders = [
+      { id: 1, status: "delivered", completion_email_status: "sent", store: "Tesco", total: 1, items: { basket: [], meals: [] }, created_at: "2026-10-01T12:00:00.000Z", payment_status: "captured", amount_captured: 10, address: {}, email: "a@b.co" },
+    ];
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: { meals: [], profiles: [], ingredient_prices: [], orders },
+    });
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    const sb = window.__mockSb;
+    const origFrom = sb.from.bind(sb);
+    const selects = [];
+    sb.from = (table) => {
+      const q = origFrom(table);
+      if (table !== "orders") return q;
+      const origSelect = q.select.bind(q);
+      q.select = (cols) => {
+        selects.push(String(cols));
+        origSelect(cols);
+        return q;
+      };
+      const origThen = q.then.bind(q);
+      q.then = (ok, err) => {
+        if (String(q._selectCols || "").includes("completion_email_")) {
+          return Promise.resolve({ data: null, error: { message: "column completion_email_status does not exist" } }).then(ok, err);
+        }
+        return origThen(ok, err);
+      };
+      const mark = (cols) => { q._selectCols = cols; };
+      const wrapped = q.select;
+      q.select = (cols) => { mark(cols); return wrapped(cols); };
+      return q;
+    };
+    await window.renderAdmin();
+    const html = document.getElementById("admin-list").innerHTML;
+    assert.equal(selects.length, 2);
+    assert.equal(selects[0].includes("completion_email_status"), true);
+    assert.equal(selects[1].includes("completion_email_"), false);
+    assert.equal(html.includes("email sent"), false);
+    assert.equal(html.includes("Send test email"), false);
+    assert.ok(html.includes("#1"));
+    assert.ok(html.includes("Tesco"));
+  });
+});
