@@ -1158,3 +1158,28 @@ describe("I-O19 order receipt (pending, not applied)", () => {
     assert.doesNotMatch(ask, /openIssueThread\(\$\{oid\},true\)/);
   });
 });
+
+describe("orders DELETE/TRUNCATE revoke (pending, not applied)", () => {
+  const raw = sqlBody("orders_revoke_delete_truncate.sql");
+  const active = stripSqlComments(raw);
+
+  it("revokes DELETE and TRUNCATE from anon and authenticated in one transaction, with a commented rollback, and is not a migration", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.equal(existsSync(path.join(ROOT, "supabase/orders_revoke_delete_truncate.sql")), true);
+    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /execute_sql/);
+    assert.match(raw, /has_table_privilege\(rolname, 'public\.orders', 'DELETE'\)/);
+    assert.match(raw, /has_table_privilege\(rolname, 'public\.orders', 'TRUNCATE'\)/);
+    assert.match(raw, /'anon'/);
+    assert.match(raw, /'authenticated'/);
+    assert.match(raw, /^-- grant delete, truncate on table public\.orders to anon, authenticated;$/m);
+    assert.doesNotMatch(active, /\bgrant\b/i);
+    const begin = active.indexOf("begin;");
+    const commit = active.lastIndexOf("commit;");
+    assert.ok(begin >= 0 && commit > begin);
+    const body = active.slice(begin, commit);
+    assert.match(body, /revoke delete, truncate on table public\.orders from anon, authenticated;/);
+    assert.doesNotMatch(body, /\bgrant\b/i);
+    assert.equal(active.slice(commit + "commit;".length).trim(), "");
+  });
+});

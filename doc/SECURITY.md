@@ -112,6 +112,7 @@ See the status table above. Live (DB 17 Sep, functions 17 Sep, static 18 Sep): S
 ## Open
 
 - Anon and authenticated still hold `MAINTAIN` on `public.meals`. `supabase/meals_revoke_maintain.sql` is written and **not applied**. Do not put it in `supabase/migrations/`.
+- After the 28 Oct 2026 capture-split ship, anon and authenticated still hold table DELETE and TRUNCATE on `public.orders` (privileges `rdDxtm`, plus column-level INSERT and UPDATE). TRUNCATE bypasses RLS. `supabase/orders_revoke_delete_truncate.sql` revokes both from anon and authenticated and is **not applied** (sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`). It does not change other privileges or column grants. Apply with Supabase SQL (`execute_sql`), not a migration. The app never deletes an order. Independent of PR #34 (`feat/order-completion-email`). Verify with `has_table_privilege` for both roles and both privileges; rollback is `grant delete, truncate on table public.orders to anon, authenticated`. See [RUNBOOK.md](RUNBOOK.md#orders-delete-and-truncate-pending).
 
 ## Known accepted risks (do not “fix” without product sign-off)
 

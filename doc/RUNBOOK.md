@@ -170,6 +170,30 @@ npm test   # must be 0
 
 **Rollback.** The commented block at the bottom of the file: `cron.unschedule('plentry_auto_complete')`, drop the three triggers, drop the six functions, drop the two checks, then drop `received_confirmed_by`, `received_confirmed_at`, and `delivered_at`. Dropping the columns while a static build still selects them makes that select fail; the client then loads orders without the receipt columns and hides the card.
 
+## Orders DELETE and TRUNCATE (pending)
+
+Not applied. `supabase/orders_revoke_delete_truncate.sql` is a loose file (sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`). Header says **PENDING, not applied**. Apply with Supabase SQL (`execute_sql`), not a migration. Do not put it in `supabase/migrations/`. A merge does not apply it. Independent of PR #34 (`feat/order-completion-email`). Whichever of this change and #34 merges second will have a trivial doc and test-count conflict.
+
+After the 28 Oct 2026 capture-split ship, table privileges on `public.orders` for anon and authenticated are `rdDxtm`, plus column-level INSERT and UPDATE. This file revokes DELETE and TRUNCATE from both roles. TRUNCATE bypasses RLS. It does not change other privileges or column grants. The app never deletes an order: `index.html` inserts, selects, and updates; `pay` and `stripe-webhook` select and update through the service role.
+
+```bash
+cd plentry
+npm test   # must be 0
+# Run supabase/orders_revoke_delete_truncate.sql with Supabase SQL (execute_sql).
+# Then run the commented verify query in that file.
+```
+
+**Verify.** Both roles should report false for DELETE and false for TRUNCATE:
+
+```sql
+select rolname,
+       has_table_privilege(rolname, 'public.orders', 'DELETE') as delete,
+       has_table_privilege(rolname, 'public.orders', 'TRUNCATE') as truncate
+from (values ('anon'), ('authenticated')) as roles(rolname);
+```
+
+**Rollback.** Run on its own, not in the same session as the revoke: `grant delete, truncate on table public.orders to anon, authenticated;`
+
 ## Functions
 
 **Deploy to production is OFF.** Noé turned the Supabase GitHub integration setting off on 25/26 Oct 2026 (project `ucciqthwxnlkjalwlhvh`, production branch `main`). A merge to `main` does not deploy edge functions. After the #31, #30, and #32 merges, all 6 functions were unchanged and the Supabase Preview check was skipped. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If Deploy to production is ever re-enabled, every merge to `main` redeploys all `supabase/functions/*`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` files are not auto-applied. Static does not ride along: `git.deploymentEnabled.main` is false.
