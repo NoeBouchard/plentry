@@ -149,6 +149,27 @@ Accounts (26 Oct 2026) says Deploy to production is off, so a merge does not dep
 
 `reconcile` is an aal2 admin task on `pay`. Omit `dryRun` or pass `true` to report only. Pass `dryRun: false` to write `amount_captured` and `payment_status` from a succeeded PaymentIntent. It does not fill the split.
 
+## Order receipt (pending)
+
+Not applied. Not a function deploy. `supabase/order_received.sql` is a loose file (sha256 `210864e66cee43103ad55510a8283db333074d95fcfbe68e33babfddad4d6c4c`). Header says **PENDING, not applied**. Paste it into the Supabase SQL editor, or run it with `execute_sql`. Do not put it in `supabase/migrations/`.
+
+The static that shows the Orders badge, **Did it all arrive?**, and the Ops chips is a separate promote. Until the columns exist, the client select fails and retries without them, so the badge and the card stay hidden. Apply the SQL before promoting that static if both should go live together. This PR does not promote static.
+
+**Open issues.** The only open value is `issue_status = 'open'` (`orders_issue_status_sane` allows null, `open`, and `resolved`). `auto_complete_orders()` requires `issue_status is distinct from 'open'`. null and `resolved` do not pause the sweep. Resolving an issue does not change `delivered_at` and does not restart the 48 hour clock. There is no issue-resolved timestamp.
+
+**Backfill.** In the same transaction, a row is set to `received_confirmed_by = 'backfill'` only when `status = 'delivered'`, `received_confirmed_at` is null, `delivered_at` is null, and `issue_status` is not `open`. Historic #31 and #38 are included on the first apply, and #39 only when its issue is not open. Ids are not hardcoded. A re-apply does not confirm a live order that already has `delivered_at`; the 15-minute job completes that order at 48 hours. An open issue stays awaiting receipt so Ops can mark it complete. PR #34's completion-email backfill must treat `backfill` rows as already emailed or skipped, so that file does not send a surprise email.
+
+**Who can write.** `confirm_order_received` and `admin_mark_received` are EXECUTE for `authenticated` only. The customer function also requires `user_id = auth.uid()`, status `delivered`, and a null confirmation. The ops function checks `is_admin_aal2()` inside the body. `auto_complete_orders()` is revoked from `public`, `anon`, and `authenticated`. pg_cron job `plentry_auto_complete` (`*/15 * * * *`) calls it as the role that scheduled the job. This file grants no table or column privileges. A BEFORE UPDATE trigger on the three new columns raises unless `plentry.receipt_write` is `'1'` in that transaction. Until `orders_capture_split.sql` revokes table UPDATE, a table-level UPDATE would include the new columns; the guard still rejects the write.
+
+```bash
+cd plentry
+npm test   # must be 0
+# Paste supabase/order_received.sql into the Supabase SQL editor and run it.
+# No supabase functions deploy for this file.
+```
+
+**Rollback.** The commented block at the bottom of the file: `cron.unschedule('plentry_auto_complete')`, drop the three triggers, drop the six functions, drop the two checks, then drop `received_confirmed_by`, `received_confirmed_at`, and `delivered_at`. Dropping the columns while a static build still selects them makes that select fail; the client then loads orders without the receipt columns and hides the card.
+
 ## Functions
 
 **Deploy to production is OFF.** Noé turned the Supabase GitHub integration setting off on 25/26 Oct 2026 (project `ucciqthwxnlkjalwlhvh`, production branch `main`). A merge to `main` does not deploy edge functions. After the #31, #30, and #32 merges, all 6 functions were unchanged and the Supabase Preview check was skipped. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If Deploy to production is ever re-enabled, every merge to `main` redeploys all `supabase/functions/*`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` files are not auto-applied. Static does not ride along: `git.deploymentEnabled.main` is false.

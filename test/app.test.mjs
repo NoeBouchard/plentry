@@ -4743,3 +4743,298 @@ describe("per-meal price split (I-P06)", () => {
     }
   });
 });
+
+describe("I-O19 order receipt", () => {
+  it("I-O19 the Orders badge and Did it all arrive are only the customer's own unconfirmed delivery", async () => {
+    const deliveredAt = new Date().toISOString();
+    const { window, document } = await loadApp({
+      session: { id: "u1", email: "u1@example.com" },
+      tables: {
+        meals: [],
+        profiles: [],
+        ingredient_prices: [],
+        orders: [
+          {
+            id: 31,
+            user_id: "u1",
+            store: "Tesco",
+            total: 10,
+            items: { basket: [{ i: "eggs", q: 1 }], meals: [] },
+            status: "delivered",
+            created_at: "2026-10-01T12:00:00.000Z",
+            payment_status: "captured",
+            amount_captured: 10,
+            delivered_at: deliveredAt,
+            received_confirmed_at: null,
+            received_confirmed_by: null,
+          },
+          {
+            id: 32,
+            user_id: "u2",
+            store: "Asda",
+            total: 8,
+            items: { basket: [], meals: [] },
+            status: "delivered",
+            created_at: "2026-10-01T12:00:00.000Z",
+            payment_status: "captured",
+            delivered_at: deliveredAt,
+            received_confirmed_at: null,
+            received_confirmed_by: null,
+          },
+          {
+            id: 33,
+            user_id: "u1",
+            store: "Waitrose",
+            total: 12,
+            items: { basket: [], meals: [] },
+            status: "ordered",
+            created_at: "2026-10-02T12:00:00.000Z",
+            payment_status: "authorized",
+            delivered_at: null,
+            received_confirmed_at: null,
+            received_confirmed_by: null,
+          },
+          {
+            id: 34,
+            user_id: "u1",
+            store: "Sainsbury's",
+            total: 9,
+            items: { basket: [], meals: [] },
+            status: "delivered",
+            created_at: "2026-10-03T12:00:00.000Z",
+            payment_status: "captured",
+            delivered_at: deliveredAt,
+            received_confirmed_at: "2026-10-04T12:00:00.000Z",
+            received_confirmed_by: "customer",
+          },
+        ],
+        order_messages: [],
+      },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "u1@example.com", name: "U" };
+    S.orders = window.__sbTables.orders.map((row) => window.orderFromRow(row));
+    assert.equal(window.__plentry.RECEIPT_HOURS, 48);
+    assert.equal(window.__plentry.receiptHoursLeft({ delivered_at: new Date(Date.now() - 49 * 3600000).toISOString() }), 0);
+    window.renderOrders();
+    const badge = document.getElementById("orders-receipt-badge");
+    assert.equal(badge.classList.contains("inbox-badge"), true);
+    assert.equal(badge.textContent, "1");
+    assert.equal(badge.style.display, "flex");
+    const cards = [...document.querySelectorAll("#orders-list .meal")];
+    const card = (name) => cards.find((c) => c.textContent.includes(name));
+    assert.ok(card("Tesco").textContent.includes("Did it all arrive?"));
+    assert.ok(card("Tesco").textContent.includes("Yes, complete"));
+    assert.ok(card("Tesco").textContent.includes("Something's wrong"));
+    assert.match(card("Tesco").textContent, /Auto-completes in 48h/);
+    assert.equal(card("Tesco").querySelectorAll(".tstep")[3].textContent, "Complete");
+    assert.equal(card("Tesco").querySelectorAll(".tstep")[3].classList.contains("active"), true);
+    assert.ok(!card("Asda").textContent.includes("Did it all arrive?"));
+    assert.ok(!card("Waitrose").textContent.includes("Did it all arrive?"));
+    assert.ok(!card("Sainsbury").textContent.includes("Did it all arrive?"));
+    assert.equal(card("Sainsbury").querySelectorAll(".tstep")[3].classList.contains("done"), true);
+    assert.equal(window.__sbTables.__rpc, undefined);
+    await window.confirmOrderReceived(32);
+    assert.equal(window.__sbTables.__rpc, undefined, "another customer's order does not call the RPC");
+    const wrong = [...card("Tesco").querySelectorAll("button")].find((b) => b.textContent.includes("Something's wrong"));
+    wrong.click();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(document.getElementById("modal").textContent.includes("Issue"));
+    window.closeModal();
+    const yes = [...card("Tesco").querySelectorAll("button")].find((b) => b.textContent.includes("Yes, complete"));
+    assert.match(yes.getAttribute("onclick"), /confirmOrderReceived\(31\)/);
+    await window.confirmOrderReceived(31);
+    assert.equal(window.__sbTables.__rpc.at(-1).fn, "confirm_order_received");
+    assert.equal(window.__sbTables.__rpc.at(-1).args.p_order_id, 31);
+    assert.equal(window.__sbTables.orders.find((o) => o.id === 31).received_confirmed_by, "customer");
+    assert.equal(document.getElementById("orders-receipt-badge").style.display, "none");
+    assert.ok(!document.getElementById("orders-list").textContent.includes("Did it all arrive?"));
+    assert.equal(document.querySelector("#orders-list .meal").querySelectorAll(".tstep")[3].classList.contains("done"), true);
+  });
+
+  it("I-O19 Ops badges, filter chips, and Mark complete", async () => {
+    const deliveredAt = new Date(Date.now() - 3 * 3600000).toISOString();
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      tables: {
+        meals: [],
+        profiles: [],
+        ingredient_prices: [],
+        orders: [
+          {
+            id: 40,
+            user_id: "u1",
+            email: "c@x.com",
+            name: "A",
+            postcode: "E2 8AA",
+            store: "Tesco",
+            total: 10,
+            items: { basket: [{ i: "eggs", q: 1, product: "eggs" }], meals: [] },
+            status: "delivered",
+            created_at: "2026-10-20T12:00:00.000Z",
+            payment_status: "captured",
+            address: {},
+            delivered_at: deliveredAt,
+            received_confirmed_at: null,
+            received_confirmed_by: null,
+          },
+          {
+            id: 41,
+            user_id: "u1",
+            email: "c@x.com",
+            name: "A",
+            postcode: "E2 8AA",
+            store: "Waitrose",
+            total: 12,
+            items: { basket: [], meals: [] },
+            status: "delivered",
+            created_at: "2026-10-18T12:00:00.000Z",
+            payment_status: "captured",
+            address: {},
+            delivered_at: deliveredAt,
+            received_confirmed_at: "2026-10-19T12:00:00.000Z",
+            received_confirmed_by: "customer",
+          },
+          {
+            id: 42,
+            user_id: "u1",
+            email: "c@x.com",
+            name: "A",
+            postcode: "E2 8AA",
+            store: "Asda",
+            total: 9,
+            items: { basket: [], meals: [] },
+            status: "delivered",
+            created_at: "2026-09-01T12:00:00.000Z",
+            payment_status: "captured",
+            address: {},
+            delivered_at: null,
+            received_confirmed_at: "2026-09-02T12:00:00.000Z",
+            received_confirmed_by: "backfill",
+          },
+        ],
+      },
+    });
+    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    assert.equal(window.isAdmin(), true);
+    await window.renderAdmin();
+    const list = document.getElementById("admin-list");
+    assert.match(list.textContent, /Awaiting receipt \(45h left\)/);
+    assert.match(list.textContent, /Complete ✓ \(customer\)/);
+    assert.match(list.textContent, /Complete ✓ \(backfill\)/);
+    assert.equal(list.querySelectorAll(".receipt-chips button").length, 3);
+    const mark = [...list.querySelectorAll("button")].filter((b) => b.textContent.includes("Mark complete"));
+    assert.equal(mark.length, 1);
+    assert.match(mark[0].getAttribute("onclick"), /adminMarkReceived\(40\)/);
+    window.setOpsReceiptFilter("awaiting");
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(document.getElementById("admin-list").textContent.includes("#40"));
+    assert.ok(!document.getElementById("admin-list").textContent.includes("#41"));
+    window.setOpsReceiptFilter("complete");
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(!document.getElementById("admin-list").textContent.includes("Mark complete"));
+    assert.ok(document.getElementById("admin-list").textContent.includes("#41"));
+    assert.ok(document.getElementById("admin-list").textContent.includes("#42"));
+    window.setOpsReceiptFilter("all");
+    await new Promise((r) => setTimeout(r, 20));
+    await window.adminMarkReceived(40);
+    assert.equal(window.__sbTables.__rpc.at(-1).fn, "admin_mark_received");
+    assert.equal(window.__sbTables.__rpc.at(-1).args.p_order_id, 40);
+    assert.match(document.getElementById("admin-list").textContent, /Complete ✓ \(ops\)/);
+    assert.equal(window.__sbTables.orders.find((o) => o.id === 40).received_confirmed_by, "ops");
+    const alerts = [];
+    window.alert = (msg) => alerts.push(String(msg));
+    const from = window.__mockSb.from.bind(window.__mockSb);
+    window.__mockSb.from = (table) => {
+      const q = from(table);
+      if (table !== "orders") return q;
+      const update = q.update.bind(q);
+      q.update = (patch) => {
+        const next = update(patch);
+        if (patch && patch.status && patch.status !== "delivered") {
+          next.then = (ok, err) => Promise.resolve({
+            data: null,
+            error: { message: "cannot change status after the order is received" },
+          }).then(ok, err);
+        }
+        return next;
+      };
+      return q;
+    };
+    await window.adminSetStatus(40, "ordered");
+    assert.ok(alerts.some((m) => m.includes("cannot change status after the order is received")));
+    assert.equal(window.__sbTables.orders.find((o) => o.id === 40).status, "delivered");
+  });
+
+  it("I-O19 an open issue pauses the countdown, and Yes stays disabled until the confirm error", async () => {
+    const deliveredAt = new Date().toISOString();
+    const { window, document } = await loadApp({
+      session: { id: "u1", email: "u1@example.com" },
+      tables: {
+        meals: [],
+        profiles: [],
+        ingredient_prices: [],
+        orders: [
+          {
+            id: 39,
+            user_id: "u1",
+            store: "Tesco",
+            total: 10,
+            items: { basket: [], meals: [] },
+            status: "delivered",
+            created_at: "2026-10-01T12:00:00.000Z",
+            payment_status: "captured",
+            issue_status: "open",
+            delivered_at: deliveredAt,
+            received_confirmed_at: null,
+            received_confirmed_by: null,
+          },
+          {
+            id: 44,
+            user_id: "u1",
+            email: "c@x.com",
+            name: "A",
+            postcode: "E2 8AA",
+            store: "Waitrose",
+            total: 11,
+            items: { basket: [], meals: [] },
+            status: "delivered",
+            created_at: "2026-10-02T12:00:00.000Z",
+            payment_status: "captured",
+            address: {},
+            issue_status: "open",
+            delivered_at: deliveredAt,
+            received_confirmed_at: null,
+            received_confirmed_by: null,
+          },
+        ],
+      },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "u1@example.com", name: "U" };
+    S.orders = window.__sbTables.orders.filter((row) => row.user_id === "u1").map((row) => window.orderFromRow(row));
+    window.renderOrders();
+    const tesco = [...document.querySelectorAll("#orders-list .meal")].find((c) => c.textContent.includes("Tesco"));
+    assert.ok(tesco.textContent.includes("Paused while an issue is open"));
+    assert.ok(!tesco.textContent.includes("Auto-completes"));
+    assert.equal(tesco.querySelectorAll(".tstep")[3].textContent, "Complete");
+    window.__sbTables.__receiptError = "order cannot be confirmed";
+    const pending = window.confirmOrderReceived(39);
+    assert.equal(document.getElementById("receipt-yes-39").disabled, true);
+    await pending;
+    const yes = document.getElementById("receipt-yes-39");
+    assert.equal(yes.disabled, false);
+    assert.ok(document.getElementById("orders-list").textContent.includes("We couldn't confirm this just now, please try again"));
+    assert.equal(window.__sbTables.orders.find((o) => o.id === 39).received_confirmed_at, null);
+    S.user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    const admins = window.__sbTables.admins;
+    window.__sbTables.admins = [{ user_id: "admin" }];
+    await window.checkAdminStatus();
+    window.__sbTables.admins = admins;
+    await window.renderAdmin();
+    const admin = document.getElementById("admin-list");
+    assert.ok(admin.textContent.includes("Paused while an issue is open"));
+    assert.ok(!admin.textContent.includes("h left"));
+  });
+});
