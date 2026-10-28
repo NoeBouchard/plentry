@@ -126,6 +126,8 @@ describe("source contracts", () => {
     // Customer + Ops both read slot + issue columns; the client bound matches the CHECK.
     assert.match(html, /delivery_slot,slot_date,slot_start,slot_end,issue_status"/);
     assert.match(html, /address,delivery_slot,slot_date,slot_start,slot_end,issue_status"/);
+    assert.match(html, /cols\+","\+receipt/);
+    assert.match(html, /delivered_at,received_confirmed_at,received_confirmed_by/);
     assert.match(html, /const ETA_DAYS=4;/);
     assert.match(html, /const SLOT_MAX=80;/);
     assert.match(html, /function isUkPhone/);
@@ -990,5 +992,97 @@ describe("meals MAINTAIN revoke (pending, not applied)", () => {
     const body = active.slice(begin, commit);
     assert.match(body, /revoke maintain on table public\.meals from anon, authenticated;/);
     assert.equal(active.slice(commit + "commit;".length).trim(), "");
+  });
+});
+
+describe("I-O19 order receipt (pending, not applied)", () => {
+  const raw = sqlBody("order_received.sql");
+  const active = stripSqlComments(raw);
+
+  it("I-O19 is one loose pending file, not a migration, and does not grant the new columns", () => {
+    assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
+    assert.equal(existsSync(path.join(ROOT, "supabase/order_received.sql")), true);
+    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /execute_sql/);
+    assert.match(raw, /emailed or skipped/);
+    assert.match(raw, /#31, #38, and #39/);
+    assert.doesNotMatch(active, /where id in\s*\(\s*31/);
+    const begin = active.indexOf("begin;");
+    const commit = active.lastIndexOf("commit;");
+    assert.ok(begin >= 0 && commit > begin);
+    assert.equal(active.slice(commit + "commit;".length).trim(), "");
+    const body = active.slice(begin, commit);
+    assert.match(body, /add column if not exists delivered_at timestamptz/);
+    assert.match(body, /add column if not exists received_confirmed_at timestamptz/);
+    assert.match(body, /add column if not exists received_confirmed_by text/);
+    assert.match(body, /'customer', 'auto', 'ops', 'backfill'/);
+    assert.match(body, /create trigger orders_receipt_insert/);
+    assert.match(body, /before insert on public\.orders/);
+    assert.match(body, /new\.delivered_at := null;/);
+    assert.match(body, /new\.received_confirmed_at := null;/);
+    assert.match(body, /new\.received_confirmed_by := null;/);
+    assert.match(body, /create trigger orders_receipt_stamp/);
+    assert.match(body, /new\.delivered_at := now\(\);/);
+    assert.match(body, /cannot change status after the order is received/);
+    assert.match(body, /create trigger orders_receipt_guard/);
+    assert.match(body, /before update of delivered_at, received_confirmed_at, received_confirmed_by/);
+    assert.match(body, /plentry\.receipt_write/);
+    assert.match(body, /set_config\('plentry\.receipt_write', '1', true\)/);
+    assert.match(body, /interval '48 hours'/);
+    assert.match(body, /issue_status is distinct from 'open'/);
+    assert.match(body, /received_confirmed_by = 'backfill'/);
+    assert.match(body, /cron\.unschedule\('plentry_auto_complete'\)/);
+    assert.match(body, /'plentry_auto_complete'/);
+    assert.match(body, /'\*\/15 \* \* \* \*'/);
+    assert.doesNotMatch(body, /create or replace function public\.validate_order/);
+    assert.doesNotMatch(body, /grant\s+(select|insert|update|delete|all)\b/i);
+    assert.doesNotMatch(body, /on table public\.orders to (anon|authenticated)/);
+    for (const name of ["confirm_order_received", "admin_mark_received", "auto_complete_orders", "orders_receipt_reset", "orders_receipt_stamp", "orders_receipt_guard"]) {
+      const at = body.indexOf(`function public.${name}`);
+      assert.ok(at > 0, name);
+      const chunk = body.slice(at, at + 220);
+      assert.match(chunk, /security definer/, name);
+      assert.match(chunk, /set search_path = public, pg_temp/, name);
+    }
+    assert.match(body, /revoke all on function public\.confirm_order_received\(bigint\) from public, anon, authenticated/);
+    assert.match(body, /grant execute on function public\.confirm_order_received\(bigint\) to authenticated/);
+    assert.match(body, /revoke all on function public\.admin_mark_received\(bigint\) from public, anon, authenticated/);
+    assert.match(body, /grant execute on function public\.admin_mark_received\(bigint\) to authenticated/);
+    assert.match(body, /revoke all on function public\.auto_complete_orders\(\) from public, anon, authenticated/);
+    assert.doesNotMatch(body, /grant execute on function public\.auto_complete_orders/);
+    assert.doesNotMatch(body, /grant execute on function public\.confirm_order_received\(bigint\) to (anon|public)/);
+    assert.doesNotMatch(body, /grant execute on function public\.admin_mark_received\(bigint\) to (anon|public)/);
+    assert.match(body, /auth\.uid\(\)/);
+    assert.match(body, /is_admin_aal2\(\)/);
+    assert.match(raw, /^--\s+select cron\.unschedule\('plentry_auto_complete'\);/m);
+    assert.match(raw, /^--\s+drop function if exists public\.confirm_order_received\(bigint\);/m);
+    assert.match(raw, /^--\s+alter table public\.orders drop column if exists delivered_at;/m);
+  });
+
+  it("I-O19 customer and Ops receipt UI calls the RPCs and wraps at a narrow width", () => {
+    assert.match(html, /id="orders-receipt-badge"/);
+    assert.match(html, /class="inbox-badge" id="orders-receipt-badge"/);
+    assert.match(html, /Did it all arrive\?/);
+    assert.match(html, /Yes, all received/);
+    assert.match(html, /Something's wrong/);
+    assert.match(html, /Auto-completes in \$\{receiptHoursLeft\(o\)\}h/);
+    assert.match(html, /sb\.rpc\("confirm_order_received",\{p_order_id:id\}\)/);
+    assert.match(html, /sb\.rpc\("admin_mark_received",\{p_order_id:id\}\)/);
+    assert.match(html, /Awaiting receipt \(\$\{receiptHoursLeft\(o\)\}h left\)/);
+    assert.match(html, /Complete ✓/);
+    assert.match(html, /Mark received/);
+    assert.match(html, /setOpsReceiptFilter\('all'\)/);
+    assert.match(html, /setOpsReceiptFilter\('awaiting'\)/);
+    assert.match(html, /setOpsReceiptFilter\('complete'\)/);
+    assert.match(html, />Complete<\/div>/);
+    assert.match(html, /function awaitingOwnReceipt/);
+    assert.match(html, /\.receipt-actions\{display:flex;flex-wrap:wrap/);
+    assert.match(html, /\.receipt-chips\{display:flex;flex-wrap:wrap/);
+    assert.match(html, /nav button\{[^}]*min-width:0/);
+    assert.match(html, /const RECEIPT_HOURS=48;/);
+    assert.doesNotMatch(html, /reminder email/i);
+    const ask = html.slice(html.indexOf("function receiptAskHtml"), html.indexOf("function adminReceiptHtml"));
+    assert.match(ask, /awaitingOwnReceipt\(o\)/);
+    assert.doesNotMatch(ask, /openIssueThread\(\$\{oid\},true\)/);
   });
 });
