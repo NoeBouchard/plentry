@@ -2,6 +2,17 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-28 — A stale delivery day is not a choice
+
+- **Checkout.** A chosen day that is no longer in the window (left open past midnight, or inside the 3-day lead) is cleared, with its time. Time buttons stay off and pay stays off. The disabled pay button shows “Choose a delivery day and time to continue” (`aria-describedby="slot-prompt"`). That line is hidden once both are chosen. Day and time buttons set `aria-pressed`. Money, SQL, and edge functions are unchanged.
+- **Tests.** `npm test` **223** on main after the servings change (main `5e12e97` is **220**). This adds 1 jsdom test.
+
+## 2026-10-28 — Delivery window is a required day, then a time
+
+- **History.** `git log -S` / `-G` on `slotPickerHtml`, `id="slot-days"`, and `Delivery window` finds one commit: `b8d1b248b6f2d11e83dc443ae6e726440631cd72` (21 Sep 2026, 15:20:54 Europe/London), which added the picker. That commit is in the pilot work merged as PR #1. No later commit removes those strings. PRs #28–#35 do not change the confirm slot UI (`index.html` is the same from PR #32 `89c84c1b` through main `ea90a314`). Live getplentry.com matches that file. Orders since the picker shipped have `slot_date`, `slot_start`, and `slot_end`, including customer order #39 (25 Oct, window 28 Oct 08:00–10:00). There is no commit that deleted or hid the picker.
+- **Checkout.** Confirm still asks for the 2-hour window. A time tap does not select the earliest day. Time buttons stay off until a day is chosen. Pay stays off until both are chosen, and the window says so. Choosing a day or a time re-renders the modal and keeps a half-typed door address. The insert still sends `slot_date`, `slot_start`, and `slot_end`. `delivery_slot` is still the Ops snapshot (`adminConfirmSlot` / `adminSaveSlot`). Money, SQL grants, and edge functions are unchanged.
+- **Tests.** This adds 1 jsdom test and 1 source contract (2 of the 3 tests the delivery-window fix adds).
+
 ## 2026-10-28 — Servings follow household size, this week, the recipe, and checkout
 
 - **Household.** Cooking for stays 2, 4, or 6. A stored number is kept only when the customer chose it (`prefs.servingsChosen`, or a stored value other than the implicit default of 2). A missing key, or a stored 2 on a household that maps to 4 or 6, follows household size: 1–2 → 2, 3–4 and legacy `4+` → 4, 5–6 → 6. Hydrate, boot, and Profile save all use that. A profile from before servings shipped, household `4+`, no longer stays at 2.

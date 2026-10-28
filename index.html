@@ -198,9 +198,13 @@
   .tstep.active{color:var(--green-d);font-weight:700}
   .tstep.warn{color:var(--amber)}
   .tstep.warn::before{background:var(--amber);border-color:var(--amber)}
+  .slot-step{margin-top:12px;padding:12px 12px 4px;border:2px solid var(--green-d);border-radius:14px;background:var(--sage)}
+  .slot-step h3{font-family:var(--serif);font-size:1.05rem;margin:0 0 4px;color:var(--green-d)}
+  .slot-k{font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--green-d);margin:8px 0 0}
   .slot-picks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
   .slot-picks button{border:1.5px solid var(--line);background:var(--card2);border-radius:10px;padding:8px 10px;font-size:.75rem;cursor:pointer;color:var(--text);font:inherit}
-  .slot-picks button.sel{background:var(--sage);border-color:var(--green);color:var(--green-d);font-weight:700}
+  .slot-picks button.sel{background:#fff;border-color:var(--green);color:var(--green-d);font-weight:700}
+  .slot-picks button:disabled{opacity:.4;cursor:default}
   .inbox-badge{display:none;min-width:16px;height:16px;border-radius:99px;background:var(--amber);color:#1a1a1a;font-size:.62rem;font-weight:800;align-items:center;justify-content:center;padding:0 4px;margin-left:4px}
   .meal-bar{display:flex;border:1.5px solid var(--line);border-radius:99px;overflow:hidden;margin:12px 0 8px;background:var(--card2)}
   .meal-seg{flex:1;border:none;background:transparent;padding:12px 0;font-size:.9rem;font-weight:800;color:var(--muted);cursor:pointer;font-family:inherit}
@@ -4275,6 +4279,19 @@ function readDeliveryForm(prefix){
     postcode:g("postcode")&&g("postcode").value,
   });
 }
+function captureDeliveryDraft(){
+  const g=id=>document.getElementById("del-"+id);
+  if(!g("name")&&!g("line1"))return window.__deliveryDraft||null;
+  window.__deliveryDraft={
+    name:g("name")?g("name").value:"",
+    phone:g("phone")?g("phone").value:"",
+    line1:g("line1")?g("line1").value:"",
+    line2:g("line2")?g("line2").value:"",
+    city:g("city")?g("city").value:"",
+    postcode:g("postcode")?g("postcode").value:"",
+  };
+  return window.__deliveryDraft;
+}
 function confirmOrder(){
   if(!chosenStore||!basket.length)return;
   if(!S.user||!S.user.id){
@@ -4285,16 +4302,21 @@ function confirmOrder(){
   }
   const {t,pay,fee,live}=compareQuote(chosenStore);
   closeBasket();
+  const keepScroll=(document.getElementById("modal")||{}).scrollTop||0;
+  captureDeliveryDraft();
   const preview=basket.slice(0,8).map(b=>`${+b.q}× ${esc(b.i)}`).join(" · ");
   const extra=basket.length>8?` · +${basket.length-8} more`:"";
   const saved=deliveryFrom(S.prefs.delivery);
   const replace=!!window.__deliveryReplace;
+  const formSrc=Object.assign({}, saved||{}, window.__deliveryDraft||{});
+  dropStaleSlot();
+  const slotReady=!!validSlot(window.__chosenSlot&&window.__chosenSlot.date, window.__chosenSlot&&window.__chosenSlot.start);
   const addrBlock=saved&&!replace
     ?`<div class="hint"><b>Deliver to this address?</b><br>${esc(deliveryLabel(saved))}<br>${esc(saved.phone)}</div>
       <button type="button" class="btn ghost sm" onclick="window.__deliveryReplace=true;confirmOrder()">Use a different address</button>`
     :`<p class="sub" style="margin:8px 0 6px">Where should this shop be delivered? This is not the card billing address. Phone is for the driver.</p>
       ${saved?`<button type="button" class="btn ghost sm" onclick="window.__deliveryReplace=false;confirmOrder()">Use the saved address</button>`:""}
-      ${deliveryFormHtml(saved)}`;
+      ${deliveryFormHtml(formSrc)}`;
   openModal(`<h2 style="margin-bottom:6px">Confirm this shop</h2>
     <p class="sub">${basket.length} items at ${esc(chosenStore.name)} · pick a 2-hour window at least 3 days out</p>
     <p class="sub" style="white-space:normal">${preview}${extra}</p>
@@ -4305,9 +4327,14 @@ function confirmOrder(){
     <div class="alert ok">A card hold of about £${holdAmount(t).toFixed(2)} (~30% buffer). Stripe will ask for card billing separately. You're charged the exact store total plus 5% after we shop.</div>
     ${live?"":`<div class="alert">${SHELF_LABEL}</div>`}
     <div class="row" style="margin-top:10px">
-      <button class="btn" style="flex:1" id="confirm-btn" onclick="placeOrder()">${saved&&!replace?"Yes — pay hold & send →":"Pay hold & send order →"}</button>
+      <div style="flex:1">
+        <button class="btn" style="width:100%" id="confirm-btn" ${slotReady?"":"disabled"}${slotReady?"":' aria-describedby="slot-prompt"'} onclick="placeOrder()">${saved&&!replace?"Yes — pay hold & send →":"Pay hold & send order →"}</button>
+        ${slotReady?"":`<p class="sub" id="slot-prompt" style="margin:6px 0 0">Choose a delivery day and time to continue</p>`}
+      </div>
       <button class="btn ghost" onclick="closeModal();openBasket()">Edit basket</button>
     </div>`);
+  const box=document.getElementById("modal");
+  if(box&&keepScroll)box.scrollTop=keepScroll;
 }
 function persistDelivery(d){
   S.prefs.delivery=d;
@@ -4457,26 +4484,56 @@ function validSlot(date,start){
   if(!w)return null;
   return {slot_date:date,slot_start:w.start,slot_end:w.end};
 }
+function dropStaleSlot(){
+  const chosen=window.__chosenSlot;
+  const date=chosen&&String(chosen.date||"");
+  if(date&&!slotDays().includes(date))window.__chosenSlot=null;
+}
 function pickSlot(date,start){
-  const slot=validSlot(date,start);
-  window.__chosenSlot=slot?{date:slot.slot_date,start:slot.slot_start}: {date,start:normTime(start)};
   const modal=document.getElementById("modal-bg");
-  if(modal&&modal.classList.contains("open"))confirmOrder();
+  const open=modal&&modal.classList.contains("open");
+  date=String(date||"");
+  const startNorm=normTime(start);
+  if(date&&!slotDays().includes(date)){
+    window.__chosenSlot=null;
+    if(open)confirmOrder();
+    return null;
+  }
+  if(startNorm&&!date){
+    window.__slotNeedDay=true;
+    if(open)confirmOrder();
+    return null;
+  }
+  window.__slotNeedDay=false;
+  const slot=validSlot(date,startNorm);
+  window.__chosenSlot=slot?{date:slot.slot_date,start:slot.slot_start}:{date,start:startNorm};
+  if(open)confirmOrder();
   return slot;
 }
 function slotPickerHtml(){
+  dropStaleSlot();
   const chosen=window.__chosenSlot||{};
   const days=slotDays();
   const wins=slotWindows();
+  const day=chosen.date||"";
+  const ready=!!validSlot(day, chosen.start);
   const fmt=ymd=>{
     const [y,m,d]=ymd.split("-").map(Number);
     return new Date(Date.UTC(y,m-1,d)).toLocaleDateString("en-GB",{timeZone:"UTC",weekday:"short",day:"numeric",month:"short"});
   };
-  return `<div style="margin-top:10px"><b>Delivery window</b>
-    <p class="sub" style="margin:4px 0 0">We only shop if ${esc((chosenStore&&chosenStore.name)||"the shop")} has this exact 2-hour slot. Earliest is 3 days from today.</p>
-    <div class="slot-picks" id="slot-days">${days.map(ymd=>`<button type="button" class="${chosen.date===ymd?"sel":""}" onclick="pickSlot('${ymd}','${esc(chosen.start||"")}')">${esc(fmt(ymd))}</button>`).join("")}</div>
-    <div class="slot-picks" id="slot-wins">${wins.map(w=>`<button type="button" class="${chosen.start===w.start?"sel":""}" onclick="pickSlot('${esc(chosen.date||days[0])}','${w.start}')">${w.start}–${w.end}</button>`).join("")}</div>
-    ${chosen.date&&chosen.start?`<div class="spice-alert" style="margin:0 0 8px"><b>Be in for this window</b><p>Someone needs to be at the door. The driver will call the phone on this order.</p></div>`:""}
+  const prompt=ready?"":(!day
+    ?(window.__slotNeedDay
+      ?"Choose a delivery day first. A time does not pick a day for you."
+      :"Choose a delivery day, then a 2-hour window. Both are required.")
+    :"Now choose a 2-hour window.");
+  return `<div class="slot-step" id="slot-step"><h3>Delivery window <span class="badge">Required</span></h3>
+    <p class="sub" style="margin:4px 0 0">We only shop if ${esc((chosenStore&&chosenStore.name)||"the shop")} has this exact 2-hour slot. Earliest is 3 days from today. Choose the day, then the time.</p>
+    ${prompt?`<p class="sub" id="slot-hint" style="margin:8px 0">${esc(prompt)}</p>`:""}
+    <div class="slot-k">1. Day</div>
+    <div class="slot-picks" id="slot-days">${days.map(ymd=>`<button type="button" class="${day===ymd?"sel":""}" aria-pressed="${day===ymd?"true":"false"}" onclick="pickSlot('${ymd}','${esc(chosen.start||"")}')">${esc(fmt(ymd))}</button>`).join("")}</div>
+    <div class="slot-k">2. Time${day?"":" — choose a day first"}</div>
+    <div class="slot-picks" id="slot-wins">${wins.map(w=>{const on=!!(day&&chosen.start===w.start);return `<button type="button"${day?"":" disabled"} class="${on?"sel":""}" aria-pressed="${on?"true":"false"}" onclick="pickSlot('${esc(day)}','${w.start}')">${w.start}–${w.end}</button>`;}).join("")}</div>
+    ${ready?`<div class="spice-alert" style="margin:0 0 8px"><b>Be in for this window</b><p>Someone needs to be at the door. The driver will call the phone on this order.</p></div>`:""}
     <div class="err" id="slot-err"></div>
   </div>`;
 }
@@ -4871,7 +4928,10 @@ function openModal(html){document.getElementById("modal").innerHTML=html;documen
 function closeModal(){
   if(mfaLock&&mfaPending()){openMfaChallenge();return;}
   mfaLock=false;
-  window.__deliveryReplace=false;stopIssuePoll();
+  window.__deliveryReplace=false;
+  window.__deliveryDraft=null;
+  window.__slotNeedDay=false;
+  stopIssuePoll();
   const bg=document.getElementById("modal-bg");
   if(bg)bg.classList.remove("open");
 }
