@@ -86,7 +86,7 @@ The same checks, if the catalog changes later:
 
 Not part of `npm test`. Applied to prod at about 15:42 GMT on 26 Oct 2026. The applied file sha256 is `af014769bf7444bb464a7fb37448f278c67ea5872fa6801aa5bc818e05907fb8`. It stays a loose file under `supabase/`, not `supabase/migrations/`. Do not apply it with the Supabase CLI, the Supabase GitHub integration, or a `supabase/migrations/` file. Never create `supabase/migrations/`. `npm test` already runs the file on PGlite (I-A14).
 
-Checks that passed the same day: grants were as reviewed. Anon and authenticated each see 52 published meals and 0 drafts. The aal2 admin path is untested. Open: anon and authenticated still hold `MAINTAIN` on `public.meals`.
+Checks that passed the same day: grants were as reviewed. Anon and authenticated each see 52 published meals and 0 drafts. The aal2 admin path is untested. `MAINTAIN` on `public.meals` was then revoked by `meals_revoke_maintain.sql` (applied 27 Oct 2026 ~22:42 GMT; checked again 4 Nov 2026).
 
 The same checks, if the grants are reviewed again:
 

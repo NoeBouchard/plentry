@@ -2,6 +2,11 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-11-04 — Docs: `meals_revoke_maintain.sql` recorded as applied
+
+- **Applied** to prod at about 22:42 GMT on 27 Oct 2026, after PR #33 (`985a4511`, 22:41:31 GMT). The docs still said pending.
+- **Check (4 Nov 2026, SELECT only).** `has_table_privilege(…, 'public.meals', 'MAINTAIN')` is false for anon and authenticated. Each still has SELECT on the same 11 columns (category, emoji, id, image_url, ing, name, portions, recipe, reviewed_at, tags, time).
+- **Files.** Only the header comment of the `.sql` changed; the SQL statement is unchanged. The source contract now asserts the APPLIED header. No new tests. No deploy.
 ## 2026-11-04 — Advisor add keeps every chosen dinner (P1, I-W11)
 
 - **Bug (pre-existing, found during the 28 Oct ship).** `addAdvisorMeals` ended with `S.menuOptions=S.menuOptions.slice(0,16)`. The week list holds the whole published catalog (52 meals), so a chosen dinner past position 16 fell out of it. `mealByName` then found nothing (a database catalog does not fall back to built-ins), so `selectedMeals()` dropped that dinner: the week showed fewer dinners, and the basket and the week price left it out.
