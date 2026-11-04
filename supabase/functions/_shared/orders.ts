@@ -143,18 +143,59 @@ export function cleanMealIds(v: unknown, n: number): Array<number | null> {
   return out
 }
 
+export type MealPairs =
+  | { ok: true; names: string[]; ids: Array<number | null> }
+  | { ok: false; error: 'meal unavailable'; unavailable: string[] }
+
+// items.meals and items.meal_ids are cleaned together, as pairs, so an id can
+// never slide onto another dinner's name. A pair whose name is blank is
+// dropped with its id. With no meal_ids array (an old cart) every id is null.
+// A meal_ids array of a different length, or a named slot whose id is present
+// but not a positive integer, is refused: never guessed, never skipped.
+export function cleanMealPairs(meals: unknown, mealIds: unknown): MealPairs {
+  const list = Array.isArray(meals) ? meals : []
+  const hasIds = Array.isArray(mealIds)
+  const idList = hasIds ? (mealIds as unknown[]) : []
+  const named = list.map((m) => clean(m, 60))
+  if (hasIds && idList.length !== list.length) {
+    return { ok: false, error: 'meal unavailable', unavailable: named.filter(Boolean).slice(0, 7) }
+  }
+  const names: string[] = []
+  const ids: Array<number | null> = []
+  const bad: string[] = []
+  for (let i = 0; i < list.length && names.length + bad.length < 7; i++) {
+    const name = named[i]
+    if (!name) continue
+    const raw = hasIds ? idList[i] : null
+    if (raw == null) { names.push(name); ids.push(null); continue }
+    const x = typeof raw === 'number' || (typeof raw === 'string' && /^\d+$/.test(raw)) ? Number(raw) : NaN
+    if (!(Number.isSafeInteger(x) && x > 0)) { bad.push(name); continue }
+    names.push(name)
+    ids.push(x)
+  }
+  if (bad.length) return { ok: false, error: 'meal unavailable', unavailable: bad }
+  return { ok: true, names, ids }
+}
+
 export type OrderMealRow = { id?: unknown; name?: unknown; reviewed_at?: unknown; [k: string]: unknown }
 export type ResolvedMeals =
   | { ok: true; meals: OrderMealRow[]; names: string[] }
   | { ok: false; error: 'meal unavailable'; unavailable: string[] }
 
+// A dinner the basket can actually buy for: at least one catalog ingredient.
+function hasBuyableIng(r: OrderMealRow): boolean {
+  const ing = Array.isArray(r.ing) ? r.ing : []
+  return ing.some((x) => CATALOG_SET.has(String(x ?? '').trim().toLowerCase()))
+}
+
 // Order meals resolve by catalog id. A name is a fallback only for an old cart
 // with no id, and only when exactly one published row has that name. An
-// unknown, hidden or ambiguous meal is an error, never a silent skip: order 39
-// (25 Oct 2026) bought nothing for "Lemon chicken & parmesan rice" because the
-// name matched no row and the basket was built as if the dinner had no
-// ingredients. A renamed dinner keeps its id, so the order carries its
-// current name.
+// unknown, hidden or ambiguous meal, an id whose row has a different name, or
+// a published row with no catalog ingredients is an error, never a silent
+// skip: order 39 (25 Oct 2026) bought nothing for "Lemon chicken & parmesan
+// rice" because the name matched no row and the basket was built as if the
+// dinner had no ingredients. The app refreshes renamed dinners by id before it
+// inserts the order, so a name/id mismatch here is refused, not repaired.
 export function resolveOrderMeals(names: string[], ids: Array<number | null>, rows: unknown): ResolvedMeals {
   const list = (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r === 'object') as OrderMealRow[]
   const published = (r: OrderMealRow) => r.reviewed_at != null && String(r.reviewed_at) !== ''
@@ -171,14 +212,15 @@ export function resolveOrderMeals(names: string[], ids: Array<number | null>, ro
     let row: OrderMealRow | null = null
     if (id != null) {
       row = byId.get(id) || null
+      if (row && clean(row.name, 60) !== name) row = null
     } else {
       const hits = list.filter((r) => published(r) && clean(r.name, 60) === name)
       const uniq = new Set(hits.map((r) => Number(r.id)))
       row = hits.length && uniq.size === 1 ? hits[0] : null
     }
-    if (!row || !published(row)) { bad.push(name); return }
+    if (!row || !published(row) || !hasBuyableIng(row)) { bad.push(name); return }
     meals.push(row)
-    out.push(clean(row.name, 60) || name)
+    out.push(name)
   })
   if (bad.length) return { ok: false, error: 'meal unavailable', unavailable: bad }
   return { ok: true, meals, names: out }

@@ -23,7 +23,7 @@
 
 import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
-import { basketTotal, clean, cleanMealIds, cleanMeals, cleanRecipes, rebuildBasket, resolveOrderMeals } from '../_shared/orders.ts'
+import { basketTotal, clean, cleanMealPairs, cleanRecipes, rebuildBasket, resolveOrderMeals } from '../_shared/orders.ts'
 import { PACKS, SEASONINGS, basketFor, normServings, storePacksFromPrices } from '../_shared/portions.ts'
 import { COMMISSION, runCapture, runReconcile } from '../_shared/capture.ts'
 import { sendTelegram } from '../_shared/telegram.ts'
@@ -69,8 +69,11 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
   // Meals resolve by catalog id (items.meal_ids); a name is the key only for an
   // old cart with no id. An unknown or hidden meal refuses the order: the
   // basket is never built as if that dinner had no ingredients.
-  const askedNames = cleanMeals(items?.meals)
-  const ids = cleanMealIds(items?.meal_ids, askedNames.length)
+  // Names and ids are cleaned as pairs, so an id never slides onto another name.
+  const pairs = cleanMealPairs(items?.meals, items?.meal_ids)
+  if (!pairs.ok) return { error: pairs.error, unavailable: pairs.unavailable }
+  const askedNames = pairs.names
+  const ids = pairs.ids
   let catalogRows: unknown[] = []
   let names: string[] = []
   if (askedNames.length) {

@@ -24,6 +24,7 @@ import {
   cleanMeals,
   cleanRecipes,
   cleanMealIds,
+  cleanMealPairs,
   resolveOrderMeals,
   rebuildBasket,
   searchUrl,
@@ -927,11 +928,58 @@ describe("I-W10 pay resolves order meals by catalog id (order 39)", () => {
     assert.equal(r.ok, false);
   });
 
-  it("ids win over names: a renamed meal resolves to its current row and name", () => {
-    const r = resolveOrderMeals(["Old taco name", "Minced Beef & Potato Coconut Stew"], [36, 162], [tacos, stew]);
+  it("ids resolve their own row; an id whose row has a different name is refused, not repaired", () => {
+    const r = resolveOrderMeals([tacos.name, stew.name], [36, 162], [stew, tacos]);
     assert.equal(r.ok, true);
-    assert.deepEqual(r.names, ["Beef & bell pepper tacos", "Minced Beef & Potato Coconut Stew"]);
+    assert.deepEqual(r.names, [tacos.name, stew.name]);
     assert.deepEqual(r.meals.map((m) => m.id), [36, 162]);
+    const swapped = resolveOrderMeals([tacos.name, stew.name], [162, 36], [tacos, stew]);
+    assert.equal(swapped.ok, false, "a cart cannot price one dinner as another");
+    assert.deepEqual(swapped.unavailable, [tacos.name, stew.name]);
+    assert.equal(resolveOrderMeals(["Old taco name"], [36], [tacos]).ok, false);
+  });
+
+  it("names and ids are cleaned as pairs: a blank name drops its own id, never shifts the rest", () => {
+    const p = cleanMealPairs(["", tacos.name, "  ", stew.name], [151, 36, 999, 162]);
+    assert.equal(p.ok, true);
+    assert.deepEqual(p.names, [tacos.name, stew.name]);
+    assert.deepEqual(p.ids, [36, 162]);
+    const r = resolveOrderMeals(p.names, p.ids, [tacos, stew, hidden]);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.meals.map((m) => m.id), [36, 162]);
+    // The old per-index cleaning would have paired the tacos with 151.
+    assert.deepEqual(cleanMealIds([151, 36, 999, 162], 2), [151, 36]);
+  });
+
+  it("pairs: a length mismatch or a bad id on a named slot is refused; no meal_ids is an old cart", () => {
+    const short = cleanMealPairs([tacos.name, stew.name], [36]);
+    assert.equal(short.ok, false);
+    assert.equal(short.error, "meal unavailable");
+    assert.deepEqual(short.unavailable, [tacos.name, stew.name]);
+    for (const badId of [-1, 0, 2.5, "x", "36abc", {}, true]) {
+      const r = cleanMealPairs([tacos.name, stew.name], [badId, 162]);
+      assert.equal(r.ok, false, String(badId));
+      assert.deepEqual(r.unavailable, [tacos.name]);
+    }
+    const legacy = cleanMealPairs([tacos.name, "", stew.name], undefined);
+    assert.equal(legacy.ok, true);
+    assert.deepEqual(legacy.ids, [null, null]);
+    const nulls = cleanMealPairs([tacos.name], [null]);
+    assert.deepEqual(nulls.ok && nulls.ids, [null]);
+    assert.deepEqual(cleanMealPairs([tacos.name], ["36"]).ids, [36]);
+    const many = cleanMealPairs(Array.from({ length: 9 }, (_, i) => "Meal " + i), undefined);
+    assert.equal(many.names.length, 7);
+  });
+
+  it("a published meal with no catalog ingredients is refused, never priced as nothing", () => {
+    const empty = { id: 70, name: "Empty dinner", ing: [], reviewed_at: LIVE };
+    const unknownIng = { id: 71, name: "Odd dinner", ing: ["unicorn"], reviewed_at: LIVE };
+    const r = resolveOrderMeals([tacos.name, empty.name, unknownIng.name], [36, 70, 71], [tacos, empty, unknownIng]);
+    assert.equal(r.ok, false);
+    assert.equal(r.error, "meal unavailable");
+    assert.deepEqual(r.unavailable, [empty.name, unknownIng.name]);
+    assert.equal(resolveOrderMeals([empty.name], [null], [empty]).ok, false);
+    assert.equal(resolveOrderMeals([tacos.name], [36], [{ ...tacos, ing: null }]).ok, false);
   });
 
   it("an old cart with no ids falls back to the name only when exactly one published row has it", () => {
@@ -957,7 +1005,9 @@ describe("I-W10 pay resolves order meals by catalog id (order 39)", () => {
     const src = readFileSync(path.join(ROOT, "supabase/functions/pay/index.ts"), "utf8");
     assert.doesNotMatch(src, /\{\s*name:\s*n,\s*ing:\s*\[\]\s*\}/, "no silent skip");
     assert.match(src, /resolveOrderMeals\(/);
-    assert.match(src, /cleanMealIds\(items\?\.meal_ids/);
+    assert.match(src, /cleanMealPairs\(items\?\.meals, items\?\.meal_ids\)/);
+    assert.match(src, /if \(!pairs\.ok\) return \{ error: pairs\.error, unavailable: pairs\.unavailable \}/);
+    assert.doesNotMatch(src, /cleanMeals\(items\?\.meals\)/);
     assert.match(src, /\.in\('id', idList\)/);
     assert.match(src, /reviewed_at/);
     assert.match(src, /meals: unavailable/);
