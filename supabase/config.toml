@@ -38,3 +38,8 @@ verify_jwt = false
 # `stripe-webhook` is called by Stripe (no user JWT); gated by signature check.
 [functions.stripe-webhook]
 verify_jwt = false
+
+# `order-email` is called by the pg_net trigger and the sweep (no user JWT).
+# The test task checks an admin JWT itself. Same gate style as notify-order.
+[functions.order-email]
+verify_jwt = false

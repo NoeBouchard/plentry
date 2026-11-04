@@ -46,9 +46,11 @@ Full backend → frontend pass (Edge Functions, SQL/RLS as written **and as live
 
 ## Secrets (never in git / never in `index.html`)
 
-`ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ORDER_WEBHOOK_SECRET` (edge side; the DB side is `vault.secrets.order_webhook_secret` — rotate both together), `PEPESTO_API_KEY` (optional), `REQUIRE_ADMIN_MFA` (flag, set to `1` after the founder enrols TOTP).
+`ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `RESEND_API_KEY` (send-only, `order-email` only; never logged, redacted from stored errors), `ORDER_WEBHOOK_SECRET` (edge side; the DB side is `vault.secrets.order_webhook_secret` — rotate both together), `PEPESTO_API_KEY` (optional), `REQUIRE_ADMIN_MFA` (flag, set to `1` after the founder enrols TOTP).
 
-Webhook compare should be constant-time (`notify-order`, `stripe-webhook`).
+Webhook compare should be constant-time (`notify-order`, `stripe-webhook`, `order-email`).
+
+**Order completion email (PR #34, not live).** `order-email` takes the same `x-webhook-secret` as `notify-order` (constant-time compare). Its `test` task needs an aal2 admin JWT, checks `is_admin_aal2`, is rate-limited by IP before `getUser` and per user after, and only sends to that admin's own login address. The `completion_email_*` columns are service-owned (guard trigger); customer selects do not read them. Claim, mark and release functions are `security definer`, revoked from public, anon and authenticated, and granted to service_role only. `completion_email_config` has RLS on and no policy. HTML is escaped. `ORDER_EMAIL_ENABLED` is the kill switch.
 
 ## SQL / RLS to re-read
 

@@ -12,6 +12,7 @@ Browser  index.html (vanilla JS)
         ├─ pay              Stripe Checkout (manual capture) + admin capture
         ├─ stripe-webhook   checkout.session.completed / expired → payment_status
         ├─ notify-order     Telegram ping after authorized hold
+        ├─ order-email      Completion email via Resend (PR #34, not deployed)
         └─ newcoming        Fortnight Telegram of unreviewed meals (cron, not the browser)
 ```
 
@@ -46,6 +47,7 @@ All under `plentry/supabase/functions/`. Shared rate limiter: `_shared/ratelimit
 | `pay` | user | `checkout` session (hold). `capture` is the founder email; admin MFA (aal2) only when `REQUIRE_ADMIN_MFA=1`. Server recomputes grocery total from `ingredient_prices`. Adds 5% on hold and capture, capped at the hold, in integer pence. Writes `amount_captured`, `store_total`, `fee_amount`, `overrun_amount` after the capture-split SQL is applied. `reconcile` reports (dry run unless `dryRun: false`). |
 | `stripe-webhook` | none (signature) | Sets `payment_status=authorized` + address |
 | `notify-order` | webhook secret | Telegram |
+| `order-email` | webhook secret; `test` task: aal2 admin JWT | PR #34, **not deployed**. Completion email via Resend when `received_confirmed_at` is set on a captured order (trigger + 15-minute sweep). Claims the row first; `Idempotency-Key: order-complete/<id>`; kill switch `ORDER_EMAIL_ENABLED`; sends only within 24 hours of receipt. Body from `orderRecipesText(items)`. |
 | `newcoming` | webhook secret | Telegram list of meals with `reviewed_at` null; no-op if empty |
 
 An old `orders` example function is **not** deployed (confirmed 13 Sep 2026). Do not add it back.
