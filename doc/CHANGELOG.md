@@ -2,6 +2,13 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-11-04 — Order meals resolve by catalog id; pay refuses unknown or hidden dinners (PR, not shipped)
+
+- **Why.** Order 39 (25 Oct 2026, Sainsbury's) bought nothing for "Lemon chicken & parmesan rice": the week still held that old built-in name, `pay` looked meals up by name only, found no row, and priced the dinner as `{ name, ing: [] }`. Lemons, parmesan and rice were never bought (chicken thighs and spinach came only from the other dinners). Curry paste on the same order was skipped because it was ticked in the cupboard, which is by design.
+- **pay.** `items.meals` and `items.meal_ids` are cleaned together as pairs (`cleanMealPairs`): a blank name drops its own id, so an id never slides onto another dinner; a `meal_ids` array of a different length, or a bad id on a named slot, is refused. No `meal_ids` at all is an old cart. `resolveOrderMeals` resolves each slot by catalog id; a name is used only for an old cart with no id, and only when exactly one published row has it. An unknown, hidden (`reviewed_at` null) or ambiguous dinner, an id whose row has a different name, or a published dinner with no catalog ingredients returns `400 order not priceable`, `detail: meal unavailable`, `meals: [...]`; nothing is charged. The empty-ingredient fallback is gone. `items.meal_ids` is written back with the server basket.
+- **App.** `placeOrder` sends `meal_ids` from the catalog. `ensureWeek` keeps a renamed dinner by id under its new name (not counted as a swap); stale names with no row are still swapped with the notice (I-W09). A `meal unavailable` refusal from `pay` refreshes the week and says nothing was charged, instead of "Payments aren't ready yet".
+- **Tests.** I-W10 in `edge.test.mjs` (resolver, cleanMealIds, basket includes every resolved dinner, pay source has no silent skip) and `app.test.mjs` (meal_ids sent, rename refresh, stale-name swap, pay refusal). Contracts I-O12 and I-A14 updated to the id lookup. No SQL (`validate_order` allows extra item keys).
+
 ## 2026-10-28 — Production ship (PR #41, recipe-step placeholders)
 
 - **Merge.** PR #41 squash `325ba8a6` (PR head `d520d1e8`) at 16:05:11 GMT.

@@ -69,15 +69,19 @@ describe("source contracts", () => {
   });
 
   it("I-O12 pay rebuilds items.basket server-side and Telegram links come from the store whitelist", () => {
-    assert.match(pay, /import \{ basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket \} from '\.\.\/_shared\/orders\.ts'/);
+    assert.match(pay, /import \{ basketTotal, clean, cleanMealPairs, cleanRecipes, rebuildBasket, resolveOrderMeals \} from '\.\.\/_shared\/orders\.ts'/);
     assert.match(pay, /import \{ PACKS, SEASONINGS, basketFor, normServings, storePacksFromPrices \} from '\.\.\/_shared\/portions\.ts'/);
     assert.match(pay, /const packs = basketFor\(weekMeals, servings, ticks, PACKS, false, storePacksFromPrices\(data \|\| \[\]\)\)/);
     assert.match(pay, /const rebuilt = rebuildBasket\(rawBasket, data \|\| \[\], store\)/);
     assert.match(pay, /update\(\{ total: est, items: priced\.items \}\)/);
     assert.match(pay, /meals: names/);
     assert.match(pay, /recipes: cleanRecipes\(\[\.\.\.catalogRows, \.\.\.clientRecipes\], names\)/);
-    assert.match(pay, /\.from\('meals'\)\.select\('name,emoji,time,ing,recipe,portions'\)\.in\('name', names\)/);
-    assert.match(pay, /\.from\('meals'\)\.select\('name,emoji,time,ing,recipe'\)\.in\('name', names\)/);
+    // I-W10: meals resolve by catalog id; a name only for an old cart with no id.
+    assert.match(pay, /const cols = 'id,name,emoji,time,ing,recipe,portions,reviewed_at'/);
+    assert.match(pay, /\.from\('meals'\)\.select\(cols\)\.in\('id', idList\)/);
+    assert.match(pay, /\.from\('meals'\)\.select\(cols\)\.in\('name', nameList\)/);
+    assert.match(pay, /const resolved = resolveOrderMeals\(askedNames, ids, rows\)/);
+    assert.match(pay, /if \(!resolved\.ok\) return \{ error: resolved\.error, unavailable: resolved\.unavailable \}/);
     assert.doesNotMatch(pay, /FALLBACK_ITEM_GBP = 2\.50/);
     assert.match(pay, /payment_method_types\[0\]', 'card'/);
     assert.match(notify, /import \{ clean, searchUrl \} from '\.\.\/_shared\/orders\.ts'/);
@@ -965,7 +969,7 @@ describe("I-A14 meals follow-ups (applied on prod 26 Oct 2026)", () => {
     assert.doesNotMatch(card, /created_by/);
     assert.match(aiSrc, /ctx\.supabase\.from\('meals'\)\.select\('name,emoji,time,ing,tags'\)/);
     assert.match(aiSrc, /ctx\.supabaseAdmin\.from\('meals'\)/);
-    assert.match(paySrc, /admin\.from\('meals'\)\.select\('name,emoji,time,ing,recipe,portions'\)/);
+    assert.match(paySrc, /admin\.from\('meals'\)\.select\(cols\)/);
     assert.match(newcoming, /ctx\.supabaseAdmin[\s\S]*\.from\('meals'\)[\s\S]*source,created_at/);
   });
 });

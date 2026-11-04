@@ -23,7 +23,7 @@
 
 import { withSupabase } from 'npm:@supabase/server'
 import { allow, clientIdent, TOO_MANY } from '../_shared/ratelimit.ts'
-import { basketTotal, clean, cleanMeals, cleanRecipes, rebuildBasket } from '../_shared/orders.ts'
+import { basketTotal, clean, cleanMealPairs, cleanRecipes, rebuildBasket, resolveOrderMeals } from '../_shared/orders.ts'
 import { PACKS, SEASONINGS, basketFor, normServings, storePacksFromPrices } from '../_shared/portions.ts'
 import { COMMISSION, runCapture, runReconcile } from '../_shared/capture.ts'
 import { sendTelegram } from '../_shared/telegram.ts'
@@ -49,7 +49,7 @@ const STORE_DB: Record<string, { db: string; fee: number }> = {
 // product / pack / price / search come from ingredient_prices + the store
 // whitelist. The rebuilt items are written back to the row so Ops and Telegram
 // never see client-written product names or links.
-async function serverTotal(admin: any, store: string, items: any): Promise<{ total: number; items: any } | { error: string }> {
+async function serverTotal(admin: any, store: string, items: any): Promise<{ total: number; items: any } | { error: string; unavailable?: string[] }> {
   const s = STORE_DB[store]
   if (!s) return { error: 'unknown store' }
   let priceQuery = await admin
@@ -66,15 +66,35 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
   if (error) return { error: 'prices unavailable' }
   // Snapshot cooking methods from the catalog (then any client copy) so the
   // customer can read them from the order after the week moves on (I-O15).
-  const names = cleanMeals(items?.meals)
+  // Meals resolve by catalog id (items.meal_ids); a name is the key only for an
+  // old cart with no id. An unknown or hidden meal refuses the order: the
+  // basket is never built as if that dinner had no ingredients.
+  // Names and ids are cleaned as pairs, so an id never slides onto another name.
+  const pairs = cleanMealPairs(items?.meals, items?.meal_ids)
+  if (!pairs.ok) return { error: pairs.error, unavailable: pairs.unavailable }
+  const askedNames = pairs.names
+  const ids = pairs.ids
   let catalogRows: unknown[] = []
-  if (names.length) {
-    const withPortions = await admin.from('meals').select('name,emoji,time,ing,recipe,portions').in('name', names)
-    if (!withPortions.error && Array.isArray(withPortions.data)) catalogRows = withPortions.data
-    else {
-      const plain = await admin.from('meals').select('name,emoji,time,ing,recipe').in('name', names)
-      if (Array.isArray(plain.data)) catalogRows = plain.data
+  let names: string[] = []
+  if (askedNames.length) {
+    const cols = 'id,name,emoji,time,ing,recipe,portions,reviewed_at'
+    const idList = [...new Set(ids.filter((x): x is number => x != null))]
+    const nameList = [...new Set(askedNames.filter((_, i) => ids[i] == null))]
+    const rows: unknown[] = []
+    if (idList.length) {
+      const r = await admin.from('meals').select(cols).in('id', idList)
+      if (r.error || !Array.isArray(r.data)) return { error: 'meals unavailable' }
+      rows.push(...r.data)
     }
+    if (nameList.length) {
+      const r = await admin.from('meals').select(cols).in('name', nameList)
+      if (r.error || !Array.isArray(r.data)) return { error: 'meals unavailable' }
+      rows.push(...r.data)
+    }
+    const resolved = resolveOrderMeals(askedNames, ids, rows)
+    if (!resolved.ok) return { error: resolved.error, unavailable: resolved.unavailable }
+    catalogRows = resolved.meals
+    names = resolved.names
   }
   const clientRecipes = Array.isArray(items?.recipes) ? items.recipes : []
   const servings = normServings(items?.servings)
@@ -86,12 +106,9 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
   // An order with no meal names still prices the basket it already stored.
   let rawBasket: unknown = items?.basket
   if (names.length) {
-    const byName: Record<string, any> = {}
-    for (const row of catalogRows) {
-      const nm = (row as any)?.name
-      if (nm) byName[String(nm)] = row
-    }
-    const weekMeals = names.map((n) => byName[n] || { name: n, ing: [] })
+    // One resolved catalog row per meal slot (see resolveOrderMeals), so no
+    // dinner can fall through with no ingredients.
+    const weekMeals = catalogRows
     const packs = basketFor(weekMeals, servings, ticks, PACKS, false, storePacksFromPrices(data || []))
     rawBasket = Object.keys(packs).map((i) => ({ i, q: packs[i] }))
   }
@@ -104,6 +121,7 @@ async function serverTotal(admin: any, store: string, items: any): Promise<{ tot
     items: {
       basket: rebuilt.basket,
       meals: names,
+      meal_ids: (catalogRows as any[]).map((r) => Number(r?.id) || null),
       recipes: cleanRecipes([...catalogRows, ...clientRecipes], names),
       eta: clean(items?.eta, 40) || null,
       mode: 'manual',
@@ -181,7 +199,12 @@ export default {
 
       // Authoritative server-side estimate; the stored total is display-only.
       const priced = await serverTotal(ctx.supabaseAdmin, o.store, o.items)
-      if ('error' in priced) return Response.json({ error: 'order not priceable', detail: priced.error }, { status: 400 })
+      if ('error' in priced) {
+        // A dinner that is gone or hidden names itself so the app can ask the
+        // customer to refresh the week (never a silent skip).
+        const unavailable = 'unavailable' in priced && Array.isArray(priced.unavailable) ? priced.unavailable : undefined
+        return Response.json({ error: 'order not priceable', detail: priced.error, ...(unavailable ? { meals: unavailable } : {}) }, { status: 400 })
+      }
       const est = priced.total
       // Keep the row honest: server total + server-built basket (S-04). The
       // validate_order trigger re-checks total/items on this UPDATE.

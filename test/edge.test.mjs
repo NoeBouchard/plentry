@@ -23,6 +23,9 @@ import {
   basketTotal,
   cleanMeals,
   cleanRecipes,
+  cleanMealIds,
+  cleanMealPairs,
+  resolveOrderMeals,
   rebuildBasket,
   searchUrl,
   ukPostcode,
@@ -892,5 +895,121 @@ describe("telegram send", () => {
     }, async () => new Response("y".repeat(400), { status: 500 }));
     assert.equal(bad.status, 502);
     assert.equal(bad.detail.length, 200);
+  });
+});
+
+describe("I-W10 pay resolves order meals by catalog id (order 39)", () => {
+  const LIVE = "2026-09-08T12:00:00.000Z";
+  const tacos = { id: 36, name: "Beef & bell pepper tacos", ing: ["minced beef", "tortillas"], reviewed_at: LIVE };
+  const stew = { id: 162, name: "Minced Beef & Potato Coconut Stew", ing: ["minced beef", "potatoes", "curry paste"], reviewed_at: LIVE };
+  const hidden = { id: 151, name: "Crispy Chicken Thigh Tortilla Stack with Tomato & Feta", ing: ["chicken thighs"], reviewed_at: null };
+
+  it("cleanMealIds keeps one positive integer id per name, else null", () => {
+    assert.deepEqual(cleanMealIds([36, "162", -1, 2.5, "x"], 6), [36, 162, null, null, null, null]);
+    assert.deepEqual(cleanMealIds(undefined, 2), [null, null]);
+    assert.deepEqual(cleanMealIds([1, 2, 3], 1), [1]);
+  });
+
+  it("an unknown name is refused, never skipped (Lemon chicken & parmesan rice)", () => {
+    const names = ["Beef & bell pepper tacos", "Lemon chicken & parmesan rice", "Minced Beef & Potato Coconut Stew"];
+    const r = resolveOrderMeals(names, [null, null, null], [tacos, stew]);
+    assert.equal(r.ok, false);
+    assert.equal(r.error, "meal unavailable");
+    assert.deepEqual(r.unavailable, ["Lemon chicken & parmesan rice"]);
+  });
+
+  it("a hidden (unreviewed) meal is refused by id and by name", () => {
+    assert.deepEqual(resolveOrderMeals([hidden.name], [151], [hidden]).unavailable, [hidden.name]);
+    assert.deepEqual(resolveOrderMeals([hidden.name], [null], [hidden]).unavailable, [hidden.name]);
+  });
+
+  it("an id that is not in the catalog is refused even when the name matches", () => {
+    const r = resolveOrderMeals(["Beef & bell pepper tacos"], [999], [tacos]);
+    assert.equal(r.ok, false);
+  });
+
+  it("ids resolve their own row; an id whose row has a different name is refused, not repaired", () => {
+    const r = resolveOrderMeals([tacos.name, stew.name], [36, 162], [stew, tacos]);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.names, [tacos.name, stew.name]);
+    assert.deepEqual(r.meals.map((m) => m.id), [36, 162]);
+    const swapped = resolveOrderMeals([tacos.name, stew.name], [162, 36], [tacos, stew]);
+    assert.equal(swapped.ok, false, "a cart cannot price one dinner as another");
+    assert.deepEqual(swapped.unavailable, [tacos.name, stew.name]);
+    assert.equal(resolveOrderMeals(["Old taco name"], [36], [tacos]).ok, false);
+  });
+
+  it("names and ids are cleaned as pairs: a blank name drops its own id, never shifts the rest", () => {
+    const p = cleanMealPairs(["", tacos.name, "  ", stew.name], [151, 36, 999, 162]);
+    assert.equal(p.ok, true);
+    assert.deepEqual(p.names, [tacos.name, stew.name]);
+    assert.deepEqual(p.ids, [36, 162]);
+    const r = resolveOrderMeals(p.names, p.ids, [tacos, stew, hidden]);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.meals.map((m) => m.id), [36, 162]);
+    // The old per-index cleaning would have paired the tacos with 151.
+    assert.deepEqual(cleanMealIds([151, 36, 999, 162], 2), [151, 36]);
+  });
+
+  it("pairs: a length mismatch or a bad id on a named slot is refused; no meal_ids is an old cart", () => {
+    const short = cleanMealPairs([tacos.name, stew.name], [36]);
+    assert.equal(short.ok, false);
+    assert.equal(short.error, "meal unavailable");
+    assert.deepEqual(short.unavailable, [tacos.name, stew.name]);
+    for (const badId of [-1, 0, 2.5, "x", "36abc", {}, true]) {
+      const r = cleanMealPairs([tacos.name, stew.name], [badId, 162]);
+      assert.equal(r.ok, false, String(badId));
+      assert.deepEqual(r.unavailable, [tacos.name]);
+    }
+    const legacy = cleanMealPairs([tacos.name, "", stew.name], undefined);
+    assert.equal(legacy.ok, true);
+    assert.deepEqual(legacy.ids, [null, null]);
+    const nulls = cleanMealPairs([tacos.name], [null]);
+    assert.deepEqual(nulls.ok && nulls.ids, [null]);
+    assert.deepEqual(cleanMealPairs([tacos.name], ["36"]).ids, [36]);
+    const many = cleanMealPairs(Array.from({ length: 9 }, (_, i) => "Meal " + i), undefined);
+    assert.equal(many.names.length, 7);
+  });
+
+  it("a published meal with no catalog ingredients is refused, never priced as nothing", () => {
+    const empty = { id: 70, name: "Empty dinner", ing: [], reviewed_at: LIVE };
+    const unknownIng = { id: 71, name: "Odd dinner", ing: ["unicorn"], reviewed_at: LIVE };
+    const r = resolveOrderMeals([tacos.name, empty.name, unknownIng.name], [36, 70, 71], [tacos, empty, unknownIng]);
+    assert.equal(r.ok, false);
+    assert.equal(r.error, "meal unavailable");
+    assert.deepEqual(r.unavailable, [empty.name, unknownIng.name]);
+    assert.equal(resolveOrderMeals([empty.name], [null], [empty]).ok, false);
+    assert.equal(resolveOrderMeals([tacos.name], [36], [{ ...tacos, ing: null }]).ok, false);
+  });
+
+  it("an old cart with no ids falls back to the name only when exactly one published row has it", () => {
+    const ok = resolveOrderMeals([tacos.name], [null], [tacos, { ...tacos, id: 37, reviewed_at: null }]);
+    assert.equal(ok.ok, true);
+    assert.deepEqual(ok.meals.map((m) => m.id), [36]);
+    const twin = resolveOrderMeals([tacos.name], [null], [tacos, { ...tacos, id: 37 }]);
+    assert.equal(twin.ok, false, "two published rows with one name is ambiguous");
+  });
+
+  it("every resolved meal reaches basketFor, so its ingredients are bought", () => {
+    const r = resolveOrderMeals([tacos.name, stew.name], [36, 162], [stew, tacos]);
+    assert.equal(r.ok, true);
+    const packs = basketFor(r.meals, 2, [], PACKS, false, {});
+    assert.ok(packs["potatoes"] >= 1);
+    assert.ok(packs["curry paste"] >= 1, "curry paste is bought unless ticked in the cupboard");
+    assert.ok(packs["tortillas"] >= 1);
+    const ticked = basketFor(r.meals, 2, ["curry paste"], PACKS, false, {});
+    assert.equal(ticked["curry paste"], undefined, "a cupboard tick skips it (order 39)");
+  });
+
+  it("pay source: no name-only lookup and no empty-ingredient fallback", () => {
+    const src = readFileSync(path.join(ROOT, "supabase/functions/pay/index.ts"), "utf8");
+    assert.doesNotMatch(src, /\{\s*name:\s*n,\s*ing:\s*\[\]\s*\}/, "no silent skip");
+    assert.match(src, /resolveOrderMeals\(/);
+    assert.match(src, /cleanMealPairs\(items\?\.meals, items\?\.meal_ids\)/);
+    assert.match(src, /if \(!pairs\.ok\) return \{ error: pairs\.error, unavailable: pairs\.unavailable \}/);
+    assert.doesNotMatch(src, /cleanMeals\(items\?\.meals\)/);
+    assert.match(src, /\.in\('id', idList\)/);
+    assert.match(src, /reviewed_at/);
+    assert.match(src, /meals: unavailable/);
   });
 });
