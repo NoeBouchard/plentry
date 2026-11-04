@@ -360,6 +360,16 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 
 Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
 
+### 2026-10-28 16:07 GMT — PR #41, static + pay
+
+PR #41 squash `325ba8a630c4901bc3e715e391a9777d4855aee5` (PR head `d520d1e8`) at 16:05:11 GMT.
+
+- **Edge functions:** `pay` v54 hand-deployed at 16:06:48 GMT under a GO (`cleanRecipes` keeps steps up to 800 characters and never cuts inside a token). `ai` v52, `checkout` v44, `notify-order` v46, `stripe-webhook` v43 and `newcoming` v37 unchanged.
+- **Static:** `dpl_HWYJibnhFdZsVgP3Qjaaia3PbvE2` from `325ba8a6`. Promoted at 16:06:58 GMT.
+- **Rollback:** static `dpl_32nbFekRDcZfQioESYQPKLHXkEig`, plus `pay` redeployed from the v53 source (`ea90a314`).
+- **SQL:** none. No meal rows edited. Meal Planner's steps patch (`steps_placeholders_2026-10-28_DRAFT.sql`, sha256 `aaad7317…`) is a separate apply under its own GO.
+- **Smoke:** mobile smoke test passed at 2, 4 and 6 servings.
+
 ### 2026-10-28 15:36 GMT — PR #40, static + SQL (PR #36 SQL at 15:41)
 
 PR #40 squash `963bf0bd9323b0f013ed42b087b82d12a46218e5` at 15:35:17 GMT. PR #36 squash `15fb5f492665176995c05c2ce7db965a34f6a731` at 15:41:43 GMT.
