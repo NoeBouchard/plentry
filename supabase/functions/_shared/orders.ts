@@ -131,6 +131,59 @@ export function cleanMeals(v: unknown): string[] {
   return (Array.isArray(v) ? v : []).slice(0, 7).map((m) => clean(m, 60)).filter(Boolean)
 }
 
+// Catalog ids sent with the meal names (items.meal_ids), one per name. A
+// missing or bad id is null, and the name is then the only key for that slot.
+export function cleanMealIds(v: unknown, n: number): Array<number | null> {
+  const list = Array.isArray(v) ? v : []
+  const out: Array<number | null> = []
+  for (let i = 0; i < n; i++) {
+    const x = Number(list[i])
+    out.push(Number.isSafeInteger(x) && x > 0 ? x : null)
+  }
+  return out
+}
+
+export type OrderMealRow = { id?: unknown; name?: unknown; reviewed_at?: unknown; [k: string]: unknown }
+export type ResolvedMeals =
+  | { ok: true; meals: OrderMealRow[]; names: string[] }
+  | { ok: false; error: 'meal unavailable'; unavailable: string[] }
+
+// Order meals resolve by catalog id. A name is a fallback only for an old cart
+// with no id, and only when exactly one published row has that name. An
+// unknown, hidden or ambiguous meal is an error, never a silent skip: order 39
+// (25 Oct 2026) bought nothing for "Lemon chicken & parmesan rice" because the
+// name matched no row and the basket was built as if the dinner had no
+// ingredients. A renamed dinner keeps its id, so the order carries its
+// current name.
+export function resolveOrderMeals(names: string[], ids: Array<number | null>, rows: unknown): ResolvedMeals {
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r === 'object') as OrderMealRow[]
+  const published = (r: OrderMealRow) => r.reviewed_at != null && String(r.reviewed_at) !== ''
+  const byId = new Map<number, OrderMealRow>()
+  for (const r of list) {
+    const id = Number(r.id)
+    if (Number.isSafeInteger(id) && id > 0 && !byId.has(id)) byId.set(id, r)
+  }
+  const meals: OrderMealRow[] = []
+  const out: string[] = []
+  const bad: string[] = []
+  names.forEach((name, i) => {
+    const id = ids[i] ?? null
+    let row: OrderMealRow | null = null
+    if (id != null) {
+      row = byId.get(id) || null
+    } else {
+      const hits = list.filter((r) => published(r) && clean(r.name, 60) === name)
+      const uniq = new Set(hits.map((r) => Number(r.id)))
+      row = hits.length && uniq.size === 1 ? hits[0] : null
+    }
+    if (!row || !published(row)) { bad.push(name); return }
+    meals.push(row)
+    out.push(clean(row.name, 60) || name)
+  })
+  if (bad.length) return { ok: false, error: 'meal unavailable', unavailable: bad }
+  return { ok: true, meals, names: out }
+}
+
 export const MAX_RECIPE_STEPS = 12
 // Steps may carry {{type:body=fallback}} placeholders (renderStep in
 // portions.ts), so the stored text is longer than what the customer reads.

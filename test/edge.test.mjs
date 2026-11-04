@@ -23,6 +23,8 @@ import {
   basketTotal,
   cleanMeals,
   cleanRecipes,
+  cleanMealIds,
+  resolveOrderMeals,
   rebuildBasket,
   searchUrl,
   ukPostcode,
@@ -892,5 +894,72 @@ describe("telegram send", () => {
     }, async () => new Response("y".repeat(400), { status: 500 }));
     assert.equal(bad.status, 502);
     assert.equal(bad.detail.length, 200);
+  });
+});
+
+describe("I-W10 pay resolves order meals by catalog id (order 39)", () => {
+  const LIVE = "2026-09-08T12:00:00.000Z";
+  const tacos = { id: 36, name: "Beef & bell pepper tacos", ing: ["minced beef", "tortillas"], reviewed_at: LIVE };
+  const stew = { id: 162, name: "Minced Beef & Potato Coconut Stew", ing: ["minced beef", "potatoes", "curry paste"], reviewed_at: LIVE };
+  const hidden = { id: 151, name: "Crispy Chicken Thigh Tortilla Stack with Tomato & Feta", ing: ["chicken thighs"], reviewed_at: null };
+
+  it("cleanMealIds keeps one positive integer id per name, else null", () => {
+    assert.deepEqual(cleanMealIds([36, "162", -1, 2.5, "x"], 6), [36, 162, null, null, null, null]);
+    assert.deepEqual(cleanMealIds(undefined, 2), [null, null]);
+    assert.deepEqual(cleanMealIds([1, 2, 3], 1), [1]);
+  });
+
+  it("an unknown name is refused, never skipped (Lemon chicken & parmesan rice)", () => {
+    const names = ["Beef & bell pepper tacos", "Lemon chicken & parmesan rice", "Minced Beef & Potato Coconut Stew"];
+    const r = resolveOrderMeals(names, [null, null, null], [tacos, stew]);
+    assert.equal(r.ok, false);
+    assert.equal(r.error, "meal unavailable");
+    assert.deepEqual(r.unavailable, ["Lemon chicken & parmesan rice"]);
+  });
+
+  it("a hidden (unreviewed) meal is refused by id and by name", () => {
+    assert.deepEqual(resolveOrderMeals([hidden.name], [151], [hidden]).unavailable, [hidden.name]);
+    assert.deepEqual(resolveOrderMeals([hidden.name], [null], [hidden]).unavailable, [hidden.name]);
+  });
+
+  it("an id that is not in the catalog is refused even when the name matches", () => {
+    const r = resolveOrderMeals(["Beef & bell pepper tacos"], [999], [tacos]);
+    assert.equal(r.ok, false);
+  });
+
+  it("ids win over names: a renamed meal resolves to its current row and name", () => {
+    const r = resolveOrderMeals(["Old taco name", "Minced Beef & Potato Coconut Stew"], [36, 162], [tacos, stew]);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.names, ["Beef & bell pepper tacos", "Minced Beef & Potato Coconut Stew"]);
+    assert.deepEqual(r.meals.map((m) => m.id), [36, 162]);
+  });
+
+  it("an old cart with no ids falls back to the name only when exactly one published row has it", () => {
+    const ok = resolveOrderMeals([tacos.name], [null], [tacos, { ...tacos, id: 37, reviewed_at: null }]);
+    assert.equal(ok.ok, true);
+    assert.deepEqual(ok.meals.map((m) => m.id), [36]);
+    const twin = resolveOrderMeals([tacos.name], [null], [tacos, { ...tacos, id: 37 }]);
+    assert.equal(twin.ok, false, "two published rows with one name is ambiguous");
+  });
+
+  it("every resolved meal reaches basketFor, so its ingredients are bought", () => {
+    const r = resolveOrderMeals([tacos.name, stew.name], [36, 162], [stew, tacos]);
+    assert.equal(r.ok, true);
+    const packs = basketFor(r.meals, 2, [], PACKS, false, {});
+    assert.ok(packs["potatoes"] >= 1);
+    assert.ok(packs["curry paste"] >= 1, "curry paste is bought unless ticked in the cupboard");
+    assert.ok(packs["tortillas"] >= 1);
+    const ticked = basketFor(r.meals, 2, ["curry paste"], PACKS, false, {});
+    assert.equal(ticked["curry paste"], undefined, "a cupboard tick skips it (order 39)");
+  });
+
+  it("pay source: no name-only lookup and no empty-ingredient fallback", () => {
+    const src = readFileSync(path.join(ROOT, "supabase/functions/pay/index.ts"), "utf8");
+    assert.doesNotMatch(src, /\{\s*name:\s*n,\s*ing:\s*\[\]\s*\}/, "no silent skip");
+    assert.match(src, /resolveOrderMeals\(/);
+    assert.match(src, /cleanMealIds\(items\?\.meal_ids/);
+    assert.match(src, /\.in\('id', idList\)/);
+    assert.match(src, /reviewed_at/);
+    assert.match(src, /meals: unavailable/);
   });
 });

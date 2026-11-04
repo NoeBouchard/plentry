@@ -3786,6 +3786,15 @@ async function runEnsureWeek(){
     else slots.push(null);
   });
   let swapped=0;
+  // A renamed dinner keeps its catalog id: refresh the name, it is not a swap.
+  for(let i=0;i<slots.length;i++){
+    if(slots[i])continue;
+    const old=saved[i]?prior[saved[i]]:null;
+    const id=old&&old.id!=null?+old.id:NaN;
+    if(!(Number.isInteger(id)&&id>0))continue;
+    const now=S.menuOptions.find(m=>m&&+m.id===id&&isPublished(m));
+    if(now&&taken.indexOf(now.name)<0){slots[i]=now.name;taken.push(now.name);}
+  }
   for(let i=0;i<slots.length;i++){
     if(slots[i])continue;
     const name=saved[i];
@@ -4706,6 +4715,17 @@ function persistDelivery(d){
   const pc=document.getElementById("pr-postcode");if(pc)pc.value=d.postcode;
   const dpc=document.getElementById("pr-del-postcode");if(dpc)dpc.value=d.postcode;
 }
+// Catalog id per week dinner, sent with the names so pay resolves meals by id
+// (a renamed dinner still prices). null when the dinner has no catalog id.
+function orderMealIds(names){
+  return (Array.isArray(names)?names:[]).slice(0,7).map(n=>{
+    const m=(Array.isArray(S.menuOptions)?S.menuOptions:[]).find(x=>x&&x.name===n);
+    const id=m?+m.id:NaN;
+    return Number.isInteger(id)&&id>0?id:null;
+  });
+}
+const PAY_MEAL_REFUSED_MSG="A dinner in your week is no longer available, so we haven't charged you. We've refreshed your week. Check it, then place the order again.";
+function payMealRefused(pay){return !!(pay&&pay.error==="order not priceable"&&pay.detail==="meal unavailable");}
 async function selectionOrderable(){
   let catalog=[];
   try{catalog=await loadCatalogMeals();}catch(e){catalog=null;}
@@ -4770,7 +4790,7 @@ async function placeOrder(){
       user_id:S.user.id,email:S.user.email,name:d.name||S.user.name,postcode:d.postcode,
       store:order.store,total:order.total,payment_status:"unpaid",
       address:{delivery:d,name:d.name,phone:d.phone},
-      items:{basket:order.items,meals:order.meals,recipes:order.recipes,eta:order.eta,mode:"manual",servings:order.servings,cupboard:cupboardTicks()},
+      items:{basket:order.items,meals:order.meals,meal_ids:orderMealIds(order.meals),recipes:order.recipes,eta:order.eta,mode:"manual",servings:order.servings,cupboard:cupboardTicks()},
       slot_date:slot.slot_date,slot_start:slot.slot_start,slot_end:slot.slot_end,
     }).select("id").single();
     if(error||!data)throw error||new Error("Could not save order");
@@ -4780,6 +4800,15 @@ async function placeOrder(){
     return;
   }
   const pay=await payApi("checkout",{order_id:order.backendId});
+  if(payMealRefused(pay)){
+    // pay found a dinner that is gone or hidden. Nothing was charged; refresh the week.
+    await ensureWeek();
+    const menu=document.getElementById("scr-menu");
+    if(menu&&!menu.classList.contains("active"))nav("menu");
+    else renderMenu();
+    openModal(`<h2>Refresh your week</h2><p class="sub">${esc(PAY_MEAL_REFUSED_MSG)}</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
+    return;
+  }
   const payUrl=pay&&pay.live?stripeCheckoutUrl(pay.url):null;
   if(!payUrl){
     openModal(`<h2>Payments aren't ready yet</h2>
@@ -5473,7 +5502,7 @@ if(typeof window!=="undefined"){
     ETA_DAYS,SLOT_MAX,etaDate,fmtDay,deliveryCopy,normSlot,catalogMealByName,mealCache,recipeFromOrder,orderRecipesPayload,
     renderStep,renderSteps,renderRecipeText,stripStepTokens,hasStepTokens,recipeStepNote,
     isUkPhone,validSlot,slotDays,fmtSlot,promisedSlotLabel,deliveredDone,issueAllowed,cleanMsg,RECEIPT_HOURS,receiptHoursLeft,awaitingOwnReceipt,
-    validMeal,
+    validMeal,orderMealIds,payMealRefused,
     setModifyPicks(a){modifyPicks=Array.isArray(a)?a:[];},
     modifyPicks:()=>modifyPicks,
     modifySeen:()=>modifySeen.slice(),

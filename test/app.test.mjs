@@ -1068,6 +1068,128 @@ describe("I-W09 hidden meals", () => {
   });
 });
 
+describe("I-W10 order meals resolve by catalog id (order 39)", () => {
+  const ING = ["chicken thighs", "rice", "onions", "garlic"];
+  const LIVE = "2026-09-08T12:00:00.000Z";
+  function row(id, name, category, reviewed) {
+    return { id, name, emoji: "🍽️", time: 30, ing: ING.slice(), tags: ["dinner", "meat"], category, reviewed_at: reviewed };
+  }
+  function fillDelivery(window, document) {
+    window.confirmOrder();
+    window.__chosenSlot = { date: window.slotDays()[0], start: "08:00" };
+    document.getElementById("del-name").value = "Noe";
+    document.getElementById("del-phone").value = "07123456789";
+    document.getElementById("del-line1").value = "1 Test Street";
+    document.getElementById("del-city").value = "London";
+    document.getElementById("del-postcode").value = "E2 8AA";
+  }
+
+  it("placeOrder sends the catalog id of every dinner with its name", async () => {
+    const liveBake = row(22, "Live bake", "oven_bake", LIVE);
+    const liveCurry = row(20, "Live curry", "curry_stew", LIVE);
+    const state = weekState();
+    state.user = { id: "u1", email: "t@t.com", name: "T" };
+    state.selected = ["Live curry", "Live bake"];
+    state.menuOptions = [liveCurry, liveBake];
+    state.prefs.delivery = null;
+    const { window, document } = await loadApp({
+      localState: state,
+      session: { id: "u1", email: "t@t.com", name: "T" },
+      tables: { meals: [liveCurry, liveBake], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    fillDelivery(window, document);
+    await window.placeOrder();
+    assert.equal(window.__sbTables.orders.length, 1);
+    const items = window.__sbTables.orders[0].items;
+    assert.deepEqual(Array.from(items.meals), ["Live curry", "Live bake"]);
+    assert.deepEqual(Array.from(items.meal_ids), [20, 22]);
+  });
+
+  it("ensureWeek keeps a renamed dinner under its new name, by id, and does not count it as a swap", async () => {
+    const renamed = row(36, "Beef & bell pepper tacos", "tacos_wraps", LIVE);
+    const liveBake = row(22, "Live bake", "oven_bake", LIVE);
+    const liveCurry = row(20, "Live curry", "curry_stew", LIVE);
+    const state = weekState();
+    state.selected = ["Old taco name", "Live bake"];
+    state.menuOptions = [{ ...renamed, name: "Old taco name" }, liveBake];
+    state.prefs.diet = "omnivore";
+    state.prefs.tags = [];
+    state.prefs.goals = [];
+    const { window } = await loadApp({
+      localState: state,
+      tables: { meals: [renamed, liveBake, liveCurry], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.selected = ["Old taco name", "Live bake"];
+    S.menuOptions = [{ ...renamed, name: "Old taco name" }, liveBake];
+    await window.ensureWeek();
+    assert.deepEqual(Array.from(S.selected), ["Beef & bell pepper tacos", "Live bake"]);
+    const notice = window.document.getElementById("week-swap-notice");
+    assert.ok(!notice || !/swapped/.test(notice.textContent), notice && notice.textContent);
+    assert.deepEqual(Array.from(window.__plentry.orderMealIds(S.selected)), [36, 22]);
+  });
+
+  it("a stale name with no catalog row is swapped out and the customer is told (Lemon chicken & parmesan rice)", async () => {
+    const liveBake = row(22, "Live bake", "oven_bake", LIVE);
+    const liveCurry = row(20, "Live curry", "curry_stew", LIVE);
+    const state = weekState();
+    state.selected = ["Lemon chicken & parmesan rice", "Live bake"];
+    state.menuOptions = [liveBake];
+    state.prefs.diet = "omnivore";
+    state.prefs.tags = [];
+    state.prefs.goals = [];
+    const { window } = await loadApp({
+      localState: state,
+      tables: { meals: [liveBake, liveCurry], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.selected = ["Lemon chicken & parmesan rice", "Live bake"];
+    await window.ensureWeek();
+    assert.equal(S.selected.includes("Lemon chicken & parmesan rice"), false);
+    assert.equal(S.selected.length, 2);
+    assert.equal(window.document.getElementById("week-swap-notice").textContent, "We swapped 1 meal that is no longer available.");
+  });
+
+  it("a pay refusal for an unavailable dinner refreshes the week and says nothing was charged", async () => {
+    const liveBake = row(22, "Live bake", "oven_bake", LIVE);
+    const liveCurry = row(20, "Live curry", "curry_stew", LIVE);
+    const state = weekState();
+    state.user = { id: "u1", email: "t@t.com", name: "T" };
+    state.selected = ["Live curry", "Live bake"];
+    state.menuOptions = [liveCurry, liveBake];
+    state.prefs.delivery = null;
+    const { window, document } = await loadApp({
+      localState: state,
+      session: { id: "u1", email: "t@t.com", name: "T" },
+      tables: { meals: [liveCurry, liveBake], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    fillDelivery(window, document);
+    let ensured = 0;
+    const realEnsure = window.ensureWeek;
+    window.ensureWeek = async () => { ensured += 1; return realEnsure(); };
+    window.payApi = async () => ({ error: "order not priceable", detail: "meal unavailable", meals: ["Live curry"] });
+    const before = window.location.href;
+    await window.placeOrder();
+    assert.ok(window.__plentry.payMealRefused({ error: "order not priceable", detail: "meal unavailable" }));
+    assert.equal(window.__plentry.payMealRefused({ error: "order not priceable", detail: "prices unavailable" }), false);
+    const modal = document.getElementById("modal").textContent;
+    assert.match(modal, /Refresh your week/);
+    assert.match(modal, /haven't charged you/);
+    assert.doesNotMatch(modal, /Payments aren't ready yet/);
+    assert.equal(window.location.href, before);
+    assert.equal(S.orders.length, 0, "a refused order is not shown as placed");
+    assert.ok(ensured >= 1, "the week was refreshed");
+  });
+});
+
 describe("seeded tie-break", () => {
   const ING = ["minced beef", "spaghetti", "onions", "garlic", "passata"];
   function tied(id, tags) {
