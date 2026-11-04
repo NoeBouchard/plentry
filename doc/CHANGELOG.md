@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-11-04 — Cooking for applies to this week, recipe pop-up switch, stored servings win (PR, stacked on #43, not shipped)
+
+- **Why.** 4 Nov diagnosis: recipes "not scaling" were the week staying at 2. Noé's profile is household 1 / servings 2; Profile → 4 then Cancel on "Apply cooking for 4 to this week too?" left the week, basket and recipes at 2, and the recipe pop-up had no switch. Guillaume's profile (household `4+`, servings 2) was resolved to 4 in memory while the week stayed at 2. Product's call, 4 Nov.
+- **Apply by default.** `setServings` and `onProfileSize` apply the new number to this week (`applyServingsChange` → `applyServingsToCurrentWeek`): week re-locked, basket edits reset, basket rebuilt. No confirm. A non-blocking notice "Applied to this week. Undo" (`#servings-applied` in `#pr-servings-applied`); Undo (`undoServingsApply`) restores the previous `weekServings` and basket edits. The profile keeps the new number. The load-time prompt (`promptResolvedServingsOnce`, `prefs.servingsWeekAsked`) is removed.
+- **Recipe pop-up switch.** `showRecipe` stores the view and `paintRecipeModal(v)` renders it; a 2/4/6 switch (`#recipe-servings`, `setRecipeServings`) starts at the basket's number (week, or order servings in the order view) and changes only the pop-up: steps, ingredient amounts, time and the "Amounts in these steps are for N people." note. "Your basket is for N" (`#recipe-basket-for`) stays on the basket's number. Nothing in the basket, week, orders or saved state changes.
+- **Stored servings win.** `resolveServings` returns the stored number whenever one is stored; only a missing value is filled from the household. Boot, login and Profile save no longer rewrite it.
+- **Tests.** I-P01 and I-P05 rewritten for the new behaviour (no prompt, Undo, stored 2 kept for `4+`, nothing rewritten on save), a new pop-up switch test in `step-placeholders.test.mjs` (I-P06), contracts updated. `npm test` 315.
+
 ## 2026-11-04 — Order meals resolve by catalog id; pay refuses unknown or hidden dinners (PR, not shipped)
 
 - **Why.** Order 39 (25 Oct 2026, Sainsbury's) bought nothing for "Lemon chicken & parmesan rice": the week still held that old built-in name, `pay` looked meals up by name only, found no row, and priced the dinner as `{ name, ing: [] }`. Lemons, parmesan and rice were never bought (chicken thighs and spinach came only from the other dinners). Curry paste on the same order was skipped because it was ticked in the cupboard, which is by design.

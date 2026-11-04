@@ -343,6 +343,50 @@ describe("step placeholders: app hooks", () => {
     }
   });
 
+  it("the recipe pop-up switch changes only the pop-up: basket, week and orders stay put", async () => {
+    const { window, document } = await loadApp({ localState: weekState({ weekServings: 2 }) });
+    const S = window.__plentry.state();
+    S.weekServings = 2;
+    window.syncBasketFromMeals();
+    const basketBefore = JSON.stringify(window.__plentry.getBasket());
+    const stateBefore = JSON.stringify({ week: S.weekServings, prefs: S.prefs.servings, selected: S.selected, orders: S.orders, basketEdit: S.basketEdit });
+    await window.showRecipe(tacos.name);
+    let modal = document.getElementById("modal");
+    const seg = () => [...modal.querySelectorAll("#recipe-servings button")];
+    assert.deepEqual(seg().map((b) => b.textContent), ["2", "4", "6"]);
+    assert.equal(seg().find((b) => b.classList.contains("active")).textContent, "2", "starts at the week's servings");
+    assert.equal(modal.querySelector("#recipe-basket-for").textContent, "Your basket is for 2");
+    assert.equal(modal.querySelector(".recipe-note").textContent, "Amounts in these steps are for 2 people.");
+    const saved = window.localStorage.getItem("plentry_v1");
+    for (const [n, want] of [[6, ["Dice 2½ onions", "Brown 1.2kg minced beef", "Warm 12 tortillas", "450ml water", "Ingredients for 6"]],
+      [4, ["Dice 2 onions", "Brown 800g minced beef", "Warm 8 tortillas", "300ml water", "Ingredients for 4"]],
+      [2, ["Dice 1 onion", "Brown 400g minced beef", "Warm 4 tortillas", "150ml water", "Ingredients for 2"]]]) {
+      seg().find((b) => b.textContent === String(n)).click();
+      modal = document.getElementById("modal");
+      const text = modal.textContent;
+      for (const w of want) assert.ok(text.includes(w), `@${n}: ${w}`);
+      assert.doesNotMatch(text, BRACE);
+      assert.equal(modal.querySelector(".recipe-note").textContent, `Amounts in these steps are for ${n} people.`);
+      assert.equal(seg().find((b) => b.classList.contains("active")).textContent, String(n));
+      assert.equal(modal.querySelector("#recipe-basket-for").textContent, "Your basket is for 2", "the basket line never follows the switch");
+      assert.equal(JSON.stringify(window.__plentry.getBasket()), basketBefore);
+      assert.equal(JSON.stringify({ week: S.weekServings, prefs: S.prefs.servings, selected: S.selected, orders: S.orders, basketEdit: S.basketEdit }), stateBefore);
+      assert.equal(window.weekServings(), 2);
+    }
+    assert.equal(window.localStorage.getItem("plentry_v1"), saved, "nothing saved by the switch");
+
+    // An order view starts at the order's servings and says so.
+    S.orders = [{ id: 77, backendId: 77, servings: 4, meals: [tacos.name], recipes: [{ name: tacos.name, emoji: "🌮", time: 30, ing: tacos.ing, portions: tacos.portions, recipe: tacos.recipe }], items: [], store: "Tesco", total: 10, status: 1, date: "04/11/2026" }];
+    await window.showRecipeFromOrder(77, 0);
+    modal = document.getElementById("modal");
+    assert.equal(modal.querySelector("#recipe-basket-for").textContent, "Your basket is for 4");
+    assert.equal(seg().find((b) => b.classList.contains("active")).textContent, "4");
+    seg().find((b) => b.textContent === "6").click();
+    assert.equal(document.getElementById("modal").querySelector(".recipe-note").textContent, "Amounts in these steps are for 6 people.");
+    assert.equal(S.orders[0].servings, 4);
+    assert.equal(window.weekServings(), 2);
+  });
+
   it("showRecipe renders tokens for the week's servings and drops the multiply note", async () => {
     const { window, document } = await loadApp({ localState: weekState() });
     const S = window.__plentry.state();

@@ -1044,16 +1044,18 @@ describe("meals MAINTAIN revoke (pending, not applied)", () => {
 });
 
 describe("servings scaling (I-P01 / I-P05)", () => {
-  it("resolves an unchosen household, prompts before this week, lists scaled ingredients, and snapshots servings on the local order", () => {
+  it("stored servings win, a profile change applies with Undo, the recipe pop-up has its own switch, and orders snapshot servings", () => {
     assert.equal(html.match(/S\.prefs\.servings=resolveServings\(S\.prefs\)/g).length, 3);
     assert.match(html, /function resolveServings\(prefs\)/);
-    assert.match(html, /p\.servingsChosen===true&&has\)return normServings\(p\.servings\)/);
-    assert.match(html, /if\(!has\)return servingsFromHousehold\(p\.size\)/);
-    assert.match(html, /if\(stored===2&&fromHouse!==2\)return fromHouse/);
-    assert.match(html, /Apply cooking for "/);
-    assert.match(html, /Your basket will be rescaled and any changes you made to it will be reset/);
-    assert.match(html, /servingsWeekAsked===true/);
-    assert.match(html, /function promptResolvedServingsOnce\(\)/);
+    assert.match(html, /if\(has\)return normServings\(p\.servings\)/);
+    assert.match(html, /return servingsFromHousehold\(p\.size\)/);
+    assert.doesNotMatch(html, /stored===2&&fromHouse!==2/);
+    assert.doesNotMatch(html, /Apply cooking for "/);
+    assert.doesNotMatch(html, /promptResolvedServingsOnce/);
+    assert.doesNotMatch(html, /confirm\(servingsApplyQuestion/);
+    assert.match(html, /Applied to this week\. <button[^>]*onclick="undoServingsApply\(\)">Undo<\/button>/);
+    assert.match(html, /function setRecipeServings\(v\)/);
+    assert.match(html, /Your basket is for \$\{basket\}/);
     assert.match(html, /function applyServingsToCurrentWeek\(\)/);
     assert.match(html, /S\.basketEdit=null/);
     assert.match(html, /class="ing-scaled"/);
