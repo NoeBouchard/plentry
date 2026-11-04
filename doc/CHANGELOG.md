@@ -2,6 +2,15 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-10-28 — Production ship (PR #41, recipe-step placeholders)
+
+- **Merge.** PR #41 squash `325ba8a6` (PR head `d520d1e8`) at 16:05:11 GMT.
+- **Edge functions.** `pay` v54 hand-deployed at 16:06:48 GMT under a GO. Others unchanged: `notify-order` v46, `ai` v52, `checkout` v44, `stripe-webhook` v43, `newcoming` v37.
+- **Static.** `dpl_HWYJibnhFdZsVgP3Qjaaia3PbvE2` from `325ba8a6`, promoted at 16:06:58 GMT.
+- **Rollback.** Static `dpl_32nbFekRDcZfQioESYQPKLHXkEig`, plus `pay` redeployed from the v53 source.
+- **Smoke.** Mobile smoke test passed at 2, 4 and 6 servings.
+- **Not in this ship.** No SQL, no meal rows edited. Meal Planner's steps patch is a separate apply under its own GO. `npm test` on main is **299**.
+
 ## 2026-10-28 — Recipe steps scale to the household (placeholder renderer)
 
 - **Why.** Customers cooking for 4 or 6 still read 2-person amounts in the method. Meal Planner's plan (`step-placeholders-renderer-plan-2026-10-28.md`) adds `{{type:body=fallback}}` tokens to step text; this is the app side. Product: counts (omelettes, wraps, stacks, the coriander bunch) scale with `{{n:}}`, `{{taste:}}` is ×1.75 at 4 and ×2.5 at 6, and there is no “show for 2” toggle.
@@ -10,7 +19,20 @@ Vault history of **functional** product changes. Newest first. Agents append her
 - **Hooks.** `showRecipe` (catalog and order view) renders steps and tip for its servings, and the note becomes “Amounts in these steps are for N people.” on tokenised meals. `placeOrder` stores `recipes` on the local order straight away. `orderRecipesText(items)` renders an order snapshot for the #34 email (not wired; #34 is on hold). `pay`'s `cleanRecipes` keeps steps up to 800 characters (was 400) and `clipStep` never cuts inside a token, and drops a lone `{` left when the cut falls between the two opening braces.
 - **Tests.** Fixture: the 52 meals of Meal Planner's re-cut draft patch (sha256 `aaad731720a3be16b7bb422800a88ae6a25f9e9a4baedc6d85bc2a7822897fa2`), id, name, steps and portions only. All 52 render at 2, 4 and 6 with no braces; 2 and 4 match the review file, 6 matches the golden renders.
 - **Follow-up (P2).** Admin 2/4/6 preview and DB token validation are not in this change (see ROADMAP).
-- **Not live.** No SQL, no meal rows edited, no `supabase/migrations/`. Static is not deployed. `pay` changed (`_shared/orders.ts`, `_shared/portions.ts`) and needs a hand deploy under a GO before the steps patch is applied. `npm test` **299** (main `15fb5f4` is **240**; this adds 59 tests).
+- **Shipped** 28 Oct 2026 at 16:06:58 GMT (see the production-ship entry above). At PR time: no SQL, no meal rows edited, no `supabase/migrations/`. Static was not deployed. `pay` changed (`_shared/orders.ts`, `_shared/portions.ts`) and needs a hand deploy under a GO before the steps patch is applied. `npm test` **299** (main `15fb5f4` is **240**; this adds 59 tests).
+
+## 2026-10-28 — Order receipt and orders DELETE/TRUNCATE revoke: SQL applied
+
+- **Applied (GMT, 28 Oct 2026).** `supabase/order_received.sql` at ~15:35:50 (applied file sha256 `210864e66cee43103ad55510a8283db333074d95fcfbe68e33babfddad4d6c4c`). `supabase/orders_revoke_delete_truncate.sql` at ~15:41:55 (applied file sha256 `49295eb80d24589386c628ab9eda8f89c376b8949756ff563da2f019b23e13a2`). Both with `execute_sql`, not migrations.
+- **Files.** Only the header comment of each `.sql` changed (PENDING → APPLIED), so the repo file sha256 no longer equals the applied one. The SQL statements are unchanged. Source contracts now assert the APPLIED header and no PENDING. No new tests; `npm test` stays **240** on `15fb5f4` (**299** on main `325ba8a6` after #41).
+- **Not in this change.** No static or function deploy.
+
+## 2026-10-28 — Production ships (PR #35; #37, #38, #39; #40)
+
+- **PR #35 (capture split).** Squash `ea90a314` at 12:02:45 GMT. `orders_capture_split.sql` applied at about 12:04 GMT; `notify-order` v46 and `pay` v53 hand-deployed. No static deploy.
+- **Static:** `dpl_9fGPbmtbbfScRbM5AfkYwBzUDrpD` from `0420fa82` (PR #37, #38, #39). Promoted at about 15:08 GMT. Rollback `dpl_4DarVmBySV9ujJq3Lrdn7MJgDx93`.
+- **Static:** `dpl_32nbFekRDcZfQioESYQPKLHXkEig` from `963bf0bd` (PR #40). Promoted at about 15:36 GMT. Rollback `dpl_9fGPbmtbbfScRbM5AfkYwBzUDrpD`. `order_received.sql` applied at about 15:35:50 GMT.
+- **Edge functions** after these ships: `pay` v53, `notify-order` v46, `ai` v52, `checkout` v44, `stripe-webhook` v43, `newcoming` v37.
 
 ## 2026-10-28 — Revoke DELETE and TRUNCATE on orders (SQL written; not applied)
 
