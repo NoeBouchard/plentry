@@ -427,8 +427,9 @@
         </select></div>
       </div>
       <div style="margin-top:12px"><label>Cooking for</label>
-        <p class="sub" id="pr-servings-note">2, 4 or 6. A 3-person home cooks for 4. We'll ask before changing the week already on screen.</p>
+        <p class="sub" id="pr-servings-note">2, 4 or 6. A 3-person home cooks for 4. A change applies to this week too.</p>
         <div id="pr-servings"></div>
+        <div id="pr-servings-applied"></div>
       </div>
       <div style="margin-top:12px"><label>Dinners / week</label><div id="pr-meals-bar"></div><select id="pr-meals" style="display:none"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
       <h3 style="margin-top:16px">Dinner tags</h3>
@@ -1119,17 +1120,15 @@ function renderRecipeText(recipe, portions, servings){
   return {steps:renderSteps(steps,portions,s),tip:renderStep(tip,portions,s),tokens,servings:s};
 }
 /* portions:end */
-// A stored 2 is the old default (and the merge in loadCloudState), not a choice,
-// unless servingsChosen is set. Anything else stored, or a missing key, follows household.
+// Stored servings win (Product, 4 Nov 2026): a profile whose household and
+// servings disagree, e.g. "4+" with 2, keeps 2 and the week follows it. Only a
+// missing servings value is filled from the household. Stored data is never
+// rewritten behind the customer's back.
 function resolveServings(prefs){
   const p=prefs&&typeof prefs==="object"?prefs:{};
   const has=Object.prototype.hasOwnProperty.call(p,"servings")&&p.servings!=null&&p.servings!=="";
-  if(p.servingsChosen===true&&has)return normServings(p.servings);
-  if(!has)return servingsFromHousehold(p.size);
-  const stored=normServings(p.servings);
-  const fromHouse=servingsFromHousehold(p.size);
-  if(stored===2&&fromHouse!==2)return fromHouse;
-  return stored;
+  if(has)return normServings(p.servings);
+  return servingsFromHousehold(p.size);
 }
 const STAPLES=["olive oil","butter","garlic","onions","lemons","curry paste","salt","black pepper","paprika","cumin","chilli flakes","mixed herbs","soy sauce","stock cubes"];
 function isStaple(i){return STAPLES.indexOf(i)>=0;}
@@ -1164,7 +1163,7 @@ function cupboardIconHtml(name,px){
   return `<img class="cupboard-ico" src="${cupboardIconSrc(name)}" width="${n}" height="${n}" alt="" aria-hidden="true">`;
 }
 function weekServings(){return normServings(S.weekServings==null?S.prefs.servings:S.weekServings);}
-function lockWeekServings(){S.weekServings=resolveServings(S.prefs);}
+function lockWeekServings(){clearServingsUndo();S.weekServings=resolveServings(S.prefs);}
 function cookMinutes(m,servings){
   const base=Math.max(0,Math.round(+(m&&m.time)||0));
   const s=normServings(servings==null?weekServings():servings);
@@ -1235,7 +1234,7 @@ function servingsWeekCopy(){
   const next=normServings(S.prefs.servings);
   const week=weekServings();
   if(next===week)return "This week cooks for "+week+".";
-  return "Next week you build cooks for "+next+". This week stays serves "+week+".";
+  return "This week cooks for "+week+". Your profile says "+next+".";
 }
 function paintServingsNotes(){
   const note=document.getElementById("ob-servings-note");if(note)note.textContent=servingsNote();
@@ -1249,50 +1248,63 @@ function applyServingsToCurrentWeek(){
   save();
   renderMenu();
 }
-function servingsApplyQuestion(next, current){
-  return "Apply cooking for "+next+" to this week too? Your basket will be rescaled and any changes you made to it will be reset. Cancel keeps this week at "+current+", and the next week you build cooks for "+next+".";
+// Profile changes apply to this week by default (Product, 4 Nov 2026). A small
+// notice offers Undo, which puts back the week's previous servings and basket edits.
+// Undo belongs to the week it was offered on: a new week, a basket edit, a meal
+// swap or a placed order clears it, and undo checks the week is still the same.
+// While the notice shows, further changes keep the FIRST saved state, so Undo
+// always goes back to where the user started.
+let servingsUndo=null;
+function clearServingsUndo(){
+  if(servingsUndo==null)return;
+  servingsUndo=null;
+  paintServingsApplied();
 }
-function askApplyServings(next, current){
-  try{return typeof confirm==="function"&&confirm(servingsApplyQuestion(next, current))===true;}catch(e){return false;}
+function hasServingsWeek(){
+  return !!S.onboarded&&Array.isArray(S.selected)&&S.selected.length>0;
 }
-function offerApplyServingsToWeek(){
+function servingsUndoLive(){
+  const u=servingsUndo;
+  if(!u)return false;
+  if(!hasServingsWeek()||u.key!==selectedKey()||u.applied!==weekServings()){servingsUndo=null;return false;}
+  return true;
+}
+function servingsAppliedHtml(){
+  return servingsUndoLive()?`<div class="alert ok" id="servings-applied" role="status" style="margin-top:8px;display:flex;align-items:center;gap:8px">Applied to this week. <button type="button" class="btn ghost sm" onclick="undoServingsApply()">Undo</button></div>`:"";
+}
+function paintServingsApplied(){
+  const host=document.getElementById("pr-servings-applied");
+  if(host)host.innerHTML=servingsAppliedHtml();
+}
+function applyServingsChange(){
   const next=normServings(S.prefs.servings);
+  // No week yet (or not onboarded): the profile number is saved and the next week uses it.
+  if(!hasServingsWeek()){servingsUndo=null;paintServingsApplied();return;}
   const current=weekServings();
-  if(next===current)return;
-  if(!S.onboarded)return;
-  if(!Array.isArray(S.selected)||!S.selected.length)return;
-  if(!askApplyServings(next, current))return;
+  const live=servingsUndoLive();
+  if(next===current){paintServingsApplied();return;}
+  if(live&&next===normServings(servingsUndo.week)){
+    // Back to where the user started: same as tapping Undo, edits included.
+    undoServingsApply();
+    return;
+  }
+  const first=live?servingsUndo:{week:current,basketEdit:Array.isArray(S.basketEdit)?S.basketEdit.map(b=>({...b})):null};
   applyServingsToCurrentWeek();
+  servingsUndo={week:first.week,basketEdit:first.basketEdit,key:selectedKey(),applied:weekServings()};
+  paintServingsApplied();
 }
-// Boot/login corrected an implicit 2. Ask once, then remember the answer on the profile.
-let servingsLoadPrompt=null;
-function storedServingsNumber(prefs){
-  const p=prefs&&typeof prefs==="object"?prefs:{};
-  const has=Object.prototype.hasOwnProperty.call(p,"servings")&&p.servings!=null&&p.servings!=="";
-  return has?normServings(p.servings):null;
-}
-function noteServingsResolution(before, locked){
-  const after=normServings(S.prefs.servings);
-  const from=before==null?2:before;
-  if(from===after||locked==null||locked!==from||locked===after){servingsLoadPrompt=null;return;}
-  servingsLoadPrompt={before:from};
-}
-function promptResolvedServingsOnce(){
-  const pending=servingsLoadPrompt;
-  servingsLoadPrompt=null;
-  if(!pending||!S.prefs||S.prefs.servingsWeekAsked===true)return;
-  if(!S.onboarded||!Array.isArray(S.selected)||!S.selected.length)return;
-  const next=normServings(S.prefs.servings);
-  const current=weekServings();
-  if(next===current||current!==pending.before)return;
-  let yes=false,answered=false;
-  try{
-    if(typeof confirm==="function"){yes=confirm(servingsApplyQuestion(next, current))===true;answered=true;}
-  }catch(e){answered=false;}
-  if(!answered)return;
-  S.prefs.servingsWeekAsked=true;
-  if(yes)applyServingsToCurrentWeek();
-  else save();
+function undoServingsApply(){
+  const live=servingsUndoLive();
+  const u=servingsUndo;
+  servingsUndo=null;
+  if(!live||!u){paintServingsApplied();paintServingsNotes();return;}
+  S.weekServings=normServings(u.week);
+  S.basketEdit=u.basketEdit;
+  S.basketFor=selectedKey();
+  syncBasketFromMeals();
+  save();
+  renderMenu();
+  paintServingsApplied();
   paintServingsNotes();
 }
 function servingsControlHtml(active){
@@ -1308,7 +1320,7 @@ function setServings(n){
   S.prefs.servingsChosen=true;
   save();
   renderServingsControl("pr-servings");
-  offerApplyServingsToWeek();
+  applyServingsChange();
   paintServingsNotes();
 }
 function onProfileSize(){
@@ -1317,7 +1329,7 @@ function onProfileSize(){
   S.prefs.servings=servingsFromHousehold(el.value);
   S.prefs.servingsChosen=false;
   renderServingsControl("pr-servings");
-  offerApplyServingsToWeek();
+  applyServingsChange();
   paintServingsNotes();
 }
 function seasoningFor(m){
@@ -1759,12 +1771,9 @@ if(!S.prefs.diet)S.prefs.diet="omnivore";
 S.prefs.budget=normBudget(S.prefs.budget,null); // local blob is untrusted too; never fill £60 for a missing budget
 S.prefs.postcode=normPostcode(S.prefs.postcode)||""; // a missing postcode stays empty; a saved one is kept
 S.prefs.meals=clampMeals(S.prefs.meals);
-const servingsBeforeBoot=storedServingsNumber(S.prefs);
-const weekLockedBeforeBoot=S.weekServings==null?null:normServings(S.weekServings);
 S.prefs.servings=resolveServings(S.prefs);
 if(S.weekServings==null)S.weekServings=S.prefs.servings;
 else S.weekServings=normServings(S.weekServings);
-noteServingsResolution(servingsBeforeBoot, weekLockedBeforeBoot);
 S.prefs.delivery=deliveryFrom(S.prefs.delivery);
 if(S.basketEdit!=null&&!Array.isArray(S.basketEdit))S.basketEdit=null;
 if(Array.isArray(S.basketEdit)&&!S.basketEdit.length)S.basketEdit=null;
@@ -1801,12 +1810,9 @@ async function loadCloudState(user){
         basketEdit:Array.isArray(data.state.basketEdit)&&data.state.basketEdit.length?data.state.basketEdit:null,
         basketFor:data.state.basketFor||null,
         weekServings:data.state.weekServings==null?null:normServings(data.state.weekServings)});
-      const servingsBeforeCloud=storedServingsNumber(S.prefs);
-      const weekLockedBeforeCloud=S.weekServings==null?null:normServings(S.weekServings);
       S.prefs.servings=resolveServings(S.prefs);
       if(S.weekServings==null)S.weekServings=S.prefs.servings;
       else S.weekServings=normServings(S.weekServings);
-      noteServingsResolution(servingsBeforeCloud, weekLockedBeforeCloud);
     }
   }catch(e){}
   if(S.prefs.preferredStore)chosenStore=STORES.find(s=>s.id===S.prefs.preferredStore)||chosenStore;
@@ -4234,14 +4240,33 @@ async function showRecipe(name, snapshot, servingsOverride){
     return;
   }
   if(stored)wroteFor=2;
-  const serves=n===2?"quantities for 2":("serves "+n);
-  const listHtml=scaledIngListHtml(meal,n);
+  recipeView={name,meal,r,stored:!!stored,wroteFor,basket:n};
+  paintRecipeModal(n);
+  renderMenu();
+}
+// The pop-up's own 2/4/6 switch. It starts at the basket's servings and only
+// changes what this pop-up shows: never the basket, the week or an order.
+let recipeView=null;
+function setRecipeServings(v){
+  if(!recipeView)return;
+  // Keep the reader's place: repainting the pop-up must not jump it back to the top.
+  const box=document.getElementById("modal");
+  const top=box?box.scrollTop:0;
+  paintRecipeModal(normServings(v));
+  if(box)box.scrollTop=top;
+}
+function paintRecipeModal(v){
+  const ctx=recipeView;
+  if(!ctx)return;
+  const {name,meal,r,stored,wroteFor,basket}=ctx;
+  const serves=v===2?"quantities for 2":("serves "+v);
+  const listHtml=scaledIngListHtml(meal,v);
   const ingBlock=listHtml
-    ?`<h3 style="margin:12px 0 4px">Ingredients for ${n}</h3>${listHtml}`
+    ?`<h3 style="margin:12px 0 4px">Ingredients for ${v}</h3>${listHtml}`
     :`<p class="sub">${esc((meal.ing||[]).join(", "))}</p>`;
-  // Placeholder tokens render for this household; plain steps come back unchanged.
-  const shown=renderRecipeText(r,meal&&meal.portions,n);
-  const scaledSteps=shown.tokens&&shown.servings===n;
+  // Placeholder tokens render for the shown servings; plain steps come back unchanged.
+  const shown=renderRecipeText(r,meal&&meal.portions,v);
+  const scaledSteps=shown.tokens&&shown.servings===v;
   let stepNum=0;
   const stepsHtml=shown.steps.map((s)=>{
     const parsed=parseStepWithHeading(s);
@@ -4250,14 +4275,16 @@ async function showRecipe(name, snapshot, servingsOverride){
     }
     return `<div class="recipe-step"><span class="n">${++stepNum}</span><span>${esc(parsed.text)}</span></div>`;
   }).join("");
+  const sw=[2,4,6].map(x=>`<button type="button" class="meal-seg ${x===v?"active":""}" aria-pressed="${x===v}" onclick="setRecipeServings(${x})">${x}</button>`).join("");
   openModal(`<h2>${esc(meal.emoji||"🍽️")} ${esc(name)}</h2>
-    <p class="sub">${cookMinutes(meal,n)} min · ${esc(serves)}</p>
+    <p class="sub">${cookMinutes(meal,v)} min · ${esc(serves)}</p>
+    <div class="recipe-servings"><div class="meal-bar" id="recipe-servings" role="group" aria-label="Show amounts for">${sw}</div>
+    <p class="sub" id="recipe-basket-for" style="margin:0 0 8px">Your basket is for ${basket}</p></div>
     ${ingBlock}
-    <p class="recipe-note">${esc(recipeStepNote(wroteFor,n,!!stored,scaledSteps))}</p>
+    <p class="recipe-note">${esc(recipeStepNote(wroteFor,v,stored,scaledSteps))}</p>
     ${stepsHtml}
     ${shown.tip?`<div class="alert ok" style="margin-top:12px">💡 ${esc(shown.tip)}</div>`:""}
     <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">Done</button>`);
-  renderMenu();
 }
 
 // ---------- PANTRY ----------
@@ -4331,6 +4358,7 @@ function rebaseBasketForStore(store){
   return true;
 }
 function mealsChanged(){
+  clearServingsUndo();
   S.basketEdit=null;
   S.basketFor=selectedKey();
   save();
@@ -4341,6 +4369,7 @@ function basketEditsThisWeek(){
   return Array.isArray(S.basketEdit)&&S.basketEdit.length>0&&S.basketFor===selectedKey();
 }
 function commitBasket(){
+  clearServingsUndo();
   S.basketEdit=basket.map(b=>({i:b.i,q:Math.max(1,Math.min(20,Math.round(+b.q||1)))}));
   if(!S.basketEdit.length)S.basketEdit=null;
   S.basketFor=selectedKey();
@@ -4352,6 +4381,7 @@ function commitBasket(){
   fetchLiveQuote();
 }
 function resetBasketFromMeals(){
+  clearServingsUndo();
   S.basketEdit=null;
   S.basketFor=selectedKey();
   save();
@@ -4795,6 +4825,7 @@ async function placeOrder(){
     }).select("id").single();
     if(error||!data)throw error||new Error("Could not save order");
     order.backendId=data.id;
+    clearServingsUndo(); // an order now exists for this week; Undo must not change it
   }catch(e){
     openModal(`<h2>Could not start checkout</h2><p class="sub">${esc(e.message||"Try again in a moment.")}</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
     return;
@@ -5480,8 +5511,6 @@ async function retryPay(orderId){
     syncHeader();
     if((S.user&&S.onboarded)||(!S.user&&S.onboarded&&S.selected.length)){
       await enterApp();
-      // The catalog is in place. Ask once if boot or login moved servings off this week's lock.
-      promptResolvedServingsOnce();
       syncBasketFromMeals();
     }else{
       startOnboarding();
