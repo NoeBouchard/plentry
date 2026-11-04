@@ -4127,6 +4127,22 @@ async function sendAdvisor(){
   }
   renderAdvisor(false);
 }
+// The week's menu list is capped so profiles.state stays small, but the cap
+// applies only to extra candidates. Every dinner in `selected` is always kept,
+// in its place, so the week, the basket and the price never lose a chosen
+// dinner (the old slice(0,16) dropped any chosen dinner past position 16).
+const MENU_OPTIONS_EXTRA_CAP=16;
+function trimMenuOptions(options,selected,cap){
+  const list=Array.isArray(options)?options:[];
+  const keep=new Set((Array.isArray(selected)?selected:[]).map(n=>String(n)));
+  const max=Number.isFinite(+cap)&&+cap>=0?Math.floor(+cap):MENU_OPTIONS_EXTRA_CAP;
+  let extras=0;
+  return list.filter(m=>{
+    if(m&&m.name!=null&&keep.has(String(m.name)))return true;
+    if(extras<max){extras++;return true;}
+    return false;
+  });
+}
 async function addAdvisorMeals(){
   const picked=advisorProposed.filter((_,i)=>advisorPicked.has(i));
   if(!picked.length)return;
@@ -4158,7 +4174,7 @@ async function addAdvisorMeals(){
     else{next[r]=m.name;r=(r+1)%n;}
   }
   S.selected=next.slice(0,n);
-  S.menuOptions=S.menuOptions.slice(0,16);
+  S.menuOptions=trimMenuOptions(S.menuOptions,S.selected,MENU_OPTIONS_EXTRA_CAP);
   save();closeModal();renderMenu();mealsChanged();
 }
 
@@ -5540,6 +5556,7 @@ if(typeof window!=="undefined"){
     STAPLES,CUPBOARD_ICONS,CUPBOARD_ICON_FALLBACK,cupboardIconSrc,catalogNames,haveItem,completeIng,storedRecipe,getBasket:()=>basket,
     tagsFor,mealTags,MEAL_TAGS,USER_MEAL_TAGS,wantedTags,clampMeals,scoreMeal,mealDiet,dietPref,basketEditsThisWeek,isPublished,publishedPool,adminMealReady,deliveryFrom,orderDeliverTo,captureChargePence,
     setWeekSeed,weekSeed,rankCatalog,
+    trimMenuOptions,MENU_OPTIONS_EXTRA_CAP,selectedMeals,
     splitMealPence,weekPriceQuote,weekPacks,basketGroceryPence,mealIngredientQuote,mealPriceLabel,dinnerShownLabel,
   };
 }

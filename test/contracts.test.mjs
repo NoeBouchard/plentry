@@ -133,6 +133,9 @@ describe("source contracts", () => {
     assert.match(html, /cols\+","\+receipt/);
     assert.match(html, /delivered_at,received_confirmed_at,received_confirmed_by/);
     assert.match(html, /const ETA_DAYS=4;/);
+    // I-W11: the advisor never trims a chosen dinner out of the week list.
+    assert.doesNotMatch(html, /S\.menuOptions=S\.menuOptions\.slice\(0,\s*16\)/);
+    assert.match(html, /S\.menuOptions=trimMenuOptions\(S\.menuOptions,S\.selected,MENU_OPTIONS_EXTRA_CAP\)/);
     assert.match(html, /const SLOT_MAX=80;/);
     assert.match(html, /function isUkPhone/);
     assert.match(html, /function validSlot/);
