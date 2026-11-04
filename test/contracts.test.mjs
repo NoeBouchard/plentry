@@ -1055,6 +1055,13 @@ describe("servings scaling (I-P01 / I-P05)", () => {
     assert.doesNotMatch(html, /confirm\(servingsApplyQuestion/);
     assert.match(html, /Applied to this week\. <button[^>]*onclick="undoServingsApply\(\)">Undo<\/button>/);
     assert.match(html, /function setRecipeServings\(v\)/);
+    assert.match(html, /const top=box\?box\.scrollTop:0;\n  paintRecipeModal\(normServings\(v\)\);\n  if\(box\)box\.scrollTop=top;/);
+    assert.match(html, /function lockWeekServings\(\)\{clearServingsUndo\(\);/);
+    for (const fn of ["mealsChanged", "commitBasket", "resetBasketFromMeals"]) {
+      assert.match(html, new RegExp(`function ${fn}\\(\\)\\{\\n  clearServingsUndo\\(\\);`), fn);
+    }
+    assert.match(html, /order\.backendId=data\.id;\n    clearServingsUndo\(\);/);
+    assert.match(html, /if\(!hasServingsWeek\(\)\)\{servingsUndo=null;/);
     assert.match(html, /Your basket is for \$\{basket\}/);
     assert.match(html, /function applyServingsToCurrentWeek\(\)/);
     assert.match(html, /S\.basketEdit=null/);

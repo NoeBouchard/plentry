@@ -2365,7 +2365,7 @@ describe("servings (I-P01 / I-P02 / I-P05)", () => {
     window.setServings(4);
     assert.equal(window.weekServings(), 4);
     window.setServings(4);
-    assert.equal(document.getElementById("servings-applied"), null, "no change, no notice");
+    assert.match(document.getElementById("servings-applied").textContent, /Applied to this week/, "tapping the same number keeps Undo");
 
     document.getElementById("pr-size").value = "6";
     window.onProfileSize();
@@ -2375,8 +2375,140 @@ describe("servings (I-P01 / I-P02 / I-P05)", () => {
     assert.equal(window.weekServings(), 6);
     assert.match(document.getElementById("servings-applied").textContent, /Applied to this week/);
     window.undoServingsApply();
-    assert.equal(window.weekServings(), 4);
+    assert.equal(window.weekServings(), 2, "Undo goes back to where the user started");
     assert.equal(S.orders[0].servings, 2);
+  });
+  it("I-P05 2 → 4 → 6 keeps the first saved state: Undo goes back to 2 with the original basket edits", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.prefs.servings = 2;
+    S.weekServings = 2;
+    window.syncBasketFromMeals();
+    S.basketEdit = [{ i: "onions", q: 7 }];
+    S.basketFor = JSON.stringify(Array.from(S.selected));
+    window.nav("profile");
+    window.setServings(4);
+    assert.equal(window.weekServings(), 4);
+    window.setServings(6);
+    assert.equal(window.weekServings(), 6);
+    assert.ok(document.getElementById("servings-applied"));
+    window.undoServingsApply();
+    assert.equal(window.weekServings(), 2, "Undo returns to the first state, not 4");
+    assert.deepEqual(JSON.parse(JSON.stringify(S.basketEdit)), [{ i: "onions", q: 7 }], "with the original basket edits");
+    assert.equal(document.getElementById("servings-applied"), null);
+
+    window.setServings(4);
+    window.setServings(2);
+    assert.equal(window.weekServings(), 2, "going back to the start number is the same as Undo");
+    assert.deepEqual(JSON.parse(JSON.stringify(S.basketEdit)), [{ i: "onions", q: 7 }], "edits come back too");
+    assert.equal(document.getElementById("servings-applied"), null);
+  });
+  it("I-P05 no week, no Applied notice: not onboarded or no dinners picked only saves the profile", async () => {
+    const fresh = weekState();
+    fresh.onboarded = false;
+    const { window, document } = await loadApp({ localState: fresh });
+    const S = window.__plentry.state();
+    S.onboarded = false;
+    S.weekServings = 2;
+    window.renderProfile();
+    window.setServings(4);
+    assert.equal(S.prefs.servings, 4);
+    assert.equal(S.weekServings, 2, "an un-onboarded week is not rescaled");
+    assert.equal(document.getElementById("servings-applied"), null);
+    window.undoServingsApply();
+    assert.equal(S.weekServings, 2);
+
+    S.onboarded = true;
+    S.selected = [];
+    window.setServings(6);
+    assert.equal(S.weekServings, 2, "no dinners picked: nothing to apply");
+    assert.equal(document.getElementById("servings-applied"), null);
+  });
+  it("I-P05 a new week clears Undo, so it can never reset the later week", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.prefs.servings = 2;
+    S.weekServings = 2;
+    window.nav("profile");
+    window.setServings(4);
+    assert.ok(document.getElementById("servings-applied"));
+    window.autoPickWeek();
+    assert.equal(window.weekServings(), 4, "the new week locks the profile's 4");
+    window.nav("profile");
+    assert.equal(document.getElementById("servings-applied"), null, "no Undo on the new week");
+    window.undoServingsApply();
+    assert.equal(window.weekServings(), 4, "a stale Undo does nothing");
+  });
+  it("I-P05 a basket edit or a meal swap clears Undo", async () => {
+    const { window, document } = await loadApp({ localState: weekState() });
+    const S = window.__plentry.state();
+    S.prefs.servings = 2;
+    S.weekServings = 2;
+    window.nav("profile");
+    window.setServings(4);
+    assert.ok(document.getElementById("servings-applied"));
+    window.commitBasket();
+    assert.equal(document.getElementById("servings-applied"), null, "edit clears the notice");
+    window.undoServingsApply();
+    assert.equal(window.weekServings(), 4, "Undo after a basket edit does nothing");
+
+    window.setServings(6);
+    assert.ok(document.getElementById("servings-applied"));
+    window.resetBasketFromMeals();
+    window.undoServingsApply();
+    assert.equal(window.weekServings(), 6, "Reset basket also clears it");
+
+    window.setServings(2);
+    assert.ok(document.getElementById("servings-applied"));
+    window.mealsChanged();
+    window.undoServingsApply();
+    assert.equal(window.weekServings(), 2, "a meal swap clears it");
+
+    window.setServings(4);
+    assert.ok(document.getElementById("servings-applied"));
+    S.selected = S.selected.slice(1);
+    window.undoServingsApply();
+    assert.equal(window.weekServings(), 4, "a different set of dinners is a different week: Undo refuses");
+  });
+  it("I-P05 placing an order clears Undo", async () => {
+    const LIVE = "2026-09-08T12:00:00.000Z";
+    const ING = ["chicken thighs", "rice", "onions", "garlic"];
+    const curry = { id: 20, name: "Live curry", emoji: "🍛", time: 30, ing: ING.slice(), tags: ["dinner", "meat"], category: "curry_stew", reviewed_at: LIVE };
+    const bake = { id: 22, name: "Live bake", emoji: "🍽️", time: 30, ing: ING.slice(), tags: ["dinner", "meat"], category: "oven_bake", reviewed_at: LIVE };
+    const state = weekState();
+    state.user = { id: "u1", email: "t@t.com", name: "T" };
+    state.prefs.delivery = null;
+    state.prefs.servings = 2;
+    state.weekServings = 2;
+    state.selected = ["Live curry", "Live bake"];
+    state.menuOptions = [curry, bake];
+    const { window, document } = await loadApp({
+      localState: state,
+      session: { id: "u1", email: "t@t.com", name: "T" },
+      tables: { meals: [curry, bake], orders: [], profiles: [], ingredient_prices: [] },
+    });
+    const S = window.__plentry.state();
+    S.user = { id: "u1", email: "t@t.com", name: "T" };
+    assert.equal(S.selected.length, 2);
+    window.nav("profile");
+    window.setServings(4);
+    assert.ok(document.getElementById("servings-applied"));
+    window.pickStore("tesco");
+    window.syncBasketFromMeals();
+    window.confirmOrder();
+    window.__chosenSlot = { date: window.slotDays()[0], start: "08:00" };
+    document.getElementById("del-name").value = "Noe";
+    document.getElementById("del-phone").value = "07123456789";
+    document.getElementById("del-line1").value = "1 Test Street";
+    document.getElementById("del-city").value = "London";
+    document.getElementById("del-postcode").value = "E2 8AA";
+    await window.placeOrder();
+    assert.equal(window.__sbTables.orders.length, 1, "the order row was written");
+    assert.equal(window.__sbTables.orders[0].items.servings, 4);
+    window.undoServingsApply();
+    assert.equal(window.weekServings(), 4, "Undo after an order does nothing");
+    window.nav("profile");
+    assert.equal(document.getElementById("servings-applied"), null);
   });
   it("recipe view lists scaled amounts above the steps, and leaves names when a meal has no portions", async () => {
     const { window, document } = await loadApp({ localState: weekState() });

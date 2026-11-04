@@ -343,7 +343,7 @@ describe("step placeholders: app hooks", () => {
     }
   });
 
-  it("the recipe pop-up switch changes only the pop-up: basket, week and orders stay put", async () => {
+  it("I-P07 the recipe pop-up switch changes only the pop-up: basket, week and orders stay put", async () => {
     const { window, document } = await loadApp({ localState: weekState({ weekServings: 2 }) });
     const S = window.__plentry.state();
     S.weekServings = 2;
@@ -374,6 +374,20 @@ describe("step placeholders: app hooks", () => {
       assert.equal(window.weekServings(), 2);
     }
     assert.equal(window.localStorage.getItem("plentry_v1"), saved, "nothing saved by the switch");
+
+    // The switch keeps the reader's place. jsdom has no layout, so model a browser
+    // that resets scrollTop whenever the pop-up's content is replaced.
+    let top = 0;
+    Object.defineProperty(modal, "scrollTop", { configurable: true, get: () => top, set: (v) => { top = v; } });
+    const realOpen = window.openModal;
+    window.openModal = (h) => { realOpen(h); top = 0; };
+    top = 137;
+    seg().find((b) => b.textContent === "4").click();
+    assert.equal(top, 137, "tapping the switch keeps the scroll position");
+    seg().find((b) => b.textContent === "2").click();
+    assert.equal(top, 137);
+    window.openModal = realOpen;
+    delete modal.scrollTop;
 
     // An order view starts at the order's servings and says so.
     S.orders = [{ id: 77, backendId: 77, servings: 4, meals: [tacos.name], recipes: [{ name: tacos.name, emoji: "🌮", time: 30, ing: tacos.ing, portions: tacos.portions, recipe: tacos.recipe }], items: [], store: "Tesco", total: 10, status: 1, date: "04/11/2026" }];

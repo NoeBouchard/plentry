@@ -1163,7 +1163,7 @@ function cupboardIconHtml(name,px){
   return `<img class="cupboard-ico" src="${cupboardIconSrc(name)}" width="${n}" height="${n}" alt="" aria-hidden="true">`;
 }
 function weekServings(){return normServings(S.weekServings==null?S.prefs.servings:S.weekServings);}
-function lockWeekServings(){S.weekServings=resolveServings(S.prefs);}
+function lockWeekServings(){clearServingsUndo();S.weekServings=resolveServings(S.prefs);}
 function cookMinutes(m,servings){
   const base=Math.max(0,Math.round(+(m&&m.time)||0));
   const s=normServings(servings==null?weekServings():servings);
@@ -1250,9 +1250,27 @@ function applyServingsToCurrentWeek(){
 }
 // Profile changes apply to this week by default (Product, 4 Nov 2026). A small
 // notice offers Undo, which puts back the week's previous servings and basket edits.
+// Undo belongs to the week it was offered on: a new week, a basket edit, a meal
+// swap or a placed order clears it, and undo checks the week is still the same.
+// While the notice shows, further changes keep the FIRST saved state, so Undo
+// always goes back to where the user started.
 let servingsUndo=null;
+function clearServingsUndo(){
+  if(servingsUndo==null)return;
+  servingsUndo=null;
+  paintServingsApplied();
+}
+function hasServingsWeek(){
+  return !!S.onboarded&&Array.isArray(S.selected)&&S.selected.length>0;
+}
+function servingsUndoLive(){
+  const u=servingsUndo;
+  if(!u)return false;
+  if(!hasServingsWeek()||u.key!==selectedKey()||u.applied!==weekServings()){servingsUndo=null;return false;}
+  return true;
+}
 function servingsAppliedHtml(){
-  return servingsUndo?`<div class="alert ok" id="servings-applied" role="status" style="margin-top:8px;display:flex;align-items:center;gap:8px">Applied to this week. <button type="button" class="btn ghost sm" onclick="undoServingsApply()">Undo</button></div>`:"";
+  return servingsUndoLive()?`<div class="alert ok" id="servings-applied" role="status" style="margin-top:8px;display:flex;align-items:center;gap:8px">Applied to this week. <button type="button" class="btn ghost sm" onclick="undoServingsApply()">Undo</button></div>`:"";
 }
 function paintServingsApplied(){
   const host=document.getElementById("pr-servings-applied");
@@ -1260,18 +1278,29 @@ function paintServingsApplied(){
 }
 function applyServingsChange(){
   const next=normServings(S.prefs.servings);
+  // No week yet (or not onboarded): the profile number is saved and the next week uses it.
+  if(!hasServingsWeek()){servingsUndo=null;paintServingsApplied();return;}
   const current=weekServings();
-  if(next===current){servingsUndo=null;paintServingsApplied();return;}
-  servingsUndo={week:current,basketEdit:Array.isArray(S.basketEdit)?S.basketEdit.slice():null};
+  const live=servingsUndoLive();
+  if(next===current){paintServingsApplied();return;}
+  if(live&&next===normServings(servingsUndo.week)){
+    // Back to where the user started: same as tapping Undo, edits included.
+    undoServingsApply();
+    return;
+  }
+  const first=live?servingsUndo:{week:current,basketEdit:Array.isArray(S.basketEdit)?S.basketEdit.map(b=>({...b})):null};
   applyServingsToCurrentWeek();
+  servingsUndo={week:first.week,basketEdit:first.basketEdit,key:selectedKey(),applied:weekServings()};
   paintServingsApplied();
 }
 function undoServingsApply(){
+  const live=servingsUndoLive();
   const u=servingsUndo;
   servingsUndo=null;
-  if(!u){paintServingsApplied();return;}
+  if(!live||!u){paintServingsApplied();paintServingsNotes();return;}
   S.weekServings=normServings(u.week);
   S.basketEdit=u.basketEdit;
+  S.basketFor=selectedKey();
   syncBasketFromMeals();
   save();
   renderMenu();
@@ -4220,7 +4249,11 @@ async function showRecipe(name, snapshot, servingsOverride){
 let recipeView=null;
 function setRecipeServings(v){
   if(!recipeView)return;
+  // Keep the reader's place: repainting the pop-up must not jump it back to the top.
+  const box=document.getElementById("modal");
+  const top=box?box.scrollTop:0;
   paintRecipeModal(normServings(v));
+  if(box)box.scrollTop=top;
 }
 function paintRecipeModal(v){
   const ctx=recipeView;
@@ -4325,6 +4358,7 @@ function rebaseBasketForStore(store){
   return true;
 }
 function mealsChanged(){
+  clearServingsUndo();
   S.basketEdit=null;
   S.basketFor=selectedKey();
   save();
@@ -4335,6 +4369,7 @@ function basketEditsThisWeek(){
   return Array.isArray(S.basketEdit)&&S.basketEdit.length>0&&S.basketFor===selectedKey();
 }
 function commitBasket(){
+  clearServingsUndo();
   S.basketEdit=basket.map(b=>({i:b.i,q:Math.max(1,Math.min(20,Math.round(+b.q||1)))}));
   if(!S.basketEdit.length)S.basketEdit=null;
   S.basketFor=selectedKey();
@@ -4346,6 +4381,7 @@ function commitBasket(){
   fetchLiveQuote();
 }
 function resetBasketFromMeals(){
+  clearServingsUndo();
   S.basketEdit=null;
   S.basketFor=selectedKey();
   save();
@@ -4789,6 +4825,7 @@ async function placeOrder(){
     }).select("id").single();
     if(error||!data)throw error||new Error("Could not save order");
     order.backendId=data.id;
+    clearServingsUndo(); // an order now exists for this week; Undo must not change it
   }catch(e){
     openModal(`<h2>Could not start checkout</h2><p class="sub">${esc(e.message||"Try again in a moment.")}</p><button class="btn" style="width:100%" onclick="closeModal()">OK</button>`);
     return;
