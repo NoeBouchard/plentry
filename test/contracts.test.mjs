@@ -1027,14 +1027,15 @@ describe("I-M10 capture split SQL (pending, not applied)", () => {
   });
 });
 
-describe("meals MAINTAIN revoke (pending, not applied)", () => {
+describe("meals MAINTAIN revoke (applied 27 Oct 2026)", () => {
   const raw = sqlBody("meals_revoke_maintain.sql");
   const active = stripSqlComments(raw);
 
   it("revokes MAINTAIN from anon and authenticated in one transaction, with a commented rollback, and is not a migration", () => {
     assert.equal(existsSync(path.join(ROOT, "supabase/migrations")), false);
     assert.equal(existsSync(path.join(ROOT, "supabase/meals_revoke_maintain.sql")), true);
-    assert.match(raw, /PENDING, not applied/);
+    assert.match(raw, /APPLIED to prod 27 Oct 2026 ~22:42 GMT/);
+    assert.doesNotMatch(raw, /PENDING/);
     assert.match(raw, /^-- grant maintain on table public\.meals to anon, authenticated;$/m);
     assert.doesNotMatch(active, /grant maintain on table public\.meals to anon, authenticated/);
     const begin = active.indexOf("begin;");
