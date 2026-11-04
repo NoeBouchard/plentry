@@ -982,6 +982,60 @@ describe("I-W09 hidden meals", () => {
     assert.equal(notice.textContent, "We've sent this idea to our kitchen to review.");
   });
 
+  it("I-W11 adding an advisor dinner keeps every chosen dinner in the list, the week and the price, past 16 meals", async () => {
+    const meals = [];
+    for (let i = 1; i <= 30; i++) meals.push(row(500 + i, `Dinner ${String(i).padStart(2, "0")}`, "curry_stew", "2026-09-08T12:00:00.000Z"));
+    const state = weekState();
+    state.menuOptions = meals.map((m) => ({ ...m }));
+    state.selected = ["Dinner 20", "Dinner 25", "Dinner 30"];
+    state.prefs.meals = 4;
+    state.prefs.diet = "omnivore";
+    state.prefs.tags = [];
+    state.prefs.goals = [];
+    const { window } = await loadApp({
+      localState: state,
+      tables: { meals, orders: [], profiles: [], ingredient_prices: [] },
+    });
+    await window.ensureWeek();
+    const S = window.__plentry.state();
+    assert.deepEqual(Array.from(S.selected), ["Dinner 20", "Dinner 25", "Dinner 30"]);
+    const known = { name: "Dinner 05", emoji: "🍛", time: 30, ing: ING.slice(), tags: ["dinner", "meat"] };
+    window.__plentry.setAdvisor([known], [0]);
+    await window.addAdvisorMeals();
+
+    const chosen = Array.from(S.selected);
+    assert.deepEqual(chosen.slice().sort(), ["Dinner 05", "Dinner 20", "Dinner 25", "Dinner 30"]);
+    const names = S.menuOptions.map((m) => m.name);
+    for (const name of chosen) assert.ok(names.includes(name), `${name} stays in the menu list`);
+    assert.equal(names.filter((n) => !chosen.includes(n)).length, 16, "extras stay capped at 16");
+    assert.ok(names.length <= 16 + chosen.length);
+
+    const week = Array.from(window.__plentry.selectedMeals());
+    assert.deepEqual(Array.from(week, (m) => m.name).sort(), chosen.slice().sort(), "every chosen dinner resolves");
+    const quote = window.__plentry.weekPriceQuote(week, null);
+    assert.equal(quote.pence.length, 4, "the price covers all four chosen dinners");
+    assert.ok(quote.pence.every((p) => p > 0), "each chosen dinner has a share of the price");
+  });
+
+  it("I-W11 trimMenuOptions caps only the extra candidates and keeps chosen dinners in order", async () => {
+    const { window } = await loadApp();
+    const { trimMenuOptions, MENU_OPTIONS_EXTRA_CAP } = window.__plentry;
+    assert.equal(MENU_OPTIONS_EXTRA_CAP, 16);
+    const opts = Array.from({ length: 40 }, (_, i) => ({ name: `M${i}` }));
+    const out = trimMenuOptions(opts, ["M39", "M25", "M3"], 16);
+    const names = Array.from(out, (m) => m.name);
+    for (const n of ["M39", "M25", "M3"]) assert.ok(names.includes(n), n);
+    assert.equal(names.length, 19, "16 extras plus the three chosen dinners");
+    assert.deepEqual(names, [...Array.from({ length: 17 }, (_, i) => `M${i}`), "M25", "M39"]);
+    const many = Array.from({ length: 7 }, (_, i) => `M${30 + i}`);
+    const kept = Array.from(trimMenuOptions(opts, many, 16), (m) => m.name);
+    for (const n of many) assert.ok(kept.includes(n), n);
+    assert.equal(kept.length, 23);
+    assert.deepEqual(Array.from(trimMenuOptions(opts.slice(0, 5), [], 16), (m) => m.name), ["M0", "M1", "M2", "M3", "M4"]);
+    assert.equal(trimMenuOptions(null, ["M1"], 16).length, 0);
+    assert.equal(trimMenuOptions(opts, null, 16).length, 16);
+  });
+
   it("I-W09 placeOrder refusal swaps the week and shows the notice", async () => {
     const liveCurry = row(20, "Live curry", "curry_stew", "2026-09-08T12:00:00.000Z");
     const livePasta = row(21, "Live pasta", "pasta", "2026-09-08T12:00:00.000Z");
