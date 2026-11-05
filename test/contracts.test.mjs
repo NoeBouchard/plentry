@@ -290,7 +290,7 @@ describe("source contracts", () => {
     assert.match(mfaSql, /supabase secrets unset REQUIRE_ADMIN_MFA/, "roll-back path documented");
     assert.doesNotMatch(html, /ADMIN_EMAIL/, "I-A15: the browser holds no admin address");
     assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&adminStatus\)&&!mfaPending\(\);\}/);
-    assert.doesNotMatch(html, /user\.email===/, "I-A15: the browser never compares the login email");
+    assert.doesNotMatch(html, /user\.email\s*[!=]=/, "I-A15: the browser never compares the login email");
     assert.match(html, /if\(mfaPending\(\)\)openMfaChallenge\(\);/);
     assert.match(html, /r&&r\.error==="mfa_required"/);
     assert.match(html, /window\.__pendingCapture=\{id,storeAmt\}/);
@@ -348,9 +348,10 @@ describe("source contracts", () => {
   });
 
   it("I-M07 admin capture is email-gated on the server; I-A15 the browser asks is_admin() and reads only user_id", () => {
-    assert.match(pay, /const ADMIN_EMAIL = '[^'\s]+@[^'\s]+'/);
-    assert.doesNotMatch(html, /ADMIN_EMAIL/);
-    assert.match(pay, /ctx\.userClaims\?\.email !== ADMIN_EMAIL/);
+    // Explicit messages: without one, a failure prints the whole file into public CI logs.
+    assert.match(pay, /const ADMIN_EMAIL = '[^'\s]+@[^'\s]+'/, "pay names the founder");
+    assert.doesNotMatch(html, /ADMIN_EMAIL/, "I-A15: the browser holds no admin address");
+    assert.match(pay, /ctx\.userClaims\?\.email !== ADMIN_EMAIL/, "pay compares the JWT email");
     assert.match(html, /sb\.rpc\("is_admin"\)/);
     assert.match(html, /sb\.from\("admins"\)\.select\("user_id"\)\.eq\("user_id",S\.user\.id\)\.maybeSingle\(\)/);
   });

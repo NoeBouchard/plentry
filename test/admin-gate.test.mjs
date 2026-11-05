@@ -63,10 +63,12 @@ describe("I-A15 no address in what the repo serves", () => {
     assert.ok(files.includes("index.html"), "listed the repo");
     const mailbox = /@(gmail|googlemail|outlook|hotmail|yahoo|icloud|proton|protonmail)\.[a-z]/i;
     for (const file of files) {
-      if (NOT_YET.has(file) || !existsSync(path.join(ROOT, file))) continue;
+      if (!existsSync(path.join(ROOT, file))) continue;
       const buf = readFileSync(path.join(ROOT, file));
       if (isBinary(buf)) continue;
-      assert.equal(mailbox.test(buf.toString("utf8")), false, `${file} names a personal mailbox`);
+      const named = mailbox.test(buf.toString("utf8"));
+      if (NOT_YET.has(file)) assert.equal(named, true, `${file} is clean: remove it from NOT_YET`);
+      else assert.equal(named, false, `${file} names a personal mailbox`);
     }
   });
 });

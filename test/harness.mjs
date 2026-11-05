@@ -237,8 +237,8 @@ export async function loadApp(opts = {}) {
     profiles: [],
     ingredient_prices: [],
   };
-  // The founder fixture (user id "admin") is a member unless a test lists other members.
-  if (!tables.admins || !tables.admins.length) tables.admins = [{ id: 1, user_id: "admin" }];
+  // The founder fixture (user id "admin") is a member unless a test sets its own admins list.
+  if (!tables.admins) tables.admins = [{ id: 1, user_id: "admin" }];
   publishSavedMeals(tables, opts.localState);
   let html = readFileSync(INDEX, "utf8");
   // Drop the vendored supabase-js tag; the fake client is injected in beforeParse.

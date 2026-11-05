@@ -4293,7 +4293,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [] },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4356,7 +4356,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [live], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+      tables: { meals: [live], orders: [], profiles: [], ingredient_prices: [] },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4381,7 +4381,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [] },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4429,7 +4429,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4469,7 +4469,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4516,7 +4516,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4553,7 +4553,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4573,7 +4573,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
