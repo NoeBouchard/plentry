@@ -7,7 +7,7 @@ Git repo is **`plentry/`** → [github.com/NoeBouchard/plentry](https://github.c
 ## Default path
 
 1. Branch off `main`: `feat/…` or `fix/…` (not product work on `main`).
-2. Implement the smallest diff. New behaviour gets a test with an invariant ID. Update the vault if behaviour changed (`npm run vault`).
+2. Implement the smallest diff. New behaviour gets a test with an invariant ID. Update the vault (`doc/`) if behaviour changed.
 3. Open a pull request. Fill the template (GitHub: `.github/PULL_REQUEST_TEMPLATE.md`; workspace: `plentry/.github/PULL_REQUEST_TEMPLATE.md`).
 4. Wait for GitHub Actions **test** (`npm test`, Node 22). Red means do not merge. **claude-review** runs only when someone adds the `claude-review` label. It is not a required check, so a pull request does not wait on it. See [Claude review gate](RUNBOOK.md#claude-review-gate).
 5. Second look (you are the only human — this replaces a second reviewer):
