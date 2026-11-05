@@ -17,7 +17,7 @@ Every agent (product, bugfix, security) follows this. Chat history is not the so
 - Smallest diff that matches CURRENT-STATE + the user request.
 - Money, status, and XSS: keep `esc` / `safeUrl` on untrusted strings; never trust `orders.total` for Stripe (server recomputes).
 - Commission is **5%** in **both** `index.html` and `pay/index.ts`. If you change one, change the other and the tests.
-- Admin gating: JWT email `noyouchka.bouchard@gmail.com` — UI hide is not security; RLS + `pay` capture check are.
+- Admin gating: the browser asks `is_admin()` and holds no address (I-A15). UI hide is not security; RLS + `pay` capture check are.
 
 ## Harness (do not skip)
 

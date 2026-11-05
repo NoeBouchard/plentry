@@ -2,7 +2,8 @@
 // admin_roles.sql runs on PGlite, only inside this process. adminDenied runs from pay's source.
 import { before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
@@ -44,6 +45,28 @@ describe("I-A15 no address in what the repo serves", () => {
       const found = buf.toString("utf8").match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || [];
       const real = found.filter((address) => !placeholders.has(address));
       assert.equal(real.length, 0, `${file} holds ${real.length} email address(es)`);
+    }
+  });
+
+  // Not served, but public in the repo. A later change clears these: shrink this list, never grow it.
+  const NOT_YET = new Set([
+    "supabase/functions/pay/index.ts",
+    "supabase/admin_meals_write.sql",
+    "supabase/admin_mfa.sql",
+    "supabase/admin_policies.sql",
+    "supabase/admin_roles.sql",
+    "supabase/meals_tags.sql",
+  ]);
+
+  it("I-A15 no other tracked file names a personal mailbox", () => {
+    const files = execFileSync("git", ["ls-files", "-z"], { cwd: ROOT, encoding: "utf8" }).split("\0").filter(Boolean);
+    assert.ok(files.includes("index.html"), "listed the repo");
+    const mailbox = /@(gmail|googlemail|outlook|hotmail|yahoo|icloud|proton|protonmail)\.[a-z]/i;
+    for (const file of files) {
+      if (NOT_YET.has(file) || !existsSync(path.join(ROOT, file))) continue;
+      const buf = readFileSync(path.join(ROOT, file));
+      if (isBinary(buf)) continue;
+      assert.equal(mailbox.test(buf.toString("utf8")), false, `${file} names a personal mailbox`);
     }
   });
 });
