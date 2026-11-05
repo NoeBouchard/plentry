@@ -10,7 +10,7 @@ Ordered. Do not skip the deploy/audit slice to build Phase 3 toys.
 - ~~Workspace + git~~ — this folder; tags already on `origin/main` (`git push` still does **not** ship Vercel).
 - ~~Auth URLs~~ — Site URL + `https://plentry.vercel.app/**` (founder, 13 Sep).
 - ~~Meals tab~~ — founder catalog add/verify/remove on https://plentry.vercel.app (14 Sep). Postgres write policies live. `npm test` 42 passing.
-- ~~Stripe **test** hold + capture~~ — order **#31** Tesco, grocery est. £26.10, hold £31.52, store £25.00 captured as **£26.25** (5% fee £1.25), status **ordered**. Webhook 200. Safe to rotate to live keys.
+- ~~Stripe **test** hold + capture~~ — a test order was held, then captured at store total + 5%, status **ordered**. Webhook 200. Safe to rotate to live keys.
 - ~~Security pass 13 Sep~~ — see [SECURITY.md](SECURITY.md). JWT `email` is GoTrue/`auth.users`, not `user_metadata`. Leftover `orders` fn gone. `pg_net` in `public` accepted. Leaked-password is **Pro-only** (org is Free).
 - ~~Security audit + fixes 17 Sep~~ — 17 findings; DB hardening live; functions/static shipped 17–19 Sep. `npm test` **103**.
 - ~~Small-team loop~~ — GitHub Actions `npm test` on PR/`main`, PR checklist, [ENGINEERING.md](ENGINEERING.md) (21 Sep). Merge still is not Vercel.

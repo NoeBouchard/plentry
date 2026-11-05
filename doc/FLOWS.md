@@ -42,7 +42,7 @@ Confirm shows **Deliver to this address?** (name, address, **phone**) when Profi
 3. The timeline is Payment, Ordered, Delivered, **Complete**. Complete is green once `received_confirmed_at` is set. At 320px those four labels stay on one line.
 4. Ops badges are **Awaiting receipt (Xh left)** and **Complete ✓ (customer, auto, ops, or backfill)**. An open issue shows **Paused while an issue is open** instead of the hours. Chips filter All, Awaiting receipt, and Complete. **Mark complete** calls `admin_mark_received` (`received_confirmed_by = 'ops'`) and the database checks `is_admin_aal2()`. A status change that the database rejects is shown to Ops.
 5. `auto_complete_orders` runs every 15 minutes. It skips rows whose `issue_status` is `open` (the only open value; null and `resolved` do not pause). Resolving the issue does not move `delivered_at`, so a delivery that is already 48 hours old completes on the next sweep.
-6. Applying the file marks a delivered, unconfirmed order `backfill` only when `delivered_at` is null and the issue is not open. That includes historic #31 and #38, and #39 when its issue is not open. A later apply does not confirm a live delivery. An open issue stays awaiting receipt. PR #34's completion-email backfill must treat `backfill` rows as already emailed or skipped.
+6. Applying the file marks a delivered, unconfirmed order `backfill` only when `delivered_at` is null and the issue is not open. A later apply does not confirm a live delivery. An open issue stays awaiting receipt. PR #34's completion-email backfill must treat `backfill` rows as already emailed or skipped.
 
 ## 4. Issue + Inbox
 
