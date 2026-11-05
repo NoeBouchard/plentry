@@ -41,7 +41,7 @@ Update the vault in the same work:
 4. `doc/SECURITY.md` if you added or closed a risk  
 5. MVP contract files if they moved: `REQUIREMENTS.md`, `INVARIANTS.md`, `FLOWS.md`  
 
-In the Kitchen planner workspace, edit root `doc/` then `npm run vault` so this `doc/` stays identical.
+Edit `doc/` in this repo directly. It is the only copy to keep current, so never copy a parent folder's `doc/` over it.
 
 ## Deploy (only if the user asks)
 

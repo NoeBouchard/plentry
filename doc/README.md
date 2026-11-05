@@ -6,7 +6,7 @@ Single source of truth for product, architecture, what is live, and how agents s
 
 **App code:** `plentry/` (`index.html` + Supabase Edge Functions).  
 **Workspace:** `/Users/noebouchard/work/EVERYTHING/Claude/Projects/Kitchen planner`  
-The same markdown is copied to `plentry/doc/` for GitHub (`cd plentry && npm run vault`). Edit **this** `doc/`, then copy.
+This `doc/` in the repo is the only copy to keep current. Edit it directly.
 
 Live: https://getplentry.com · Admin: the founder · Last ship: **5 Oct 2026** (custom domain).
 
