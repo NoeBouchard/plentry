@@ -157,7 +157,7 @@ The static that shows the Orders badge, **Did it all arrive?**, and the Ops chip
 
 **Open issues.** The only open value is `issue_status = 'open'` (`orders_issue_status_sane` allows null, `open`, and `resolved`). `auto_complete_orders()` requires `issue_status is distinct from 'open'`. null and `resolved` do not pause the sweep. Resolving an issue does not change `delivered_at` and does not restart the 48 hour clock. There is no issue-resolved timestamp.
 
-**Backfill.** In the same transaction, a row is set to `received_confirmed_by = 'backfill'` only when `status = 'delivered'`, `received_confirmed_at` is null, `delivered_at` is null, and `issue_status` is not `open`. Historic #31 and #38 are included on the first apply, and #39 only when its issue is not open. Ids are not hardcoded. A re-apply does not confirm a live order that already has `delivered_at`; the 15-minute job completes that order at 48 hours. An open issue stays awaiting receipt so Ops can mark it complete. PR #34's completion-email backfill must treat `backfill` rows as already emailed or skipped, so that file does not send a surprise email.
+**Backfill.** In the same transaction, a row is set to `received_confirmed_by = 'backfill'` only when `status = 'delivered'`, `received_confirmed_at` is null, `delivered_at` is null, and `issue_status` is not `open`. Historic deliveries are included on the first apply, unless their issue is open. Ids are not hardcoded. A re-apply does not confirm a live order that already has `delivered_at`; the 15-minute job completes that order at 48 hours. An open issue stays awaiting receipt so Ops can mark it complete. PR #34's completion-email backfill must treat `backfill` rows as already emailed or skipped, so that file does not send a surprise email.
 
 **Who can write.** `confirm_order_received` and `admin_mark_received` are EXECUTE for `authenticated` only. The customer function also requires `user_id = auth.uid()`, status `delivered`, and a null confirmation. The ops function checks `is_admin_aal2()` inside the body. `auto_complete_orders()` is revoked from `public`, `anon`, and `authenticated`. pg_cron job `plentry_auto_complete` (`*/15 * * * *`) calls it as the role that scheduled the job. This file grants no table or column privileges. A BEFORE UPDATE trigger on the three new columns raises unless `plentry.receipt_write` is `'1'` in that transaction. Until `orders_capture_split.sql` revokes table UPDATE, a table-level UPDATE would include the new columns; the guard still rejects the write.
 
@@ -202,7 +202,7 @@ PR #34. Not applied, not deployed. Ship only under Noé's GO, in this order. **S
 2. **Secrets** (`supabase secrets set`, never in git or logs): `RESEND_API_KEY` (send-only key), `ORDER_EMAIL_REPLY_TO=hello@getplentry.com` (also the default), `ORDER_EMAIL_ENABLED=0` for now. `ORDER_EMAIL_FROM` is optional; the default sender is `Plentry <orders@getplentry.com>`. `ORDER_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are already set for `notify-order`.
 3. **`npm test`** exits 0 on the merge commit.
 4. **Deploy `order-email` with the switch OFF** (new function; `ORDER_EMAIL_ENABLED` unset or `0`): `supabase functions deploy order-email`. `verify_jwt = false` is in `supabase/config.toml`. Do not redeploy `notify-order` (v46).
-5. **Then apply `supabase/order_completion_email.sql`** with Supabase SQL (`execute_sql`), not a migration. It needs `order_received.sql` (applied 28 Oct) and the Vault `order_webhook_secret`. It creates the trigger `notify_order_completion_email` and the pg_cron job `plentry-order-email-sweep` (`*/15 * * * *`), and marks every existing order with `id <= 41` `skipped` (`pre-launch: existing order at setup`; prod max id was 40 on 4 Nov, including #39 with an open issue and smoke order #40), plus any other order already received and captured, so no past customer is emailed.
+5. **Then apply `supabase/order_completion_email.sql`** with Supabase SQL (`execute_sql`), not a migration. It needs `order_received.sql` (applied 28 Oct) and the Vault `order_webhook_secret`. It creates the trigger `notify_order_completion_email` and the pg_cron job `plentry-order-email-sweep` (`*/15 * * * *`), and marks every order up to the id threshold in the file `skipped` (`pre-launch: existing order at setup`; check the threshold still covers the current max id before applying), plus any other order already received and captured, so no past customer is emailed.
 6. **Test send.** Ops → **Send test email** (aal2). The [TEST] email reaches the admin's login address from `orders@getplentry.com` with Reply-To `hello@getplentry.com`.
 7. **Last, switch on.** `supabase secrets set ORDER_EMAIL_ENABLED=1`. No deploy. The next confirmed, captured order sends one email; Ops shows **email sent**.
 
@@ -212,7 +212,7 @@ PR #34. Not applied, not deployed. Ship only under Noé's GO, in this order. **S
 
 **Rollback.** In the SQL editor: `select cron.unschedule('plentry-order-email-sweep');` and `drop trigger if exists notify_order_completion_email on public.orders;`. The `order-email` function, the columns and the other functions can stay. `notify-order` v46 is untouched. The full commented rollback is at the bottom of the SQL file.
 
-**Verify after apply (SELECT only).** `select jobname, schedule from cron.job where jobname = 'plentry-order-email-sweep';` returns one row. `select completion_email_status, completion_email_error, count(*) from orders group by 1, 2;` shows only null and `skipped`; every `id <= 41` is `skipped` with `pre-launch: existing order at setup`.
+**Verify after apply (SELECT only).** `select jobname, schedule from cron.job where jobname = 'plentry-order-email-sweep';` returns one row. `select completion_email_status, completion_email_error, count(*) from orders group by 1, 2;` shows only null and `skipped`; every order up to that threshold is `skipped` with `pre-launch: existing order at setup`.
 
 ## Functions
 
@@ -581,7 +581,7 @@ Test first. Webhook (same URL in **test** and **live**; each mode has its own `w
 
 Events: `checkout.session.completed`, `checkout.session.expired`.
 
-Then `STRIPE_WEBHOOK_SECRET`. After 4242 works (done 13 Sep, order #31 captured):
+Then `STRIPE_WEBHOOK_SECRET`. After 4242 works (done 13 Sep):
 
 1. Capture any open **test** authorized orders in Ops (store £ + 5%). Test PaymentIntents cannot be captured with `sk_live_`.
 2. Stripe Dashboard → **Live** mode → [API keys](https://dashboard.stripe.com/apikeys) → secret `sk_live_…`.

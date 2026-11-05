@@ -62,6 +62,7 @@ npm test
 ## Never
 
 - Put secrets in `index.html` or the vault  
+- Put customer details, order IDs or amounts, or order and customer counts in this repo, including docs, PR descriptions and commit messages. The repo is public  
 - Capture more than the Stripe hold  
 - Add a second front-end framework  
 - Skip `npm test`, or ship to production while tests are red  
