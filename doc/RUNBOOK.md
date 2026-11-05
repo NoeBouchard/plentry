@@ -360,6 +360,17 @@ curl -s -o /dev/null -w 'pay POST %{http_code}\n' -X POST \
 
 Newest first. The same ships are in [CHANGELOG.md](CHANGELOG.md) and under Last production ship in [CURRENT-STATE.md](CURRENT-STATE.md).
 
+### 2026-11-04 17:52 GMT — PR #43, #44, #46 (static + pay); docs #45
+
+Squash merges: #43 `0d5b03c120f5f1ce55b93ff06a82cf2e3f9de1c5`, #44 `1f9a339c03bc355dda9c600444bedc141c86a7f0`, #46 `eb7a611f81acfe0339f67aa4c943273685607562`, #45 `77706b671d397c6bd46a7c034a8c8c7bb6386646` (docs, no deploy).
+
+- **Edge functions:** `pay` v55 hand-deployed from `eb7a611f` at 17:51:51 GMT under a GO (`verify_jwt` true; deployed files match main). `ai` v52, `checkout` v44, `notify-order` v46, `stripe-webhook` v43 and `newcoming` v37 unchanged.
+- **Static:** `dpl_GsaAhnoquaASicq83zH4vCo9CEmw` from `eb7a611f`. Promoted at 17:51:52 GMT. Live `index.html` matches main on all three hosts.
+- **Rollback:** static `dpl_HWYJibnhFdZsVgP3Qjaaia3PbvE2`, plus `pay` redeployed from the v54 source.
+- **Deploy to production:** OFF. `pay` stayed v54 about 60 s and about 17 minutes after #43 merged.
+- **SQL:** none.
+- **Smoke:** Mobile smoke on live getplentry.com (headless Chromium, Pixel 5, page-only fake user; every non-GET, functions and Stripe call aborted, the advisor answer mocked in the page) passed every check: the recipe pop-up 2/4/6 switch on 3 published meals (Baked Eggs with Chickpea Tomato Sauce, Beef & bell pepper tacos, Salmon traybake) scales amounts (eggs 4 → 8 → 12), shows no braces, the note "Amounts in these steps are for N people." and "Your basket is for 2", and leaves the basket unchanged; Profile → 4 shows "Applied to this week. Undo" (week 4, 38 packs) and Undo goes back to 2 (28 packs); checkout at 2, 4 and 6 reaches the confirm modal with the week basket (£46.38, £65.93, £83.53) and Pay enabled after a day and time, stopped before Pay, and the order-view recipe opens at N with "Your basket is for N"; the advisor keeps chosen dinners at catalog positions 1, 20, 25 and 30 after an add. `pay` v55 refuses an empty, a `{}` and a publishable-key-only POST with 401. No order, Stripe session or card hold was created.
+
 ### 2026-10-28 16:07 GMT — PR #41, static + pay
 
 PR #41 squash `325ba8a630c4901bc3e715e391a9777d4855aee5` (PR head `d520d1e8`) at 16:05:11 GMT.
