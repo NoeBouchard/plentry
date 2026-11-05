@@ -288,9 +288,9 @@ describe("source contracts", () => {
     assert.match(mfaSql, /APPLIED 18 Sep 2026/);
     assert.match(mfaSql, /lock yourself out of Ops/);
     assert.match(mfaSql, /supabase secrets unset REQUIRE_ADMIN_MFA/, "roll-back path documented");
-    assert.match(html, /const ADMIN_EMAIL="noyouchka.bouchard@gmail.com"/);
+    assert.doesNotMatch(html, /ADMIN_EMAIL/, "I-A15: the browser holds no admin address");
     assert.match(html, /function isAdmin\(\)\{return !!\(S\.user&&adminStatus\)&&!mfaPending\(\);\}/);
-    assert.match(html, /S\.user\.email===ADMIN_EMAIL/);
+    assert.doesNotMatch(html, /user\.email===/, "I-A15: the browser never compares the login email");
     assert.match(html, /if\(mfaPending\(\)\)openMfaChallenge\(\);/);
     assert.match(html, /r&&r\.error==="mfa_required"/);
     assert.match(html, /window\.__pendingCapture=\{id,storeAmt\}/);
@@ -347,10 +347,12 @@ describe("source contracts", () => {
     assert.match(pay, /payment_intent_data\[shipping\]\[address\]\[line1\]/);
   });
 
-  it("admin capture is email-gated on the server", () => {
-    assert.match(pay, /noyouchka\.bouchard@gmail\.com/);
-    assert.match(html, /noyouchka\.bouchard@gmail\.com/);
+  it("I-M07 admin capture is email-gated on the server; I-A15 the browser asks is_admin() and reads only user_id", () => {
+    assert.match(pay, /const ADMIN_EMAIL = '[^'\s]+@[^'\s]+'/);
+    assert.doesNotMatch(html, /ADMIN_EMAIL/);
     assert.match(pay, /ctx\.userClaims\?\.email !== ADMIN_EMAIL/);
+    assert.match(html, /sb\.rpc\("is_admin"\)/);
+    assert.match(html, /sb\.from\("admins"\)\.select\("user_id"\)\.eq\("user_id",S\.user\.id\)\.maybeSingle\(\)/);
   });
 
   it("new AI meals search TheMealDB by dish name once", () => {

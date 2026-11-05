@@ -4161,6 +4161,102 @@ describe("ops", () => {
   });
 });
 
+describe("I-A15 the browser asks the server who is admin", () => {
+  const founder = { id: "admin", email: "founder@example.test" };
+  const customer = { id: "customer", email: "customer@example.test" };
+  const tables = (extra) => ({ meals: [], orders: [], profiles: [], ingredient_prices: [], ...extra });
+  const settle = () => new Promise((r) => setTimeout(r, 30));
+  const navs = (document) =>
+    ["nav-admin", "nav-meals", "nav-ingredients", "nav-inbox"].map((id) => document.getElementById(id).style.display);
+  const open = ["", "", "", ""];
+  const hidden = ["none", "none", "none", "none"];
+
+  it("I-A15 is_admin() true opens Ops, whatever the admins read would say", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: tables({ __isAdmin: true, admins: [{ id: 1, user_id: "someone-else" }] }),
+    });
+    await settle();
+    assert.equal(window.isAdmin(), true);
+    assert.deepEqual(navs(document), open);
+    assert.ok(window.__sbTables.__rpc.some((call) => call.fn === "is_admin"));
+  });
+
+  it("I-A15 is_admin() false keeps Ops hidden, even with a row the read would find", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: customer,
+      tables: tables({ __isAdmin: false, admins: [{ id: 1, user_id: "customer" }] }),
+    });
+    await settle();
+    assert.equal(window.isAdmin(), false);
+    assert.deepEqual(navs(document), hidden);
+    await window.showIngredientsScreen();
+    assert.equal(document.getElementById("ingredients-list").textContent, "Admin only.");
+  });
+
+  it("I-A15 a member at aal1 is held at the code, then gets Ops at aal2", async () => {
+    const mfa = mockMfa({ enrolled: true });
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: tables({ __isAdmin: true }),
+      mfa,
+    });
+    await settle();
+    assert.equal(window.mfaPending(), true);
+    assert.equal(window.isAdmin(), false);
+    assert.deepEqual(navs(document), hidden);
+    assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+
+    document.getElementById("mfa-code").value = "123456";
+    await window.submitMfaChallenge();
+    await settle();
+    assert.equal(window.mfaPending(), false);
+    assert.equal(window.isAdmin(), true);
+    assert.deepEqual(navs(document), open);
+  });
+
+  for (const [label, answer] of [["errors", undefined], ["throws", "throw"]]) {
+    it(`I-A15 when is_admin() ${label}, a member's own row answers and no row is not admin`, async () => {
+      const member = await loadApp({ localState: weekState(), session: founder, tables: tables({ __isAdmin: answer }) });
+      await settle();
+      assert.equal(member.window.isAdmin(), true);
+      const other = await loadApp({ localState: weekState(), session: customer, tables: tables({ __isAdmin: answer }) });
+      await settle();
+      assert.equal(other.window.isAdmin(), false);
+    });
+  }
+
+  const readFailures = [
+    ["errors", () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: "down" } }) }) }) })],
+    ["throws", () => { throw new Error("network down"); }],
+  ];
+  for (const [label, from] of readFailures) {
+    it(`I-A15 is_admin() throws and the admins read ${label}: not admin, and a verified factor still demands the code`, async () => {
+      const plain = await loadApp({ localState: weekState(), session: founder, tables: tables({ __isAdmin: "throw" }) });
+      await settle();
+      assert.equal(plain.window.isAdmin(), true, "own row, before the read fails");
+      plain.window.__mockSb.from = from;
+      await plain.window.checkAdminStatus();
+      assert.equal(plain.window.isAdmin(), false);
+
+      const withFactor = await loadApp({
+        localState: weekState(),
+        session: founder,
+        tables: tables({ __isAdmin: "throw" }),
+        mfa: mockMfa({ enrolled: true }),
+      });
+      await settle();
+      withFactor.window.__mockSb.from = from;
+      await withFactor.window.checkAdminStatus();
+      assert.equal(withFactor.window.isAdmin(), false);
+      assert.equal(withFactor.window.mfaPending(), true);
+    });
+  }
+});
+
 describe("I-A12 admin meals and ingredients", () => {
   const founder = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
 

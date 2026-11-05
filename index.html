@@ -1890,8 +1890,7 @@ function syncMfaBanner(){
   if(el)el.classList.toggle("show",mfaPending());
 }
 function mfaPending(){
-  const gate=adminStatus||!!(S.user&&S.user.email===ADMIN_EMAIL);
-  if(gate&&mfa.factorId&&mfa.level!=="aal2")return true;
+  if(adminStatus&&mfa.factorId&&mfa.level!=="aal2")return true;
   return mfa.next==="aal2"&&mfa.level!=="aal2";
 }
 const mfaCode=()=>{const el=document.getElementById("mfa-code");return String(el?el.value:"").replace(/\D/g,"");};
@@ -2459,8 +2458,7 @@ async function enterApp(){
 // RLS does the real gating (supabase/admin_roles.sql) — hiding the nav button
 // is just UI. Statuses: new -> ordered -> delivered.
 // isAdmin() is false while a 2-step code is pending (S-06 / I-A10).
-// public.admins is the list. Until that SQL is applied, the founder email still works.
-const ADMIN_EMAIL="noyouchka.bouchard@gmail.com";
+// public.admins is the list, and only the server answers who is on it.
 let adminStatus=false; // cached after login
 async function checkAdminStatus(){
   if(!sb||!S.user){adminStatus=false;return false;}
@@ -2470,14 +2468,11 @@ async function checkAdminStatus(){
       if(rpc&&!rpc.error&&(rpc.data===true||rpc.data===false)){adminStatus=rpc.data===true;return adminStatus;}
     }
   }catch(e){}
+  // is_admin() gave no answer. RLS lets a member read their own row; anything else is not admin.
   try{
     const {data,error}=await sb.from("admins").select("user_id").eq("user_id",S.user.id).maybeSingle();
-    if(!error&&data){adminStatus=true;return true;}
-    if(error){adminStatus=S.user.email===ADMIN_EMAIL;return adminStatus;}
-    const all=await sb.from("admins").select("user_id").limit(1);
-    const empty=!all||all.error||!all.data||!all.data.length;
-    adminStatus=!!(empty&&S.user.email===ADMIN_EMAIL);
-  }catch(e){adminStatus=S.user.email===ADMIN_EMAIL;}
+    adminStatus=!error&&!!data;
+  }catch(e){adminStatus=false;}
   return adminStatus;
 }
 function isAdmin(){return !!(S.user&&adminStatus)&&!mfaPending();}
