@@ -194,6 +194,26 @@ from (values ('anon'), ('authenticated')) as roles(rolname);
 
 **Rollback.** Run on its own, not in the same session as the revoke: `grant delete, truncate on table public.orders to anon, authenticated;`
 
+## Order completion email (pending)
+
+PR #34. Not applied, not deployed. Ship only under Noé's GO, in this order. **Ship order: deploy `order-email` with the switch OFF → apply the SQL → set `ORDER_EMAIL_ENABLED=1`.**
+
+1. **Resend domain.** `getplentry.com` is verified in Resend (domain id `6395f26d-1f15-41cf-87a6-28fe66085874`, region eu-west-1; Product confirmed 4 Nov 2026). Re-check it shows Verified before the ship.
+2. **Secrets** (`supabase secrets set`, never in git or logs): `RESEND_API_KEY` (send-only key), `ORDER_EMAIL_REPLY_TO=hello@getplentry.com` (also the default), `ORDER_EMAIL_ENABLED=0` for now. `ORDER_EMAIL_FROM` is optional; the default sender is `Plentry <orders@getplentry.com>`. `ORDER_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are already set for `notify-order`.
+3. **`npm test`** exits 0 on the merge commit.
+4. **Deploy `order-email` with the switch OFF** (new function; `ORDER_EMAIL_ENABLED` unset or `0`): `supabase functions deploy order-email`. `verify_jwt = false` is in `supabase/config.toml`. Do not redeploy `notify-order` (v46).
+5. **Then apply `supabase/order_completion_email.sql`** with Supabase SQL (`execute_sql`), not a migration. It needs `order_received.sql` (applied 28 Oct) and the Vault `order_webhook_secret`. It creates the trigger `notify_order_completion_email` and the pg_cron job `plentry-order-email-sweep` (`*/15 * * * *`), and marks every existing order with `id <= 41` `skipped` (`pre-launch: existing order at setup`; prod max id was 40 on 4 Nov, including #39 with an open issue and smoke order #40), plus any other order already received and captured, so no past customer is emailed.
+6. **Test send.** Ops → **Send test email** (aal2). The [TEST] email reaches the admin's login address from `orders@getplentry.com` with Reply-To `hello@getplentry.com`.
+7. **Last, switch on.** `supabase secrets set ORDER_EMAIL_ENABLED=1`. No deploy. The next confirmed, captured order sends one email; Ops shows **email sent**.
+
+**Open issue.** An order with `issue_status = 'open'` is deferred: not claimed, not skipped. Once the issue is resolved the sweep picks it up within 15 minutes, under the 24-hour rule counted from `received_confirmed_at` (not from when the issue was resolved). Resolved more than 24 hours after receipt means it is skipped as stale.
+
+**Kill switch.** `supabase secrets set ORDER_EMAIL_ENABLED=0` stops customer emails without a deploy. It is checked before the row claim, so nothing changes on `orders`. When it is turned back on, the 24-hour rule applies automatically: the sweep sends only for orders whose `received_confirmed_at` is within the last 24 hours, and marks older held or unsent rows `skipped` with `completion_email_error = 'stale: confirmed >24h before send'`. No manual SQL is needed. To see them: `select id, completion_email_error from orders where completion_email_error like 'stale:%';`.
+
+**Rollback.** In the SQL editor: `select cron.unschedule('plentry-order-email-sweep');` and `drop trigger if exists notify_order_completion_email on public.orders;`. The `order-email` function, the columns and the other functions can stay. `notify-order` v46 is untouched. The full commented rollback is at the bottom of the SQL file.
+
+**Verify after apply (SELECT only).** `select jobname, schedule from cron.job where jobname = 'plentry-order-email-sweep';` returns one row. `select completion_email_status, completion_email_error, count(*) from orders group by 1, 2;` shows only null and `skipped`; every `id <= 41` is `skipped` with `pre-launch: existing order at setup`.
+
 ## Functions
 
 **Deploy to production is OFF.** Noé turned the Supabase GitHub integration setting off on 25/26 Oct 2026 (project `ucciqthwxnlkjalwlhvh`, production branch `main`). A merge to `main` does not deploy edge functions. After the #31, #30, and #32 merges, all 6 functions were unchanged and the Supabase Preview check was skipped. Functions deploy only by hand with `supabase functions deploy <name>` or MCP, under a GO. If Deploy to production is ever re-enabled, every merge to `main` redeploys all `supabase/functions/*`. Never create `supabase/migrations/`: files there auto-apply to prod on merge. Loose `supabase/*.sql` files are not auto-applied. Static does not ride along: `git.deploymentEnabled.main` is false.
