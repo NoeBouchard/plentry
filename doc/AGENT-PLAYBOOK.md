@@ -46,7 +46,7 @@ When the change is ready to keep (committed, or user said ship/stage):
 3. If the next action changed, update `ROADMAP.md`.
 4. If you added a threat or control, update `SECURITY.md`.
 5. If the MVP contract moved, update `REQUIREMENTS.md` / `INVARIANTS.md` / `FLOWS.md`.
-6. Keep `plentry/doc/` identical — that copy ships with the GitHub repo. Edit workspace-root `doc/` then copy (`cd plentry && npm run vault`). `npm run vault` copies live `*.md` plus `archive/*.md`. It does not copy the Word pack (`.docx`).
+6. Edit `doc/` in this repo directly. It is the only copy to keep current, so never copy a parent folder's `doc/` over it.
 
 Do not leave the vault describing the old product (e.g. “no payments”).
 
