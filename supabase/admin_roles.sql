@@ -13,8 +13,8 @@
 --
 -- If this file runs before the static ship, the founder still works: policies
 -- use is_admin_aal2(), and the empty-table fallback is the founder email + aal2.
--- If the static ship runs first, the client falls back to that same email until
--- is_admin() exists.
+-- If the static ship runs first, the founder sees no Ops nav until this file runs:
+-- the client asks is_admin() and holds no address.
 --
 -- Roll back the policies only: re-run supabase/admin_mfa.sql (email + aal2).
 -- That file recreates "admin delete meals". This file drops it again on the next run.

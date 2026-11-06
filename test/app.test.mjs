@@ -1913,7 +1913,7 @@ describe("one meal price", () => {
       .find((el) => el.textContent.includes("Veggie spaghetti pomodoro"));
     assert.equal(card.querySelector(".mp").textContent, "Price soon");
     assert.equal(card.querySelector(".mp").textContent.includes("£"), false);
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test" };
     await window.checkAdminStatus();
     assert.equal(window.isAdmin(), true);
     window.renderMenu();
@@ -1934,7 +1934,7 @@ describe("one meal price", () => {
     assert.equal(quote.incomplete, true);
     assert.equal(quote.pence, null);
     assert.equal(window.mealPriceLabel(quote), "Price soon");
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test" };
     await window.checkAdminStatus();
     assert.equal(window.mealPriceLabel(quote), "incomplete");
   });
@@ -3140,7 +3140,7 @@ describe("photos", () => {
 });
 
 describe("founder 2-step verification (S-06)", () => {
-  const admin = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+  const admin = { id: "admin", email: "founder@example.test" };
   const tables = () => ({ meals: [], profiles: [], ingredient_prices: [], orders: [] });
 
   it("with a verified factor, login is aal1: Ops hidden and a code is demanded until verified", async () => {
@@ -3302,7 +3302,7 @@ describe("ops", () => {
   it("isAdmin is email-gated; status bar can set new, ordered, delivered", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -3326,7 +3326,7 @@ describe("ops", () => {
       },
     });
     const S = window.__plentry.state();
-    S.user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    S.user = { id: "admin", email: "founder@example.test", name: "Noe" };
     assert.equal(window.isAdmin(), true);
     await window.renderAdmin();
     const html = document.getElementById("admin-list").innerHTML;
@@ -3345,7 +3345,7 @@ describe("ops", () => {
   it("Ops capture preview shows store plus 5% and delivery prefers profile address", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -3371,7 +3371,7 @@ describe("ops", () => {
         ],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     assert.equal(window.__plentry.captureChargePence(1), 105);
     await window.renderAdmin();
     const html = document.getElementById("admin-list").innerHTML;
@@ -3559,7 +3559,7 @@ describe("ops", () => {
   it("I-M04 Ops warns when store plus 5% is above the hold, then charges the hold (Plentry covers the rest)", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -3582,7 +3582,7 @@ describe("ops", () => {
         ],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     await window.renderAdmin();
     const alerts = [];
     window.alert = (m) => alerts.push(String(m));
@@ -3606,7 +3606,7 @@ describe("ops", () => {
 
   it("I-M08 payApi returns Stripe error JSON instead of null", async () => {
     const { window } = await loadApp({
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
     });
     window.fetch = async () => ({
       ok: false,
@@ -3631,7 +3631,7 @@ describe("ops", () => {
   it("I-M10 a capture the server did not record is an error, not money received", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -3654,7 +3654,7 @@ describe("ops", () => {
         ],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     await window.renderAdmin();
     const alerts = [];
     window.alert = (m) => alerts.push(String(m));
@@ -3681,7 +3681,7 @@ describe("ops", () => {
   it("I-O02 unpaid orders lock the status bar and hide capture", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -3704,7 +3704,7 @@ describe("ops", () => {
         ],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     await window.renderAdmin();
     const html = document.getElementById("admin-list").innerHTML;
     assert.ok(html.includes("Waiting for the customer to pay"));
@@ -3824,11 +3824,11 @@ describe("ops", () => {
     };
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: { meals: [draft, live], profiles: [], ingredient_prices: [], orders: [] },
     });
     const S = window.__plentry.state();
-    S.user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    S.user = { id: "admin", email: "founder@example.test", name: "Noe" };
     await window.showMealsScreen();
     const neu = document.getElementById("meals-new").textContent;
     const pub = document.getElementById("meals-live").textContent;
@@ -3870,7 +3870,7 @@ describe("ops", () => {
     const secret = "22222222-2222-4222-8222-222222222222";
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [{ id: 99, name: "Table only dinner", emoji: "🍲", time: 20, source: "seed", reviewed_at: "2026-09-01T00:00:00.000Z", ing: ["rice"], tags: ["dinner", "vegetarian"], category: "rice_bowl", recipe: { steps: ["Boil."] } }],
         profiles: [],
@@ -3878,7 +3878,7 @@ describe("ops", () => {
         orders: [],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     window.__mockSb.rpc = async (fn) => {
       if (fn !== "admin_read_meals") return { data: null, error: { message: "missing" } };
       return {
@@ -3925,10 +3925,10 @@ describe("ops", () => {
     };
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: { meals: [draft], profiles: [], ingredient_prices: [], orders: [] },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     window.__mockSb.rpc = async () => ({ data: null, error: { message: "function admin_read_meals() does not exist" } });
     await window.showMealsScreen();
     const neu = document.getElementById("meals-new").textContent;
@@ -3947,11 +3947,11 @@ describe("ops", () => {
     }));
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: { meals: [], profiles: [], ingredient_prices: [], orders: [] },
     });
     const S = window.__plentry.state();
-    S.user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    S.user = { id: "admin", email: "founder@example.test", name: "Noe" };
     S.menuOptions = liveRows;
     await window.showMealsScreen();
     const pub = document.getElementById("meals-live").textContent;
@@ -3966,7 +3966,7 @@ describe("ops", () => {
   it("I-O16 Ops: slot field appears once money is received, saving it stores delivery_slot and marks the order Ordered", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -4025,7 +4025,7 @@ describe("ops", () => {
         ],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     await window.renderAdmin();
     let html = document.getElementById("admin-list").innerHTML;
     assert.ok(!html.includes('id="slot-4"'), "hold only → no slot field yet (shop first)");
@@ -4115,7 +4115,7 @@ describe("ops", () => {
   it("I-O18 founder Inbox lists open threads and can start one", async () => {
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -4142,7 +4142,7 @@ describe("ops", () => {
         order_messages: [],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     await window.enterApp();
     assert.equal(document.getElementById("nav-inbox").style.display, "");
     await window.openIssueThread(22, true);
@@ -4161,8 +4161,104 @@ describe("ops", () => {
   });
 });
 
+describe("I-A15 the browser asks the server who is admin", () => {
+  const founder = { id: "admin", email: "founder@example.test" };
+  const customer = { id: "customer", email: "customer@example.test" };
+  const tables = (extra) => ({ meals: [], orders: [], profiles: [], ingredient_prices: [], ...extra });
+  const settle = () => new Promise((r) => setTimeout(r, 30));
+  const navs = (document) =>
+    ["nav-admin", "nav-meals", "nav-ingredients", "nav-inbox"].map((id) => document.getElementById(id).style.display);
+  const open = ["", "", "", ""];
+  const hidden = ["none", "none", "none", "none"];
+
+  it("I-A15 is_admin() true opens Ops, whatever the admins read would say", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: tables({ __isAdmin: true, admins: [{ id: 1, user_id: "someone-else" }] }),
+    });
+    await settle();
+    assert.equal(window.isAdmin(), true);
+    assert.deepEqual(navs(document), open);
+    assert.ok(window.__sbTables.__rpc.some((call) => call.fn === "is_admin"));
+  });
+
+  it("I-A15 is_admin() false keeps Ops hidden, even with a row the read would find", async () => {
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: customer,
+      tables: tables({ __isAdmin: false, admins: [{ id: 1, user_id: "customer" }] }),
+    });
+    await settle();
+    assert.equal(window.isAdmin(), false);
+    assert.deepEqual(navs(document), hidden);
+    await window.showIngredientsScreen();
+    assert.equal(document.getElementById("ingredients-list").textContent, "Admin only.");
+  });
+
+  it("I-A15 a member at aal1 is held at the code, then gets Ops at aal2", async () => {
+    const mfa = mockMfa({ enrolled: true });
+    const { window, document } = await loadApp({
+      localState: weekState(),
+      session: founder,
+      tables: tables({ __isAdmin: true }),
+      mfa,
+    });
+    await settle();
+    assert.equal(window.mfaPending(), true);
+    assert.equal(window.isAdmin(), false);
+    assert.deepEqual(navs(document), hidden);
+    assert.ok(document.getElementById("modal").innerHTML.includes("Enter your 6-digit code"));
+
+    document.getElementById("mfa-code").value = "123456";
+    await window.submitMfaChallenge();
+    await settle();
+    assert.equal(window.mfaPending(), false);
+    assert.equal(window.isAdmin(), true);
+    assert.deepEqual(navs(document), open);
+  });
+
+  for (const [label, answer] of [["errors", undefined], ["throws", "throw"]]) {
+    it(`I-A15 when is_admin() ${label}, a member's own row answers and no row is not admin`, async () => {
+      const member = await loadApp({ localState: weekState(), session: founder, tables: tables({ __isAdmin: answer }) });
+      await settle();
+      assert.equal(member.window.isAdmin(), true);
+      const other = await loadApp({ localState: weekState(), session: customer, tables: tables({ __isAdmin: answer }) });
+      await settle();
+      assert.equal(other.window.isAdmin(), false);
+    });
+  }
+
+  const readFailures = [
+    ["errors", () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: "down" } }) }) }) })],
+    ["throws", () => { throw new Error("network down"); }],
+  ];
+  for (const [label, from] of readFailures) {
+    it(`I-A15 is_admin() throws and the admins read ${label}: not admin, and a verified factor still demands the code`, async () => {
+      const plain = await loadApp({ localState: weekState(), session: founder, tables: tables({ __isAdmin: "throw" }) });
+      await settle();
+      assert.equal(plain.window.isAdmin(), true, "own row, before the read fails");
+      plain.window.__mockSb.from = from;
+      await plain.window.checkAdminStatus();
+      assert.equal(plain.window.isAdmin(), false);
+
+      const withFactor = await loadApp({
+        localState: weekState(),
+        session: founder,
+        tables: tables({ __isAdmin: "throw" }),
+        mfa: mockMfa({ enrolled: true }),
+      });
+      await settle();
+      withFactor.window.__mockSb.from = from;
+      await withFactor.window.checkAdminStatus();
+      assert.equal(withFactor.window.isAdmin(), false);
+      assert.equal(withFactor.window.mfaPending(), true);
+    });
+  }
+});
+
 describe("I-A12 admin meals and ingredients", () => {
-  const founder = { id: "admin", email: "noyouchka.bouchard@gmail.com" };
+  const founder = { id: "admin", email: "founder@example.test" };
 
   it("a non-member is not admin once public.admins has someone else; aal1 stays blocked", async () => {
     const mfa = mockMfa({ enrolled: true });
@@ -4197,7 +4293,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [] },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4260,7 +4356,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [live], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+      tables: { meals: [live], orders: [], profiles: [], ingredient_prices: [] },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4285,7 +4381,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [], admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: [] },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4333,7 +4429,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4373,7 +4469,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4420,7 +4516,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4457,7 +4553,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -4477,7 +4573,7 @@ describe("I-A12 admin meals and ingredients", () => {
     const { window, document } = await loadApp({
       localState: weekState(),
       session: founder,
-      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices, admins: [] },
+      tables: { meals: [], orders: [], profiles: [], ingredient_prices: prices },
     });
     window.__plentry.state().user = founder;
     await window.checkAdminStatus();
@@ -5088,7 +5184,7 @@ describe("I-O19 order receipt", () => {
     const deliveredAt = new Date(Date.now() - 3 * 3600000).toISOString();
     const { window, document } = await loadApp({
       localState: weekState(),
-      session: { id: "admin", email: "noyouchka.bouchard@gmail.com" },
+      session: { id: "admin", email: "founder@example.test" },
       tables: {
         meals: [],
         profiles: [],
@@ -5148,7 +5244,7 @@ describe("I-O19 order receipt", () => {
         ],
       },
     });
-    window.__plentry.state().user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    window.__plentry.state().user = { id: "admin", email: "founder@example.test", name: "Noe" };
     assert.equal(window.isAdmin(), true);
     await window.renderAdmin();
     const list = document.getElementById("admin-list");
@@ -5259,7 +5355,7 @@ describe("I-O19 order receipt", () => {
     assert.equal(yes.disabled, false);
     assert.ok(document.getElementById("orders-list").textContent.includes("We couldn't confirm this just now, please try again"));
     assert.equal(window.__sbTables.orders.find((o) => o.id === 39).received_confirmed_at, null);
-    S.user = { id: "admin", email: "noyouchka.bouchard@gmail.com", name: "Noe" };
+    S.user = { id: "admin", email: "founder@example.test", name: "Noe" };
     const admins = window.__sbTables.admins;
     window.__sbTables.admins = [{ user_id: "admin" }];
     await window.checkAdminStatus();

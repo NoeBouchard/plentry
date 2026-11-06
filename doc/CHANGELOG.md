@@ -2,6 +2,14 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-11-05 — The browser asks the server who is admin
+
+- **App.** `index.html` holds no admin address. `checkAdminStatus()` asks `is_admin()`, then reads the user's own `public.admins` row (`user_id` only). Anything else is not admin. `mfaPending()` reads `adminStatus` only. If both reads fail, Ops stays hidden until the next check (entering the code, or a reload), and a verified factor still demands the code.
+- **Server.** Unchanged: no SQL, no function deploy. RLS still uses `is_admin_aal2()`, and `pay` capture keeps its own check (I-M07).
+- **Docs and tests.** `doc/` and `test/` no longer name a personal mailbox. Fixtures use `founder@example.test`.
+- **Tests.** `test/admin-gate.test.mjs` (I-A15, I-M07) runs `admin_roles.sql` on PGlite, runs `pay`'s `adminDenied` from its source, and guards served and tracked files. 355 + 19 = **374**.
+- **Not live.** This needs a static ship. This change does not ship anything.
+
 ## 2026-11-04 — Production ship (PR #43, #44, #46; docs #45)
 
 - **Merges (squash, each pinned to its head).** #43 `0d5b03c120f5f1ce55b93ff06a82cf2e3f9de1c5` (head `3c674516`); #44 `1f9a339c03bc355dda9c600444bedc141c86a7f0` (head `65c148b9`, retargeted to main, tree identical to the reviewed `949be901`); #46 `eb7a611f81acfe0339f67aa4c943273685607562` (head `3a75af7b`, invariant renumbered I-W11, otherwise the reviewed `9b16a616`); #45 `77706b671d397c6bd46a7c034a8c8c7bb6386646` (docs, no deploy).

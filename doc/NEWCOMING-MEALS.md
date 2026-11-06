@@ -6,7 +6,7 @@ Queue of catalog dinners that are **not founder-verified** (`meals.reviewed_at` 
 
 ## Fast path
 
-1. Log in as `noyouchka.bouchard@gmail.com`.
+1. Log in as the founder.
 2. **Meals** tab → **+ Add meal** (or open a card in **New meal**).
 3. Ingredients (catalog keys only), instructions (one step per line, qty for 2), diet + extra tags. **Fill tags from ingredients** if you want a starting set.
 4. Before publishing, take it through [`meal-ingredient verification/`](meal-ingredient%20verification/README.md) (`verify.py build` creates its record; three stages against a chef source).

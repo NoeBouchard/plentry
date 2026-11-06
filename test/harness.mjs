@@ -134,6 +134,12 @@ function createMockSb(tables, session, mfa) {
     async rpc(fn, args) {
       const calls = (tables.__rpc = tables.__rpc || []);
       calls.push({ fn, args: args || {} });
+      if (fn === "is_admin") {
+        // Opt-in per test: true or false is the server's answer, "throw" is a network
+        // failure. Unset falls through to the error below, so the app reads public.admins.
+        if (tables.__isAdmin === "throw") throw new Error("network down");
+        if (typeof tables.__isAdmin === "boolean") return { data: tables.__isAdmin, error: null };
+      }
       const id = args && args.p_order_id;
       const row = (tables.orders || []).find((r) => r.id === id);
       if (fn === "confirm_order_received") {
@@ -231,6 +237,8 @@ export async function loadApp(opts = {}) {
     profiles: [],
     ingredient_prices: [],
   };
+  // The founder fixture (user id "admin") is a member unless a test sets its own admins list.
+  if (!tables.admins) tables.admins = [{ id: 1, user_id: "admin" }];
   publishSavedMeals(tables, opts.localState);
   let html = readFileSync(INDEX, "utf8");
   // Drop the vendored supabase-js tag; the fake client is injected in beforeParse.
