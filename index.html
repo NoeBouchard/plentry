@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plentry — What's for dinner tonight?</title>
+<title>Plentry — HelloFresh dinners. Supermarket prices.</title>
 <meta name="description" content="Plan your week, price it at Tesco, Sainsbury's, Asda or Waitrose, and we'll order the missing ingredients to your door.">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#f4f0e6">
@@ -154,6 +154,9 @@
   .store .sdetail{color:var(--muted);font-size:.78rem;margin-top:2px}
   .price{font-size:1.15rem;font-weight:800}
   .badge{font-size:.66rem;font-weight:800;background:var(--sage);color:var(--green-d);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+  .pilot-badge{display:inline-block;margin:0 0 10px;background:#f8edd0;color:var(--amber);letter-spacing:.04em;text-transform:uppercase}
+  .landing-facts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+  .landing-facts .store-chip{margin:0}
   .stock-bar{height:6px;background:var(--card);border-radius:99px;overflow:hidden;margin-top:6px}
   .stock-bar i{display:block;height:100%;border-radius:99px}
   .pantry-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -284,12 +287,16 @@
   </div>
 
   <!-- LANDING / SIGNUP -->
-  <div class="screen" id="scr-landing">
+  <div class="screen active" id="scr-landing">
     <div style="padding:28px 4px 8px">
-      <h1>What's for dinner<br><em>tonight?</em></h1>
-      <p class="lede">Never that question again.</p>
-      <p class="sub">We plan your week, price it at Tesco, Sainsbury's, Asda or Waitrose, and order the missing ingredients to your door.</p>
-      <button class="btn" style="width:100%" onclick="startOnboarding()">Plan my week →</button>
+      <span class="badge pilot-badge" id="pilot-badge">London pilot</span>
+      <h1 id="landing-title">HelloFresh dinners.<br><em>Supermarket prices.</em></h1>
+      <p class="sub" id="landing-sub">We plan your week, price it at four supermarkets, and place the order.</p>
+      <!-- 52 = published meals (meals.reviewed_at is not null) on 19 Nov 2026. There is no
+           build step to read it from the database; change it by hand when the catalog does. -->
+      <div class="landing-facts" id="landing-facts"><span class="store-chip">For 2, 4 or 6 people</span><span class="store-chip">52 dinners to choose from</span></div>
+      <button class="btn" style="width:100%" id="landing-cta" onclick="startOnboarding()">Plan my week →</button>
+      <p class="hint" id="landing-money">You pay the store total plus 5%. The card hold at checkout is a bit higher in case the till comes in high, and the unused hold is never charged.</p>
       <p class="sub" style="text-align:center;margin-top:12px">Early access · we shop it for you</p>
     </div>
     <div class="card">
@@ -306,7 +313,7 @@
   </div>
 
   <!-- ONBOARDING -->
-  <div class="screen active" id="scr-onboard">
+  <div class="screen" id="scr-onboard">
     <div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="ob-back" onclick="obBack()">←</button><div class="steps" style="flex:1;margin:0"><i class="done"></i><i id="st2"></i><i id="st3"></i><i id="st4"></i><i id="st5"></i><i id="st6"></i></div></div>
     <div id="ob-1">
       <h1>Choose your shop</h1>
@@ -1792,6 +1799,7 @@ S.prefs.servings=resolveServings(S.prefs);
 if(S.weekServings==null)S.weekServings=S.prefs.servings;
 else S.weekServings=normServings(S.weekServings);
 S.prefs.delivery=deliveryFrom(S.prefs.delivery);
+if(S.prefs.ref!=null){const r=normRef(S.prefs.ref);if(r)S.prefs.ref=r;else delete S.prefs.ref;}
 if(S.basketEdit!=null&&!Array.isArray(S.basketEdit))S.basketEdit=null;
 if(Array.isArray(S.basketEdit)&&!S.basketEdit.length)S.basketEdit=null;
 let basket=[],chosenStore=null,authMode="login",basketOpen=false,pendingCheckout=false,pendingMeals=false,obStep=1,lastAuthMsg="";
@@ -1841,6 +1849,8 @@ async function loadCloudState(user){
   S.prefs.postcode=normPostcode(S.prefs.postcode)||"";
   S.prefs.meals=clampMeals(S.prefs.meals);
   S.prefs.delivery=deliveryFrom(S.prefs.delivery);
+  const ref=normRef(user.user_metadata&&user.user_metadata.ref)||normRef(S.prefs.ref);
+  if(ref)S.prefs.ref=ref;else delete S.prefs.ref;
   save();
   await refreshMfa();
 }
@@ -2034,6 +2044,26 @@ function stripeCheckoutUrl(u){
   try{const x=new URL(String(u==null?"":u));return x.protocol==="https:"&&x.hostname==="checkout.stripe.com"?x.href:null;}
   catch(e){return null;}
 }
+// Invite attribution (?ref=pilot). First touch wins. Its own key, because signOut
+// clears plentry_v1. Sent once as auth user_metadata.ref on sign-up; never rendered.
+const REF_KEY="plentry_ref";
+let inviteRef="";
+function normRef(v){
+  const s=String(v==null?"":v).trim().toLowerCase();
+  return /^[a-z0-9_-]{1,32}$/.test(s)?s:"";
+}
+function storedRef(){
+  try{return normRef(localStorage.getItem(REF_KEY))||inviteRef;}catch(e){return inviteRef;}
+}
+function captureRef(){
+  let r="";
+  try{r=normRef(new URLSearchParams(location.search).get("ref"));}catch(e){}
+  if(r&&!storedRef()){
+    inviteRef=r;
+    try{localStorage.setItem(REF_KEY,r);}catch(e){}
+  }
+  return storedRef();
+}
 function authFormHtml(){
   const signup=authMode==="signup";
   const switchRow=signup
@@ -2081,7 +2111,8 @@ async function submitAuth(){
     btn.disabled=true;btn.textContent="One sec…";
     try{
       if(authMode==="signup"){
-        const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
+        const ref=storedRef();
+        const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:ref?{name,ref}:{name}}});
         if(error)throw error;
         if(!data.session){
           openModal(`<h2 style="margin-bottom:6px">📬 Check your inbox</h2>
@@ -2133,6 +2164,13 @@ async function signOut(){
 // ---------- ONBOARDING ----------
 // Shop → what you eat → dinner tags → household → dinners → cupboard.
 // Goals and the budget slider are not steps. Saved prefs.goals and prefs.budget stay on the blob.
+// A visitor with no account and no finished onboarding sees the landing first.
+function showLanding(){
+  activateScreen("scr-landing");
+  document.getElementById("main-nav").classList.remove("show");
+  showSticky(false);
+  syncHeader();
+}
 function startOnboarding(){
   activateScreen("scr-onboard");
   document.getElementById("main-nav").classList.remove("show");
@@ -5554,6 +5592,7 @@ async function retryPay(orderId){
 // ---------- INIT ----------
 (async function init(){
   try{
+    captureRef();
     if("serviceWorker" in navigator){
       navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>{
         const src=((r.active||r.waiting||r.installing)||{}).scriptURL||"";
@@ -5575,6 +5614,8 @@ async function retryPay(orderId){
     if((S.user&&S.onboarded)||(!S.user&&S.onboarded&&S.selected.length)){
       await enterApp();
       syncBasketFromMeals();
+    }else if(!S.user&&!S.onboarded){
+      showLanding();
     }else{
       startOnboarding();
     }

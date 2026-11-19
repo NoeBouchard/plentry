@@ -2,6 +2,15 @@
 
 Vault history of **functional** product changes. Newest first. Agents append here when staging.
 
+## 2026-11-19 — London pilot landing and `?ref=` invite tracking (static only, not live)
+
+- **Landing.** A visitor with no account and onboarding not finished sees the landing first. Before this, boot went straight to **Choose your shop** and the landing was never shown. A signed-in visitor still goes to onboarding or the app.
+- **Copy (Product, 19 Nov).** **London pilot** badge. Headline and page title **HelloFresh dinners. Supermarket prices.** Subline **We plan your week, price it at four supermarkets, and place the order.** Above **Plan my week →**: **For 2, 4 or 6 people** and **52 dinners to choose from**. Money line: **You pay the store total plus 5%. The card hold at checkout is a bit higher in case the till comes in high, and the unused hold is never charged.** The old headline and lede are gone.
+- **Dinner count.** **52** is hardcoded, with a comment. It is the published count (`meals.reviewed_at is not null`, 52 of 77) read on 19 Nov 2026. There is no build step to read it from the database, and adding one is out of scope. Change it by hand when the catalog does.
+- **Attribution.** `?ref=<slug>` is kept first-touch in `localStorage.plentry_ref`, sent as auth `user_metadata.ref` on sign-up, and copied to `profiles.state.prefs.ref`. Query: `select id, email, created_at from auth.users where raw_user_meta_data->>'ref' = 'pilot' order by created_at desc;`
+- **Tests.** I-L01 and I-L02, 6 jsdom tests. 374 + 6 = **380**.
+- **Not live.** Static only. No SQL, no function change. Needs Product review and Noé's GO for the static ship.
+
 ## 2026-11-05 — The browser asks the server who is admin
 
 - **App.** `index.html` holds no admin address. `checkAdminStatus()` asks `is_admin()`, then reads the user's own `public.admins` row (`user_id` only). Anything else is not admin. `mfaPending()` reads `adminStatus` only. If both reads fail, Ops stays hidden until the next check (entering the code, or a reload), and a verified factor still demands the code.
