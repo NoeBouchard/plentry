@@ -97,6 +97,13 @@ Coverage: **covered** = `npm test` already guards it. **ops** = founder/manual (
 | I-A11 | The DB-webhook header secret lives in `vault.secrets` (`order_webhook_secret`), read via definer-only `public.order_webhook_secret()`; no function body contains it; new `public` functions have no anon/authenticated EXECUTE by default. | covered — contracts; live-verified 17 Sep |
 | I-S01 | Hardening SQL defines and the functions use: `public.rate_limits`, `check_rate_limit()` (service_role only), `validate_order` trigger `before insert or update on orders`. Must be **applied on live** — check with RUNBOOK “Live schema check” after any project reset. | covered — contracts (source); live = ops |
 
+## Landing and attribution
+
+| ID | Rule | Coverage |
+|---|---|---|
+| I-L01 | A visitor with no account and onboarding not finished sees `scr-landing` first (it is also the screen active in the static HTML). A signed-in visitor goes to onboarding or the app; an anonymous visitor with a saved week goes to the app. Copy (Product, 19 Nov 2026): badge **London pilot**; headline **HelloFresh dinners. Supermarket prices.** (also the page title); subline **We plan your week, price it at four supermarkets, and place the order.**; directly above **Plan my week →**: **For 2, 4 or 6 people** and **52 dinners to choose from**; money line **You pay the store total plus 5%. The card hold at checkout is a bit higher in case the till comes in high, and the unused hold is never charged.** The 5% follows `COMMISSION`, the hold claim needs `HOLD_BUFFER` > 0, the servings follow `normServings` (2, 4, 6), and "four supermarkets" follows `STORES` (Tesco, Sainsbury's, Asda, Waitrose; never Morrisons). **52** is hardcoded: it is the published count (`reviewed_at is not null`) on 19 Nov 2026, there is no build step to read it, and it must be changed by hand when the catalog does. | covered — jsdom |
+| I-L02 | `?ref=<slug>` (`[a-z0-9_-]`, 1–32, lower-cased; anything else ignored) is stored first-touch in `localStorage.plentry_ref` (sign-out does not clear it). Sign-up sends it as auth `user_metadata.ref` with the name; no ref sends no `ref` key. `loadCloudState` copies `user_metadata.ref` to `prefs.ref`, so it is saved in `profiles.state.prefs.ref`. A plain login with a `?ref` link does not tag an existing account. The ref is never rendered. | covered — jsdom |
+
 ## How to add a test
 
 1. Name it after the invariant (`I-M04 capture blocked when store+5% exceeds hold`).
