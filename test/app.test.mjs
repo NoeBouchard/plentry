@@ -5457,3 +5457,110 @@ describe("I-O20 admin completion email", () => {
     assert.ok(html.includes("Tesco"));
   });
 });
+
+describe("landing (London pilot)", () => {
+  const flat = (el) => el.textContent.replace(/\s+/g, " ").trim();
+
+  it("I-L01 a new visitor lands on the pilot landing with the agreed copy", async () => {
+    const { window, document } = await loadApp();
+    assert.ok(document.getElementById("scr-landing").classList.contains("active"));
+    assert.ok(!document.getElementById("scr-onboard").classList.contains("active"));
+    assert.equal(document.getElementById("pilot-badge").textContent, "London pilot");
+    assert.equal(document.getElementById("landing-title").innerHTML, "HelloFresh dinners.<br><em>Supermarket prices.</em>");
+    assert.equal(document.title, "Plentry — HelloFresh dinners. Supermarket prices.");
+    assert.equal(document.getElementById("landing-sub").textContent, "We plan your week, price it at four supermarkets, and place the order.");
+    const facts = [...document.querySelectorAll("#landing-facts .store-chip")].map((e) => e.textContent);
+    assert.deepEqual(facts, ["For 2, 4 or 6 people", "52 dinners to choose from"]);
+    assert.equal(document.getElementById("landing-facts").nextElementSibling, document.getElementById("landing-cta"));
+    assert.equal(
+      document.getElementById("landing-money").textContent,
+      "You pay the store total plus 5%. The card hold at checkout is a bit higher in case the till comes in high, and the unused hold is never charged.",
+    );
+    const landing = flat(document.getElementById("scr-landing"));
+    assert.ok(!/morrisons/i.test(landing));
+    window.startOnboarding();
+    assert.ok(document.getElementById("scr-onboard").classList.contains("active"));
+    assert.notEqual(document.getElementById("ob-1").style.display, "none");
+  });
+
+  it("I-L01 landing claims match the money constants, servings and shops", async () => {
+    const { window, document } = await loadApp();
+    const p = window.__plentry;
+    const pct = Math.round(p.COMMISSION * 100);
+    assert.equal(pct, 5);
+    assert.ok(document.getElementById("landing-money").textContent.includes(`store total plus ${pct}%`));
+    assert.ok(p.HOLD_BUFFER > 0, "the hold is higher than the charge");
+    assert.deepEqual([...new Set([1, 2, 3, 4, 5, 6, 7].map((n) => window.normServings(n)))].sort(), [2, 4, 6]);
+    assert.ok(document.getElementById("landing-facts").textContent.includes("For 2, 4 or 6 people"));
+    assert.deepEqual(JSON.parse(window.eval("JSON.stringify(STORES.map((s) => s.name).sort())")), ["Asda", "Sainsbury's", "Tesco", "Waitrose"]);
+    assert.ok(document.getElementById("landing-sub").textContent.includes("four supermarkets"));
+  });
+
+  it("I-L01 signed-in or onboarded visitors skip the landing", async () => {
+    const signedIn = await loadApp({ session: { id: "u-new", email: "new@example.com" } });
+    assert.ok(signedIn.document.getElementById("scr-onboard").classList.contains("active"));
+    const back = await loadApp({ localState: weekState() });
+    assert.ok(!back.document.getElementById("scr-landing").classList.contains("active"));
+  });
+});
+
+describe("invite ref (?ref=pilot)", () => {
+  function signUpSpy(window) {
+    const calls = [];
+    window.__mockSb.auth.signUp = async (args) => {
+      calls.push(args);
+      return { data: { user: { id: "u-ref" }, session: null }, error: null };
+    };
+    return calls;
+  }
+  async function signUp(window, document) {
+    window.openSignup();
+    document.getElementById("su-name").value = "Pat";
+    document.getElementById("su-email").value = "pat@example.com";
+    document.getElementById("su-pass").value = "12345678";
+    await window.submitAuth();
+  }
+
+  it("I-L02 ?ref=pilot is kept in localStorage and sent as sign-up metadata", async () => {
+    const { window, document } = await loadApp({ url: "https://getplentry.com/?ref=pilot" });
+    assert.equal(window.localStorage.getItem("plentry_ref"), "pilot");
+    const calls = signUpSpy(window);
+    await signUp(window, document);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(calls[0].options.data)), { name: "Pat", ref: "pilot" });
+  });
+
+  it("I-L02 first touch wins, junk is ignored, and no ref sends no ref", async () => {
+    const { window, document } = await loadApp({ url: "https://getplentry.com/?ref=PILOT" });
+    assert.equal(window.localStorage.getItem("plentry_ref"), "pilot");
+    window.history.replaceState(null, "", "/?ref=other");
+    assert.equal(window.captureRef(), "pilot");
+    assert.equal(window.localStorage.getItem("plentry_ref"), "pilot");
+
+    const junk = await loadApp({ url: "https://getplentry.com/?ref=%3Cscript%3E" });
+    assert.equal(junk.window.localStorage.getItem("plentry_ref"), null);
+    const calls = signUpSpy(junk.window);
+    await signUp(junk.window, junk.document);
+    assert.deepEqual(JSON.parse(JSON.stringify(calls[0].options.data)), { name: "Pat" });
+    assert.equal(junk.window.normRef("x".repeat(33)), "");
+    assert.equal(junk.window.normRef(" Pilot "), "pilot");
+  });
+
+  it("I-L02 a pilot sign-up carries ref into profiles.state.prefs; a plain login does not", async () => {
+    const tables = { meals: [], orders: [], ingredient_prices: [], profiles: [] };
+    const { window } = await loadApp({
+      tables,
+      session: { id: "u-pilot", email: "pilot@example.com", user_metadata: { name: "Pat", ref: "pilot" } },
+    });
+    assert.equal(window.__plentry.state().prefs.ref, "pilot");
+    await window.pushCloudState();
+    const row = tables.profiles.find((r) => r.id === "u-pilot");
+    assert.equal(row.state.prefs.ref, "pilot");
+
+    const plain = await loadApp({
+      url: "https://getplentry.com/?ref=pilot",
+      session: { id: "u-old", email: "old@example.com", user_metadata: { name: "Old" } },
+    });
+    assert.equal(plain.window.__plentry.state().prefs.ref, undefined);
+  });
+});
